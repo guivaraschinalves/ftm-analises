@@ -1,0 +1,291 @@
+/* FtM Dados — o escuro é o padrão (identidade dos gráficos do FtM). */
+:root {
+  --bg: #0b0b0b;
+  --surface: #151515;
+  --border: rgba(255, 255, 255, .13);
+  --ink: #f2f2f2;
+  --ink-2: rgba(255, 255, 255, .7);
+  --accent: #4BACC6;
+  --accent-wash: rgba(75, 172, 198, .16);
+  --chart-bg: #000 url("assets/fundo.jpg") center / cover no-repeat;
+  --logo: #b3b3b3;
+  --shadow: 0 10px 30px rgba(0, 0, 0, .4);
+  --font: Calibri, Carlito, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+:root[data-theme="light"] {
+  --bg: #f3f4f5;
+  --surface: #ffffff;
+  --border: #dcdfe2;
+  --ink: #1b1f23;
+  --ink-2: #5b6570;
+  --accent: #2b7f96;
+  --accent-wash: rgba(43, 127, 150, .12);
+  --chart-bg: #ffffff;
+  --logo: #595959;
+  --shadow: 0 6px 20px rgba(20, 30, 40, .08);
+}
+
+* { box-sizing: border-box; }
+html { color-scheme: dark; scroll-behavior: smooth; scroll-padding-top: 20px; }
+html[data-theme="light"] { color-scheme: light; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.45 var(--font); }
+
+/* ---------- esqueleto: barra lateral + conteúdo ---------- */
+.app { display: grid; grid-template-columns: 268px 1fr; min-height: 100vh; }
+
+.lateral {
+  position: sticky; top: 0; height: 100vh; overflow-y: auto; scrollbar-width: thin;
+  background: var(--surface); border-right: 1px solid var(--border);
+  padding: 22px 16px 20px; display: flex; flex-direction: column; gap: 18px;
+}
+.marca { display: flex; align-items: center; gap: 8px; }
+.marca-logo { display: block; color: var(--logo); flex: 1 1 auto; min-width: 0; text-decoration: none; }
+.logo { display: block; width: 118px; line-height: 0; }
+.logo svg { width: 100%; height: auto; }
+
+.icon-btn {
+  display: inline-grid; place-items: center; flex: none; width: 34px; height: 34px;
+  border-radius: 9px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--ink); cursor: pointer;
+}
+.icon-btn:hover { border-color: var(--accent); }
+.icon-btn[hidden] { display: none; }
+.ico-lua { display: none; }
+:root[data-theme="light"] .ico-sol { display: none; }
+:root[data-theme="light"] .ico-lua { display: block; }
+#tela-cheia-pagina .ico-sair { display: none; }
+#tela-cheia-pagina[aria-pressed="true"] .ico-entrar { display: none; }
+#tela-cheia-pagina[aria-pressed="true"] .ico-sair { display: block; }
+
+/* ---------- navegação (categoria > subcategoria > gráfico) ---------- */
+.nav { display: flex; flex-direction: column; gap: 4px; }
+.nav-grupo, .nav-sub { display: flex; flex-direction: column; }
+.nav-rotulo, .nav-sub-rotulo {
+  display: flex; align-items: center; gap: 6px; cursor: pointer; list-style: none;
+  padding: 6px 4px; border-radius: 8px; color: var(--ink);
+}
+.nav-rotulo::-webkit-details-marker, .nav-sub-rotulo::-webkit-details-marker { display: none; }
+.nav-rotulo { font-size: 15px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.nav-sub-rotulo { font-size: 14px; color: var(--ink-2); padding-left: 8px; }
+.nav-rotulo:hover, .nav-sub-rotulo:hover { background: var(--accent-wash); color: var(--ink); }
+.nav-conta { margin-left: auto; font-size: 12px; color: var(--ink-2); }
+.nav a {
+  display: block; padding: 5px 8px 5px 22px; border-radius: 7px;
+  color: var(--ink-2); text-decoration: none; font-size: 13.5px; line-height: 1.3;
+}
+.nav a:hover { background: var(--accent-wash); color: var(--ink); }
+.seta { flex: none; color: var(--ink-2); transition: transform .15s ease; }
+details[open] > summary > .seta, details[open] > .nav-rotulo > .seta, details[open] > .nav-sub-rotulo > .seta { transform: rotate(90deg); }
+
+.lateral-rodape {
+  margin-top: auto; padding-top: 14px; border-top: 1px solid var(--border);
+  color: var(--ink-2); font-size: 12.5px;
+}
+
+/* ---------- conteúdo ---------- */
+.conteudo { padding: 30px 26px 60px; max-width: 1400px; }
+.sobrancelha { margin: 0; color: var(--accent); font-size: 12.5px; letter-spacing: .12em; text-transform: uppercase; }
+.titulo-pagina { margin: 4px 0 6px; font-size: 30px; }
+.lede { margin: 0 0 18px; color: var(--ink-2); max-width: 70ch; }
+.graficos { display: flex; flex-direction: column; gap: 10px; }
+.estado { color: var(--ink-2); text-align: center; padding: 40px 0; }
+.estado.erro { color: #ff8d7a; }
+
+/* categoria e seção, as duas retráteis */
+.categoria { border-top: 1px solid var(--border); }
+.categoria-rotulo, .secao-rotulo {
+  display: flex; align-items: center; gap: 8px; cursor: pointer; list-style: none;
+  margin: 0; color: var(--ink);
+}
+.categoria-rotulo::-webkit-details-marker, .secao-rotulo::-webkit-details-marker { display: none; }
+.categoria-rotulo:hover, .secao-rotulo:hover { color: var(--accent); }
+.categoria-rotulo { padding: 18px 2px; font-size: 25px; font-weight: 700; }
+.categoria[open] > .categoria-rotulo { padding-bottom: 8px; }
+/* o parágrafo de abertura do assunto: é uma análise, não só um painel */
+.apresentacao { margin: 0 0 10px; padding-left: 26px; color: var(--ink-2); max-width: 78ch; line-height: 1.5; }
+.secao { padding-left: 21px; border-left: 1px solid var(--border); margin-left: 5px; }
+.secao-rotulo { padding: 10px 2px; font-size: 19px; font-weight: 700; }
+.secao-graficos { display: grid; gap: 22px; padding: 6px 0 16px; }
+
+/* ---------- cartão do gráfico (retrátil) ---------- */
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; box-shadow: var(--shadow); overflow: hidden;
+}
+.card-cabecalho {
+  display: flex; align-items: center; gap: 10px; cursor: pointer; list-style: none;
+  padding: 12px 14px;
+}
+.card-cabecalho::-webkit-details-marker { display: none; }
+.card-cabecalho:hover { background: var(--accent-wash); }
+.card-titulo { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.25; }
+.card-sub { margin: 2px 0 0; font-size: 13px; color: var(--ink-2); line-height: 1.25; }
+.card-tools {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 10px; padding: 0 14px 12px;
+}
+.card-acoes { display: flex; align-items: center; gap: 8px; }
+.card-escolhas { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.card-escolhas .periodos + .periodos { border-left: 1px solid var(--border); padding-left: 12px; }
+.card-escolhas .periodos[hidden] { display: none; }
+.periodos { display: flex; flex-wrap: wrap; gap: 6px; }
+.periodos button, .btn {
+  font: inherit; font-size: 14px; color: var(--ink-2); cursor: pointer;
+  background: transparent; border: 1px solid var(--border); border-radius: 8px; padding: 5px 11px;
+}
+.periodos button:hover, .btn:hover { color: var(--ink); border-color: var(--accent); }
+.periodos button[aria-pressed="true"] { color: var(--ink); background: var(--accent-wash); border-color: var(--accent); }
+.btn { display: inline-flex; align-items: center; gap: 7px; color: var(--ink); }
+
+.baixar { position: relative; }
+.menu {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 5; min-width: 260px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: var(--shadow); padding: 6px;
+}
+.menu[hidden] { display: none; }
+.menu button {
+  display: block; width: 100%; text-align: left; font: inherit; font-size: 14px;
+  color: var(--ink); background: none; border: 0; border-radius: 7px; padding: 8px 10px; cursor: pointer;
+}
+.menu button:hover, .menu button:focus-visible { background: var(--accent-wash); outline: none; }
+.menu small { display: block; color: var(--ink-2); font-size: 12px; }
+.menu-rotulo { display: block; padding: 6px 10px 8px; font-size: 12px; color: var(--ink-2); }
+.menu-tamanho {
+  display: block; width: 100%; margin-top: 4px; font: inherit; font-size: 14px; color: var(--ink);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 7px; padding: 6px 8px;
+}
+.menu hr { border: 0; border-top: 1px solid var(--border); margin: 6px 4px; }
+
+.frame { position: relative; background: var(--chart-bg); border-top: 1px solid var(--border); }
+.frame svg { display: block; width: 100%; height: auto; touch-action: pan-y; }
+.nota { margin: 0; padding: 10px 14px; color: var(--ink-2); font-size: 14px; border-top: 1px solid var(--border); }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- visor: um gráfico grande, com anotação à mão ---------- */
+body.visor-aberto { overflow: hidden; }
+.visor {
+  position: fixed; inset: 0; z-index: 100; background: rgba(6, 6, 6, .9);
+  display: flex; align-items: center; justify-content: center; padding: 56px 24px;
+}
+.visor[hidden] { display: none; }
+
+/* O palco tem a proporção do layout desenhado (--ar): a largura é a menor
+   entre a que cabe na janela e a que a altura permite, e o SVG e o canvas de
+   anotação ocupam 100% dele — assim os dois ficam sempre sobrepostos. */
+.visor-palco {
+  position: relative; line-height: 0; aspect-ratio: var(--ar, 1.7778);
+  width: min(calc(100vw - 48px), calc((100vh - 118px) * var(--ar, 1.7778)));
+  background: var(--chart-bg); border-radius: 8px; overflow: hidden;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .5);
+}
+.visor-palco svg { display: block; width: 100%; height: 100%; }
+.visor-tela { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; pointer-events: none; }
+.visor.desenhando .visor-tela { pointer-events: auto; cursor: crosshair; }
+
+.visor-barra {
+  position: absolute; top: 16px; left: 22px; z-index: 1;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; max-width: calc(100% - 90px);
+}
+.visor-barra-inline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.visor-btn {
+  font: inherit; font-size: 14px; color: #fff; cursor: pointer;
+  background: rgba(255, 255, 255, .1); border: 1px solid rgba(255, 255, 255, .25);
+  border-radius: 7px; padding: 6px 12px;
+}
+.visor-btn:hover { background: rgba(255, 255, 255, .2); }
+.visor-btn[aria-pressed="true"] { background: rgba(255, 255, 255, .28); border-color: #fff; }
+.visor-dica { font-size: 13px; color: rgba(255, 255, 255, .62); }
+
+/* O menu de hambúrguer só existe em tela cheia (regras :fullscreen abaixo):
+   fora dela os botões ficam soltos na margem escura, sem atrapalhar nada. */
+.visor-menu-caixa { display: none; position: relative; }
+.visor-menu-btn {
+  color: #fff; cursor: pointer; width: 34px; height: 34px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, .1); border: 1px solid rgba(255, 255, 255, .25); border-radius: 7px;
+}
+.visor-menu-btn:hover, .visor-menu-btn[aria-expanded="true"] { background: rgba(255, 255, 255, .24); }
+.visor-menu {
+  position: absolute; top: calc(100% + 8px); left: 0; z-index: 2;
+  display: flex; flex-direction: column; gap: 2px; min-width: 200px;
+  background: rgba(10, 10, 10, .94); border: 1px solid rgba(255, 255, 255, .2);
+  border-radius: 10px; padding: 6px; box-shadow: 0 14px 34px rgba(0, 0, 0, .5);
+}
+.visor-menu[hidden] { display: none; }
+.visor-menu button {
+  font: inherit; font-size: 14px; color: #fff; text-align: left;
+  background: none; border: 0; border-radius: 6px; padding: 9px 10px; cursor: pointer;
+}
+.visor-menu button:hover { background: rgba(255, 255, 255, .14); }
+
+/* z-index: o palco vem depois no HTML e é position:relative — sem isto, um
+   controle que caia dentro da área do gráfico fica escondido atrás dele */
+.visor-fechar {
+  position: absolute; z-index: 1; top: 16px; right: 22px; width: 38px; height: 38px; border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, .25); background: rgba(255, 255, 255, .08); color: #fff;
+  font-size: 16px; line-height: 1; cursor: pointer;
+}
+.visor-fechar:hover { background: rgba(255, 255, 255, .18); }
+.visor-baixar {
+  position: absolute; z-index: 1; bottom: 18px; left: 50%; transform: translateX(-50%);
+  font: inherit; font-size: 14px; color: #fff; cursor: pointer;
+  background: rgba(255, 255, 255, .1); border: 1px solid rgba(255, 255, 255, .25);
+  border-radius: 7px; padding: 6px 14px;
+}
+.visor-baixar:hover { background: rgba(255, 255, 255, .2); }
+
+/* Tela cheia: o gráfico vale a tela inteira e os controles passam a flutuar
+   sobre ele — daí o fundo escuro opaco, o menu de hambúrguer no lugar dos
+   botões soltos e o sumiço automático depois de um tempo parado.
+   `:fullscreen` e `:-webkit-full-screen` em blocos separados de propósito: um
+   seletor desconhecido dentro de uma lista invalida a lista inteira. */
+.visor:fullscreen { padding: 0; background: #060606; }
+.visor:-webkit-full-screen { padding: 0; background: #060606; }
+.visor:fullscreen .visor-palco {
+  width: min(100vw, calc(100vh * var(--ar, 1.7778))); border-radius: 0; box-shadow: none;
+}
+.visor:-webkit-full-screen .visor-palco {
+  width: min(100vw, calc(100vh * var(--ar, 1.7778))); border-radius: 0; box-shadow: none;
+}
+.visor:fullscreen .visor-btn, .visor:fullscreen .visor-menu-btn,
+.visor:fullscreen .visor-fechar, .visor:fullscreen .visor-baixar { background: rgba(6, 6, 6, .74); }
+.visor:-webkit-full-screen .visor-btn, .visor:-webkit-full-screen .visor-menu-btn,
+.visor:-webkit-full-screen .visor-fechar, .visor:-webkit-full-screen .visor-baixar { background: rgba(6, 6, 6, .74); }
+.visor:fullscreen .visor-dica { color: rgba(255, 255, 255, .85); text-shadow: 0 1px 3px #060606; }
+.visor:-webkit-full-screen .visor-dica { color: rgba(255, 255, 255, .85); text-shadow: 0 1px 3px #060606; }
+.visor:fullscreen .visor-barra-inline { display: none; }
+.visor:-webkit-full-screen .visor-barra-inline { display: none; }
+.visor:fullscreen .visor-menu-caixa { display: flex; }
+.visor:-webkit-full-screen .visor-menu-caixa { display: flex; }
+
+.visor:fullscreen .visor-barra, .visor:fullscreen .visor-fechar, .visor:fullscreen .visor-baixar {
+  transition: opacity .25s ease;
+}
+.visor:fullscreen.chrome-oculto .visor-barra,
+.visor:fullscreen.chrome-oculto .visor-fechar,
+.visor:fullscreen.chrome-oculto .visor-baixar { opacity: 0; pointer-events: none; }
+.visor:-webkit-full-screen.chrome-oculto .visor-barra,
+.visor:-webkit-full-screen.chrome-oculto .visor-fechar,
+.visor:-webkit-full-screen.chrome-oculto .visor-baixar { opacity: 0; pointer-events: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .seta { transition: none; }
+  .visor:fullscreen .visor-barra, .visor:fullscreen .visor-fechar, .visor:fullscreen .visor-baixar { transition: none; }
+}
+
+@media (max-width: 860px) {
+  .app { grid-template-columns: 1fr; }
+  .lateral { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+  .conteudo { padding: 20px 14px 50px; }
+  .lateral-rodape { margin-top: 10px; }
+  .card-tools { padding: 0 10px 10px; }
+  .visor { padding: 44px 10px; }
+  .visor-palco { width: min(calc(100vw - 20px), calc((100vh - 96px) * var(--ar, 1.7778))); }
+}

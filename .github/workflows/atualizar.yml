@@ -1,0 +1,41 @@
+name: Atualiza os dados
+
+on:
+  schedule:
+    # 21:30 UTC (18:30 em Brasília), todo dia. O FRED publica o DGS10 do dia
+    # por volta das 16h de Nova York, depois do fechamento do mercado de juros.
+    - cron: "30 21 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atualizar-dados
+  cancel-in-progress: false
+
+jobs:
+  atualizar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Só biblioteca padrão: nada para instalar.
+      - name: Taxa de 10 anos dos EUA — baixa as séries do FRED
+        run: python scripts/juros_eua.py
+
+      - name: Commita, se algum número mudou
+        run: |
+          if git diff --quiet -- dados; then
+            echo "Nada mudou."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dados
+          git commit -m "Atualiza os dados"
+          git push
