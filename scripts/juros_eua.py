@@ -143,10 +143,14 @@ def baixar_intradiario():
         except Exception as e:
             print("  [!] intradiário %s não veio: %s" % (intervalo, e))
             continue
-        for linha in bruto.get("data", []):
+        linhas = bruto.get("data", [])
+        for linha in linhas:
             ms, fecha = linha[0], linha[4]
             t = datetime.datetime.fromtimestamp(ms / 1000, datetime.timezone.utc).astimezone(NOVA_YORK)
             pontos[t.strftime("%Y-%m-%dT%H:%M")] = round(float(fecha), 3)
+        # sem esta linha, "0 novos" no acervo seria ambíguo: fonte fora do ar ou
+        # só nada de novo desde a última rodada?
+        print("  intradiário %s: %d cotações baixadas" % (intervalo, len(linhas)))
     return pontos
 
 
