@@ -138,6 +138,18 @@
   // eixo diário: o índice é o dia corrido (UTC, para não pegar fuso nem horário de verão)
   function idxDia(iso) { var p = iso.split("-"); return Math.round(Date.UTC(+p[0], +p[1] - 1, +p[2]) / 86400000); }
   function dataDeIdx(i) { return new Date(i * 86400000); }
+  // eixo intradiário: o índice é o bloco de 15 minutos. A chave é a hora de
+  // Nova York escrita por extenso ("2026-09-16T14:00") e lida como se fosse
+  // UTC — o que importa é o espaçamento, e assim o rótulo sai direto da chave,
+  // sem conta de fuso no navegador. (Na virada do horário de verão americano a
+  // hora repetida some: o script grava uma chave só.)
+  var BLOCO = 900000;
+  function idxIntra(k) {
+    var p = k.split("T"), d = p[0].split("-"), h = (p[1] || "00:00").split(":");
+    return Math.round(Date.UTC(+d[0], +d[1] - 1, +d[2], +h[0], +h[1]) / BLOCO);
+  }
+  function dataDeIdxIntra(i) { return new Date(i * BLOCO); }
+  function hhmm(d) { return d.getUTCHours() + "h" + ("0" + d.getUTCMinutes()).slice(-2); }
   function mesDeIdx(i) { return Math.floor(i / 12) + "-" + ("0" + (i % 12 + 1)).slice(-2); }
   function rotuloMesCurto(i) { return MESES[i % 12] + "/" + String(Math.floor(i / 12)).slice(-2); }
   function rotuloMesLongo(i) { return MESES_LONGOS[i % 12] + " de " + Math.floor(i / 12); }
@@ -145,10 +157,15 @@
   // Eixo X: normalmente é o tempo (um passo por mês); com "categorias" no
   // gráfico, é uma lista de rótulos (o acumulado do cronograma de vencimentos).
   function idxDe(g, chave) {
-    return g.categorias ? +chave : g.diario ? idxDia(chave) : idxMes(chave);
+    return g.categorias ? +chave : g.intradiario ? idxIntra(chave) : g.diario ? idxDia(chave) : idxMes(chave);
   }
   function rotuloX(g, i, longo) {
     if (g.categorias) return g.categorias[i] || "";
+    if (g.intradiario) {
+      var t = dataDeIdxIntra(i), dia = t.getUTCDate(), mes = t.getUTCMonth();
+      if (!longo) return dia + "/" + ("0" + (mes + 1)).slice(-2);
+      return dia + " de " + MESES_LONGOS[mes].toLowerCase() + ", " + hhmm(t);
+    }
     if (g.diario) {
       var d = dataDeIdx(i);
       if (!longo) return MESES[d.getUTCMonth()] + "/" + String(d.getUTCFullYear()).slice(-2);
@@ -158,7 +175,7 @@
   }
   // Quantos passos do eixo cabem num ano — o que separa "mês" de "dia" nas
   // contas de período (Tudo / 10 anos / 5 anos…).
-  function passosPorAno(g) { return g.diario ? 365.25 : 12; }
+  function passosPorAno(g) { return g.intradiario ? 365.25 * 96 : g.diario ? 365.25 : 12; }
 
   // Um cartão pode ter variantes (agência, moeda, "% ou R$"…): o gráfico que
   // vale é a base com a variante escolhida por cima. O objeto fica guardado
@@ -273,6 +290,41 @@
     });
     Object.keys(pilhaPos).forEach(function (i) { mx = Math.max(mx, pilhaPos[i]); mn = Math.min(mn, 0); });
     Object.keys(pilhaNeg).forEach(function (i) { mn = Math.min(mn, pilhaNeg[i]); });
+    // Acontecimentos: cada um ganha uma linha vertical e um rótulo curto no
+    // alto do gráfico. Os rótulos entram em fileiras — a próxima fileira só é
+    // usada quando o texto encostaria no anterior — e quem cai perto da borda
+    // direita escreve para a esquerda da linha.
+    var fsEv = Math.round(L.xlab * 0.95);
+    var eventos = (g.eventos || []).map(function (e) {
+      return { i: idxDe(g, e.em), rot: e.rot };
+    }).filter(function (e) {
+      return e.i >= d0 && e.i < d1;
+    }).sort(function (a, b) { return a.i - b.i; });
+    function disporEventos(fx, xDir) {
+      var fimFileira = [];
+      return eventos.map(function (e) {
+        var xe = fx(e.i + 0.5), w = largura(e.rot, fsEv), paraEsq = xe + w + 10 > xDir;
+        var ini = paraEsq ? xe - w - 8 : xe + 6, fila = 0;
+        while (fimFileira[fila] !== undefined && ini < fimFileira[fila] + 12) fila++;
+        fimFileira[fila] = ini + w;
+        return { i: e.i, rot: e.rot, x: xe, paraEsq: paraEsq, fila: fila,
+                 y: y0 + fsEv * (1 + fila * 1.25) };
+      });
+    }
+
+    // Antes de fechar a escala, abre espaço no alto para esses rótulos: sem
+    // isso eles caem em cima da linha justamente quando a taxa está no topo.
+    // Duas passadas, porque a largura do eixo depende da escala e a posição do
+    // rótulo depende da largura — a primeira é só para contar as fileiras.
+    if (eventos.length && mx > mn) {
+      var esc0 = escalaY(mn, mx, g.eixo);
+      var tw0 = Math.max.apply(null, esc0.ticks.map(function (t) { return largura(F.eixo(t, esc0.passo), L.tick); }));
+      var xa = 26 + tw0 + 14, xb = L.W - (22 + (L.eixoDuplo ? tw0 + 14 : 0) + 60);
+      var filas = disporEventos(function (i) { return xa + (i - d0) / (d1 - d0) * (xb - xa); }, xb)
+        .reduce(function (n, e) { return Math.max(n, e.fila + 1); }, 0);
+      var folga = (filas * fsEv * 1.25 + fsEv * 0.8) / (L.y1 - y0);
+      mx = mn + (mx - mn) / (1 - Math.min(0.45, folga));
+    }
     var esc = escalaY(mn, mx, g.eixo);
 
     var tw = Math.max.apply(null, esc.ticks.map(function (t) { return largura(F.eixo(t, esc.passo), L.tick); }));
@@ -347,6 +399,23 @@
           "text-anchor": "middle", "dominant-baseline": "hanging"
         }));
       }
+    } else if (g.intradiario) {
+      // janela longa: a virada de cada dia; janela curta: de hora em hora
+      var marcasI = [], porDia = d1 - d0 > 96 * 4;
+      var passoI = porDia ? 96 : 4;
+      for (var ii = Math.ceil(d0 / passoI) * passoI; ii < d1; ii += passoI) marcasI.push(ii);
+      var espacoI = marcasI.length > 1 ? pw / (marcasI.length - 1) : pw;
+      var puloI = Math.max(1, Math.ceil(L.xlab * 1.4 / espacoI));
+      [1, 2, 3, 4, 6, 8, 12, 24].some(function (n) { if (n >= puloI) { puloI = n; return true; } });
+      marcasI.forEach(function (im, k4) {
+        if (k4 % puloI !== 0) return;
+        var cxi = X(im + 0.5), t = dataDeIdxIntra(im);
+        svg.appendChild(el("line", { x1: cxi, x2: cxi, y1: L.y1, y2: L.y1 + 7, stroke: pal.zero, "stroke-width": 1.5 }));
+        svg.appendChild(texto(porDia ? t.getUTCDate() + "/" + ("0" + (t.getUTCMonth() + 1)).slice(-2) : hhmm(t), {
+          x: cxi + 4, y: L.y1 + 16, "font-size": L.xlab, fill: pal.eixo, "text-anchor": "end",
+          "dominant-baseline": "hanging", transform: "rotate(" + L.xRot + " " + (cxi + 4) + " " + (L.y1 + 16) + ")"
+        }));
+      });
     } else if (g.diario) {
       // 1º de janeiro de cada ano (de 1, 2, 5 ou 10 em 10, conforme couber);
       // em janela curta, o primeiro dia de cada mês
@@ -402,6 +471,21 @@
       }
     }
 
+    // acontecimentos: linha vertical fina na data, rótulo curto no alto. A
+    // disposição já foi calculada (as fileiras), então aqui é só desenhar; o
+    // texto vai por cima da linha do gráfico, no fim.
+    var rotulosEventos = [];
+    disporEventos(X, L.x1).forEach(function (e) {
+      svg.appendChild(el("line", {
+        x1: e.x, x2: e.x, y1: e.y + fsEv * 0.3, y2: L.y1,
+        stroke: pal.suave, "stroke-width": 1.2, "stroke-dasharray": "3 7", opacity: 0.75
+      }));
+      rotulosEventos.push(texto(e.rot, {
+        x: e.paraEsq ? e.x - 8 : e.x + 6, y: e.y, "font-size": fsEv, fill: pal.suave,
+        "text-anchor": e.paraEsq ? "end" : "start"
+      }));
+    });
+
     // barras empilhadas
     var area = el("g", { "clip-path": "url(#" + idClip + ")" });
     svg.appendChild(area);
@@ -425,7 +509,9 @@
     // linhas, na ordem da lista (a última fica por cima)
     // no eixo diário, todo fim de semana é um salto de 3 dias: a linha só corta
     // quando o buraco for maior que isso (ali o título não estava em oferta)
-    var buracoMax = g.buracoMax || (g.diario ? 6 : 1);
+    // no intradiário o pregão é quase 24 h: só o fim de semana (mais de 2 h
+    // sem cotação) corta a linha
+    var buracoMax = g.buracoMax || (g.intradiario ? 8 : g.diario ? 6 : 1);
     g.series.forEach(function (s, k) {
       if (s.tipo === "barra" || !vis[k].length) return;
       var d = "", ant = null;
@@ -494,6 +580,8 @@
       svg.appendChild(gl);
     }
 
+    rotulosEventos.forEach(function (t) { svg.appendChild(t); });
+
     return { svg: svg, L: L, pal: pal, X: X, Y: Y, d0: d0, d1: d1, vis: vis, esc: esc };
   }
 
@@ -514,16 +602,20 @@
       pt.x = ev.clientX; pt.y = ev.clientY;
       var p = pt.matrixTransform(svg.getScreenCTM().inverse());
       var i = Math.floor(desenho.d0 + (p.x - L.x0) / (L.x1 - L.x0) * (desenho.d1 - desenho.d0));
-      if (g.diario) {
-        // fim de semana e feriado não têm pregão: vale o último dia com taxa
-        for (var volta = 0; volta < 7; volta++) {
+      if (g.diario || g.intradiario) {
+        // fim de semana e feriado não têm pregão: vale a última cotação antes
+        var limite = g.intradiario ? 9 : 7;
+        for (var volta = 0; volta < limite; volta++) {
           var achou = porSerie.some(function (m) { return m[i - volta] !== undefined; });
           if (achou) { i -= volta; break; }
         }
       }
+      // ficar fora da legenda não é ficar fora da caixa: o que sai daqui é a
+      // série repetida (mesmo nome), como as duas metades de uma banda
       var linhas = [];
       g.series.forEach(function (s, k) {
-        if (s.legenda === false || porSerie[k][i] === undefined) return;
+        if (porSerie[k][i] === undefined) return;
+        if (linhas.some(function (l) { return l.s.nome === s.nome; })) return;
         linhas.push({ s: s, v: porSerie[k][i] });
       });
       limpar();
@@ -897,15 +989,24 @@
   }
   function periodosDisponiveis(g) {
     if (g.categorias) return [];   // eixo de categorias não tem janela de tempo
-    var e = extensao(g), passo = passosPorAno(g), anos = (e.fim - e.ini + 1) / passo;
-    var lista = [{ id: "tudo", rot: "Tudo" }];
+    var e = extensao(g), lista = [{ id: "tudo", rot: "Tudo" }];
+    if (g.intradiario) {           // no intradiário a janela se conta em dias
+      var dias = (e.fim - e.ini + 1) / 96;
+      [10, 5, 2, 1].forEach(function (d) {
+        if (dias > d * 1.3) lista.push({ id: "d" + d, rot: d === 1 ? "1 dia" : d + " dias" });
+      });
+      return lista;
+    }
+    var anos = (e.fim - e.ini + 1) / passosPorAno(g);
     (g.diario ? [20, 10, 5, 2, 1] : [20, 10, 5]).forEach(function (a) {
       if (anos > a * 1.1) lista.push({ id: String(a), rot: a === 1 ? "1 ano" : a + " anos" });
     });
     return lista;
   }
   function inicioDoPeriodo(g, id) {
-    return id === "tudo" ? null : extensao(g).fim - Math.round((+id) * passosPorAno(g)) + 1;
+    if (id === "tudo") return null;
+    if (id.charAt(0) === "d") return extensao(g).fim - (+id.slice(1)) * 96 + 1;
+    return extensao(g).fim - Math.round((+id) * passosPorAno(g)) + 1;
   }
 
   function criarCartao(g) {
@@ -987,6 +1088,19 @@
     cartao.frame = html("div", { "class": "frame" });
     raiz.appendChild(cartao.frame);
     if (g.nota) raiz.appendChild(html("p", { "class": "nota", texto: g.nota }));
+    // o gráfico leva o rótulo curto do acontecimento; a explicação inteira fica
+    // aqui embaixo, em lista, na ordem em que aconteceu
+    var comTexto = (g.eventos || []).filter(function (e) { return e.texto; });
+    if (comTexto.length) {
+      var lista = html("ul", { "class": "eventos" });
+      comTexto.forEach(function (e) {
+        var li = html("li", {});
+        li.appendChild(html("b", { texto: e.quando || e.rot }));
+        li.appendChild(document.createTextNode(" — " + e.texto));
+        lista.appendChild(li);
+      });
+      raiz.appendChild(lista);
+    }
 
     // fechado não tem largura: o desenho espera o cartão abrir
     raiz.addEventListener("toggle", function () {
@@ -1178,7 +1292,7 @@
       var n = s.nome.replace(/;/g, ",");
       return cols.filter(function (t, j) { return j < k && t.nome === s.nome; }).length ? n + " (2)" : n;
     });
-    var linhas = [(g.categorias ? "faixa" : g.diario ? "data" : "mes") + ";" + nomes.join(";")];
+    var linhas = [(g.categorias ? "faixa" : g.intradiario ? "hora" : g.diario ? "data" : "mes") + ";" + nomes.join(";")];
     Object.keys(meses).sort().forEach(function (m) {
       linhas.push((g.categorias ? g.categorias[+m] : m) + ";" + mapas.map(function (mp) {
         return mp[m] === undefined ? "" : String(mp[m]).replace(".", ",");

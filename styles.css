@@ -160,6 +160,11 @@ details[open] > summary > .seta, details[open] > .nav-rotulo > .seta, details[op
 .frame { position: relative; background: var(--chart-bg); border-top: 1px solid var(--border); }
 .frame svg { display: block; width: 100%; height: auto; touch-action: pan-y; }
 .nota { margin: 0; padding: 10px 14px; color: var(--ink-2); font-size: 14px; border-top: 1px solid var(--border); }
+/* os acontecimentos marcados no gráfico, por extenso */
+.eventos { margin: 0; padding: 10px 14px 14px 32px; color: var(--ink-2); font-size: 14px; line-height: 1.5; border-top: 1px solid var(--border); }
+.eventos li { margin: 0 0 4px; }
+.eventos li:last-child { margin-bottom: 0; }
+.eventos b { color: var(--ink); font-weight: 700; }
 
 .sr-only {
   position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;

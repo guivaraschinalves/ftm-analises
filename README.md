@@ -9,7 +9,10 @@ No ar: <https://guivaraschinalves.github.io/ftm-analises/>
 
 | Assunto | Dados | De onde vêm |
 |---|---|---|
-| **Taxa de 10 anos dos EUA** | `dados/juros-eua.json` | Baixados **sozinhos** todo dia do FRED (St. Louis Fed), séries `DGS10` e `GS10` |
+| **Taxa de 10 anos dos EUA** | `dados/juros-eua.json` | Baixados **sozinhos** todo dia do FRED (St. Louis Fed), séries `DGS10` e `GS10`, e do investing.com (intradiário) |
+
+O acervo intradiário fica à parte, em `dados/intradiario-10a.json`: é o arquivo
+que **acumula** as cotações de 15 em 15 minutos (veja abaixo).
 
 O motor de desenho é o mesmo do [ftm-dados](https://github.com/guivaraschinalves/ftm-dados):
 
@@ -27,7 +30,8 @@ O motor de desenho é o mesmo do [ftm-dados](https://github.com/guivaraschinalve
 
 ## A taxa de 10 anos dos EUA
 
-Dois gráficos: a história inteira e o ano corrente, com os dados do **FRED**.
+Três gráficos: a história inteira, o ano corrente e o mês em detalhe. Os dois
+primeiros vêm do **FRED**; o terceiro é intradiário e vem de outra fonte.
 
 **Por que o CSV e não a API.** O FRED tem duas portas para o mesmo dado: a API
 JSON (`api.stlouisfed.org`), que **exige chave** — sem `api_key` ela responde
@@ -58,7 +62,48 @@ em 0,3 s. Não acrescente `User-Agent` em `scripts/juros_eua.py`.
   é outro instrumento, não dá para emendar na mesma linha.)
 
 O gráfico do ano corrente é a série diária filtrada pelo ano em `ANO_RECENTE`
-(hoje 2026) — virado o ano, é só mudar essa constante.
+(hoje 2026) — virado o ano, é só mudar essa constante. O do mês em detalhe sai
+de `MES_DETALHE` (hoje `2026-09`).
+
+### O intradiário
+
+O FRED não tem dado intradiário: o `DGS10` é **uma cotação por dia**, a das
+15h30 de Nova York. Para o gráfico do mês, a fonte é o endpoint de gráfico do
+**investing.com** (id 23705), que responde sem chave desde que a requisição
+mande o header `Domain-Id: www`. Duas coisas importam:
+
+- **a janela é curta.** O endpoint devolve no máximo 744 pontos: ~1 mês de
+  cotação horária (`PT1H`) ou ~13 dias de 15 em 15 minutos (`PT15M`). Por isso
+  existe o acervo `dados/intradiario-10a.json`, que **só cresce**: cada rodada
+  junta o que baixou ao que já estava guardado, e o gráfico é montado do
+  acervo. **O que não for guardado hoje não volta mais** — se o site ficar um
+  mês sem rodar, aquele mês fica sem intradiário;
+- **não é o dado oficial.** É a cotação de mercado do papel, não o cálculo do
+  Tesouro. O script compara as duas todo dia e imprime o resultado: na primeira
+  carga, 20 dias conferidos, diferença média de **0,007 p.p.** e máxima de
+  0,018 p.p. A linha atravessa a madrugada porque o Treasury é negociado na
+  Ásia e na Europa; o corte no fim de semana é o mercado fechado.
+
+A hora gravada é a de **Nova York** (é nela que saem o dado e a decisão do
+Fed). A chave é o horário escrito por extenso (`2026-09-16T14:00`) e o
+navegador a lê como se fosse UTC: o que importa é o espaçamento, e assim o
+rótulo sai direto da chave, sem conta de fuso. Na virada do horário de verão
+americano a hora repetida vira uma chave só.
+
+Se a fonte intradiária cair, o script segue: mantém o acervo e continua
+atualizando o resto.
+
+### Os acontecimentos marcados
+
+Os dois gráficos de 2026 levam uma linha do tempo: linha vertical na data,
+rótulo curto no gráfico e a explicação inteira na lista embaixo do cartão, com
+a fonte de cada uma. As listas estão em `EVENTOS_ANO` e `EVENTOS_MES`, no
+script — **escritas na mão**, com data e número conferidos na fonte citada.
+Nada ali é deduzido do próprio gráfico, e a nota do cartão diz o que a marca
+significa: coincidência de data, não prova de causa.
+
+No gráfico do mês a hora entra na marca (`2026-09-16T14:00`), então o dado das
+8h30 e a decisão do Fed das 14h caem no ponto exato do salto.
 
 ## Para acrescentar um assunto
 
@@ -86,6 +131,9 @@ O formato do JSON:
       "titulo": "…", "subtitulo": "…",
       "unidade": "%",                      // "%", "bi" (R$ bilhões) ou "anos"
       "diario": true,                      // eixo X em dias; sem isso, mensal
+      "intradiario": true,                 // eixo X em blocos de 15 min (chave "AAAA-MM-DDTHH:MM")
+      "eventos": [{ "em": "2026-09-16T14:00", "rot": "Fed sobe o juro",
+                    "quando": "16 de setembro, 14h", "texto": "…" }],
       "series": [{ "nome": "10 anos", "cor": "#FFFFFF",
                    "dados": [["1962-01-02", 4.06]],
                    "rotulo": true,          // valor do último ponto na ponta da linha
@@ -116,7 +164,7 @@ python3 -m http.server 8000   # http://localhost:8000
 ```
 index.html  styles.css  app.js
 assets/     fundo.jpg (fundo dos slides do FtM), logo-ftm.svg, favicon.svg
-dados/      juros-eua.json (gerado)
-scripts/    juros_eua.py (FRED, automático)
+dados/      juros-eua.json (gerado) + intradiario-10a.json (o acervo que acumula)
+scripts/    juros_eua.py (FRED e intradiário, automático)
 .github/workflows/atualizar.yml
 ```
