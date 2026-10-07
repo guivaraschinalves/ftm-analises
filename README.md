@@ -10,6 +10,7 @@ No ar: <https://guivaraschinalves.github.io/ftm-analises/>
 | Assunto | Dados | De onde vêm |
 |---|---|---|
 | **Taxa de 10 anos dos EUA** | `dados/juros-eua.json` | Baixados **sozinhos** todo dia do FRED (St. Louis Fed), séries `DGS10` e `GS10`, e do investing.com (intradiário) |
+| **A bolsa nas eleições presidenciais** | `dados/eleicoes.json` | Baixados da API aberta do Ipeadata (Ibovespa diário desde 1993); `scripts/eleicoes.py`, rodado à mão |
 
 O acervo intradiário fica à parte, em `dados/intradiario-10a.json`: é o arquivo
 que **acumula** as cotações de 15 em 15 minutos (veja abaixo).
@@ -168,3 +169,60 @@ dados/      juros-eua.json (gerado) + intradiario-10a.json (o acervo que acumula
 scripts/    juros_eua.py (FRED e intradiário, automático)
 .github/workflows/atualizar.yml
 ```
+
+## A bolsa nas eleições presidenciais
+
+`python3 scripts/eleicoes.py` baixa da API OData aberta do Ipeadata (sem chave)
+e grava `dados/eleicoes.json`. Não entra na Action: a amostra só muda de quatro
+em quatro anos.
+
+| Série | O que é |
+|---|---|
+| `GM366_IBVSP366` | Ibovespa, fechamento diário, desde 27/04/1993 |
+| `GM366_IBVSPV366` | Ibovespa, volatilidade — **só conferência**, ver abaixo |
+
+São 8 eleições e **14 turnos** (1994 e 1998 foram decididas no 1º turno), contra
+8.315 pregões de base.
+
+### Quatro decisões de método que mudam o resultado
+
+- **A volatilidade do Ipea não entra nas contas.** Ela é desvio-padrão móvel de
+  ~21 pregões — o script confere isso a cada rodada (correlação 1,000 com o
+  nosso cálculo) e aborta se deixar de ser. Como olha um mês para trás, no dia
+  seguinte à eleição ela ainda é quase toda feita de dias anteriores a ela. A
+  volatilidade usada aqui é recalculada dos fechamentos, com janelas
+  explícitas.
+- **A janela do 2º turno se sobrepõe ao 1º.** Os turnos distam 13 a 18 pregões,
+  então "os 21 pregões antes do 2º turno" incluem o 1º turno e sua agitação.
+  Comparar esse "antes" contaminado com um "depois" limpo faz a volatilidade
+  parecer cair por construção: na janela suja ela cai em **5 de 6** segundas
+  voltas, na limpa em **3 de 6**. O gráfico mostra os dois recortes.
+- **Tudo é normalizado pelo desvio-padrão do próprio ano.** Um movimento de 3%
+  em 1994, quando a bolsa andava 3,9% por dia, não é o mesmo que 3% em 2010,
+  quando andava 1,3%. Sem essa correção os anos 1990 dominam qualquer média.
+- **Nada de teste t.** Com 6 a 8 casos por grupo, os testes são de sinal
+  (binomial) e de permutação, que não supõem formato de distribuição. As
+  comparações de retorno são contra a distribuição de **todas** as janelas do
+  mesmo tamanho desde 1993, por percentil.
+
+### O que a análise achou — e o que não achou
+
+Não existe: direção previsível (7/14 altas, p=1,00), volatilidade elevada antes
+da eleição (8/14 acima do normal do ano, p=0,79), rali entre os turnos (+1,45%
+contra base de +2,18%) nem retorno anormal em qualquer janela de −60 a +60
+pregões (percentis 46 a 58).
+
+Existe: o dia seguinte é um dia grande (mediana de 1,42 desvios-padrão do ano;
+só 13% dos pregões do ano se mexem mais) e, o principal, **a agitação sobe
+quando o 1º turno não resolve a disputa** — razão de 1,27 contra 0,92 nas
+votações que definiram o presidente, permutação p=0,029. A incerteza se resolve
+quando o presidente é definido, não quando há eleição.
+
+### Por que não há gráfico do preço em torno da eleição
+
+Porque não há o que mostrar. O retorno acumulado em qualquer janela ao redor da
+votação cai entre os percentis 46 e 58 de todas as janelas do mesmo tamanho —
+indistinguível de um trecho qualquer da série. Desenhar o caminho médio do
+índice produziria uma linha serrilhada que o leitor leria como padrão, e os
+testes negam que haja um. O gráfico de caminho é o da **volatilidade**, que é
+onde a diferença aparece e que é lisa por construção.

@@ -71,7 +71,7 @@
   // Um arquivo por assunto. Cada um traz assunto, fonte, data de referência,
   // uma apresentação e as suas seções; um que faltar é só ignorado. A ordem
   // aqui é a ordem da página.
-  var FONTES = ["dados/juros-eua.json"];
+  var FONTES = ["dados/juros-eua.json", "dados/eleicoes.json"];
   var docs = [];
   var logoSvg = null;   // {viewBox, nos}
 
@@ -130,7 +130,13 @@
     bi: { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
           valor: function (v) { return "R$ " + nf(1).format(v) + " bi"; } },
     anos: { eixo: function (v, passo) { return nf(Math.max(1, casasDoPasso(passo))).format(v); },
-            valor: function (v) { return nf(2).format(v) + " anos"; } }
+            valor: function (v) { return nf(2).format(v) + " anos"; } },
+    // desvio-padrão: o tamanho do movimento medido na régua do próprio ano
+    dp: { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
+          valor: function (v) { return nf(2).format(v) + " dp"; } },
+    // razão entre duas medidas (volatilidade depois ÷ antes)
+    x: { eixo: function (v, passo) { return nf(Math.max(1, casasDoPasso(passo))).format(v); },
+         valor: function (v) { return nf(2).format(v) + "\u00d7"; } }
   };
   function unidade(g) { return UNIDADES[g.unidade] || UNIDADES["%"]; }
 
@@ -217,7 +223,10 @@
   function escalaY(mn, mx, eixo) {
     eixo = eixo || {};
     var baixo = mn, alto = mx;
-    if (mn >= 0 && mn <= mx * 0.6) baixo = 0;
+    // Série que não chega perto de zero pede "zero: false": aí o piso acompanha
+    // os dados, em vez de descer até zero e espremer a linha na metade de cima.
+    // (É o caso da razão de volatilidade, que vive em torno de 1.)
+    if (eixo.zero !== false && mn >= 0 && mn <= mx * 0.6) baixo = 0;
     if (eixo.min !== undefined) baixo = eixo.min;
     if (eixo.max !== undefined) alto = eixo.max;
     if (alto - baixo <= 0) alto = baixo + 1;
@@ -387,11 +396,19 @@
 
     // rótulos do eixo X
     if (g.categorias) {
-      // uma coluna por categoria: rótulo em pé, do tamanho que couber na coluna
+      // Rótulo do tamanho que couber ENTRE DOIS RÓTULOS, e não dentro de uma
+      // coluna: num eixo de 121 posições que mostra só de vinte em vinte, a
+      // largura da coluna é de poucos pixels e a fonte sairia invisível.
+      var comRotulo = [];
+      for (var cr = d0; cr < d1; cr++) if (rotuloX(g, cr)) comRotulo.push(cr);
+      var vao = comRotulo.length > 1 ? X(comRotulo[1] + 0.5) - X(comRotulo[0] + 0.5) : pw;
       var fsCat = Math.min(L.xlab * 1.2, corpoQueCabe(
         g.categorias.reduce(function (a, b) { return a.length > b.length ? a : b; }, ""),
-        L.xlab * 1.2, pxMes * 0.95));
+        L.xlab * 1.2, vao * 0.95));
       for (var ci = d0; ci < d1; ci++) {
+        // categoria de rótulo vazio não ganha marca nem texto: é assim que um
+        // eixo de 121 posições mostra só de dez em dez sem virar borrão
+        if (!rotuloX(g, ci)) continue;
         var cxc = X(ci + 0.5);
         svg.appendChild(el("line", { x1: cxc, x2: cxc, y1: L.y1, y2: L.y1 + 7, stroke: pal.zero, "stroke-width": 1.5 }));
         svg.appendChild(texto(rotuloX(g, ci), {
