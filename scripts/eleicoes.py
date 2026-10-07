@@ -347,29 +347,43 @@ def g_volatilidade(todos):
 def g_caminho(base, evs, cam):
     rots = []
     for k in range(-CAMINHO, CAMINHO + 1):
-        rots.append("%+d" % k if k % 20 == 0 and k != 0 else ("voto" if k == 0 else ""))
+        rots.append("%+d" % k if k % 20 == 0 and k != 0 else ("véspera" if k == 0 else ""))
     def pares(nome):
         return [(k + CAMINHO, cam[nome].get(k)) for k in range(-CAMINHO, CAMINHO + 1)]
     return dict(
         id="eleicoes-caminho",
         titulo="A agitação em torno da votação",
-        subtitulo="Volatilidade de 21 pregões dividida pela normal do ano; 1,00 é um mês comum",
+        subtitulo="Em cada ponto: quanto a bolsa oscilou no mês anterior a ele, "
+                  "comparado ao normal daquele ano. 1,00 é um mês comum",
         categorias=rots,
         unidade="x",
         fonte=FONTE,
         eixo=dict(zero=False),
+        # a votação é no domingo e não tem pregão: o marcador fica na véspera,
+        # que é o último dado que existe antes dela
+        eventos=[dict(em=str(CAMINHO), rot="votação (domingo)")],
         series=[
             serie("Votação que definiu o presidente", VERDE, pares("resolve"), 3, largura=6, rotulo=True),
             serie("Votação que foi para 2º turno", VERMELHO, pares("adia"), 3, largura=6, rotulo=True),
         ],
-        nota="O eixo conta pregões, não dias de calendário: 60 pregões são cerca de três meses, e "
-             "o zero é o último pregão antes do voto. Cada ponto é o desvio-padrão dos retornos "
-             "dos 21 pregões **anteriores** a ele, dividido pelo desvio-padrão daquele ano inteiro "
-             "— então 1,00 quer dizer “um mês tão agitado quanto o ano costuma ser”, e a divisão "
-             "é o que torna 1994 comparável a 2022. A linha é a **mediana** dos eventos de cada "
-             "grupo: com 6 e 8 casos, a média seria arrastada por um ano extremo (1998 teve a "
-             "crise russa no meio da eleição). Como a janela olha para trás, o efeito de uma data "
-             "aparece espalhado nos 21 pregões seguintes a ela, e não de um dia para o outro. "
+        nota="**Não há ponto no dia da votação, porque não há pregão no domingo.** O eixo conta "
+             "pregões, e o zero é a **véspera** — o último fechamento antes do voto. O primeiro "
+             "ponto depois dele, o +1, já é a segunda-feira. O fim de semana é o buraco entre os "
+             "dois, e é nele que o resultado sai.\n\n"
+             "Como ler um ponto qualquer: ele responde “quanto a bolsa oscilou no mês que "
+             "terminou aqui, comparado com o quanto ela costuma oscilar neste ano?”. A conta é o "
+             "desvio-padrão dos retornos dos 21 pregões **anteriores** ao ponto, dividido pelo "
+             "desvio-padrão do ano inteiro. 1,00 é um mês tão agitado quanto o ano costuma ser; "
+             "1,25 é um mês 25% mais agitado que o normal daquele ano. A divisão pelo ano é o que "
+             "torna 1994 comparável a 2026 — sem ela os anos 1990 dominariam tudo, por serem "
+             "simplesmente mais voláteis.\n\n"
+             "A linha **não é a média**: é a **mediana** das eleições de cada grupo, ou seja, o "
+             "valor do meio quando se ordenam os casos. Com 6 e 8 eleições, a média seria "
+             "arrastada por um ano extremo — 1998 teve a crise russa no meio da eleição. "
+             "60 pregões são cerca de três meses. Como a janela de 21 pregões olha para trás, o "
+             "efeito de uma data aparece espalhado nos 21 pregões seguintes a ela, e não de um "
+             "dia para o outro: é por isso que a linha vermelha sobe devagar depois da véspera, "
+             "em vez de dar um salto. "
              "**Não há um gráfico equivalente para o preço do índice** porque não há o que mostrar: "
              "o retorno acumulado em qualquer janela em torno da eleição cai entre os percentis 46 "
              "e 58 da distribuição de todas as janelas do mesmo tamanho desde 1993 — ou seja, é "
@@ -413,6 +427,63 @@ def g_reversao(todos):
              "ser acaso: embaralhando os pares ao acaso, uma correlação desse tamanho aparece em "
              "13% das vezes. É indício, não conclusão.\n\n"
              "O 1º turno de 2026 não aparece aqui: faltam os 60 pregões seguintes.")
+
+
+def num(v, fmt="%+.2f%%", cor_por_sinal=True):
+    """Célula numérica. Verde no positivo, vermelho no negativo — a mesma
+    convenção dos outros sites."""
+    if v is None:
+        return dict(t=None)
+    t = (fmt % v).replace(".", ",")
+    if not cor_por_sinal:
+        return dict(t=t)
+    return dict(t=t, cor=VERDE if v > 0 else (VERMELHO if v < 0 else None))
+
+
+def g_tabela(evs):
+    """Os 15 turnos, com tudo o que os gráficos mostram separado — e com as
+    colunas que não cabem em gráfico nenhum (a data, o dia da semana, se a
+    votação resolveu a eleição)."""
+    linhas = []
+    for e in evs:
+        d, m, a = e["data"][8:], e["data"][5:7], e["data"][:4]
+        linhas.append([
+            dict(t=e["rot"], forte=True),
+            "%s/%s/%s" % (d, m, a),
+            "sim" if e["resolve"] else "não",
+            num(e["reacao"]),
+            num(e["reacao_dp"], "%+.2f"),
+            num(e["razao_limpa"], "%.2f", cor_por_sinal=False) if e["razao_limpa"] else dict(t=None),
+            num(e["pos60"]),
+        ])
+    return dict(
+        id="eleicoes-tabela",
+        titulo="Os 15 turnos, um a um",
+        subtitulo="Tudo o que os gráficos mostram separado, lado a lado",
+        tipo="tabela",
+        fonte=FONTE,
+        colunas=[
+            dict(rot="Turno"),
+            dict(rot="Votação"),
+            dict(rot="Definiu o presidente?"),
+            dict(rot="Reação", num=True),
+            dict(rot="Reação (dp do ano)", num=True),
+            dict(rot="Volatilidade depois ÷ antes", num=True),
+            dict(rot="60 pregões seguintes", num=True),
+        ],
+        linhas=linhas,
+        nota="**Reação** é a variação do último fechamento antes do voto para o primeiro depois "
+             "— como a votação é no domingo, quase sempre de sexta para segunda. **dp do ano** é "
+             "essa mesma reação dividida pelo desvio-padrão dos retornos diários daquele ano "
+             "civil, que é o que torna 1994 comparável a 2026: um movimento de 3% valia pouco num "
+             "ano em que a bolsa andava 3,9% por dia e vale muito num de 1,3%. **Volatilidade "
+             "depois ÷ antes** compara o sobe-e-desce dos 21 pregões seguintes com o dos "
+             "anteriores, sem deixar a janela do 2º turno invadir o 1º; acima de 1 a bolsa ficou "
+             "mais agitada. **60 pregões seguintes** é o retorno dos três meses posteriores, já "
+             "sem contar o dia da reação.\n\n"
+             "Os traços na última linha não são dado faltando: o 1º turno de 2026 tem dois "
+             "pregões de vida, e as duas últimas colunas precisam de 21 e de 60."
+    )
 
 
 # --------------------------------------------------------------------------
@@ -485,6 +556,8 @@ def main():
             "permutação, que não dependem do formato da distribuição, e nenhuma conclusão "
             "deveria ser levada para além do que esse punhado de casos sustenta."),
         secoes=[
+            dict(titulo="Os números, turno a turno",
+                 graficos=[g_tabela(evs)]),
             dict(titulo="O dia seguinte",
                  graficos=[g_reacao(evs), g_reversao(evs)]),
             dict(titulo="Antes e depois",

@@ -1005,6 +1005,8 @@
     return { ini: ini, fim: fim };
   }
   function periodosDisponiveis(g) {
+    // tabela não tem eixo do tempo nem séries: não há janela a oferecer
+    if (g.tipo === "tabela" || !g.series) return [];
     if (g.categorias) return [];   // eixo de categorias não tem janela de tempo
     var e = extensao(g), lista = [{ id: "tudo", rot: "Tudo" }];
     if (g.intradiario) {           // no intradiário a janela se conta em dias
@@ -1092,19 +1094,40 @@
     ferramentas.appendChild(esquerda);
 
     var acoes = html("div", { "class": "card-acoes" });
-    var btnFs = html("button", { type: "button", "class": "btn", title: "Ver só este gráfico, em tela cheia, com anotação à mão" });
-    btnFs.appendChild(icone(ICO_ENTRAR));
-    btnFs.appendChild(html("span", { texto: "Tela cheia" }));
-    btnFs.addEventListener("click", function () { abrirVisor(cartao, true); });
-    cartao.botaoTelaCheia = btnFs;
-    acoes.appendChild(btnFs);
-    acoes.appendChild(menuBaixar(cartao));
+    if (g.tipo === "tabela") {
+      // nada de tela cheia nem de PNG: não há desenho para ampliar nem para
+      // rasterizar. O dado, esse sai em CSV como o de qualquer cartão.
+      var btnCsv = html("button", { type: "button", "class": "btn", texto: "Baixar CSV" });
+      btnCsv.addEventListener("click", function () { baixarCSV(cartao); });
+      acoes.appendChild(btnCsv);
+    } else {
+      var btnFs = html("button", { type: "button", "class": "btn", title: "Ver só este gráfico, em tela cheia, com anotação à mão" });
+      btnFs.appendChild(icone(ICO_ENTRAR));
+      btnFs.appendChild(html("span", { texto: "Tela cheia" }));
+      btnFs.addEventListener("click", function () { abrirVisor(cartao, true); });
+      cartao.botaoTelaCheia = btnFs;
+      acoes.appendChild(btnFs);
+      acoes.appendChild(menuBaixar(cartao));
+    }
     ferramentas.appendChild(acoes);
     raiz.appendChild(ferramentas);
 
     cartao.frame = html("div", { "class": "frame" });
     raiz.appendChild(cartao.frame);
-    if (g.nota) raiz.appendChild(html("p", { "class": "nota", texto: g.nota }));
+    // A nota aceita duas marcações, e só duas: linha em branco separa parágrafo,
+    // **assim** fica em negrito. É o suficiente para definir um termo técnico no
+    // meio da explicação sem o texto virar um bloco só — e não é Markdown, para
+    // não abrir a porta a HTML vindo do arquivo de dados.
+    if (g.nota) {
+      g.nota.split(/\n\s*\n/).forEach(function (paragrafo) {
+        var p = html("p", { "class": "nota" });
+        paragrafo.split(/\*\*/).forEach(function (pedaco, i) {
+          if (!pedaco) return;
+          p.appendChild(i % 2 ? html("b", { texto: pedaco }) : document.createTextNode(pedaco));
+        });
+        raiz.appendChild(p);
+      });
+    }
     // o gráfico leva o rótulo curto do acontecimento; a explicação inteira fica
     // aqui embaixo, em lista, na ordem em que aconteceu
     var comTexto = (g.eventos || []).filter(function (e) { return e.texto; });
@@ -1128,6 +1151,39 @@
     return cartao;
   }
 
+  // Cartão de tabela: HTML, não SVG. Nem todo achado é uma linha ou uma barra —
+  // um resumo de teste estatístico, com p-valor e contagem, se lê melhor numa
+  // tabela, e forçá-lo num gráfico só esconderia o número.
+  //
+  // Formato: `colunas` é a lista de cabeçalhos ({rot, num} — "num" alinha à
+  // direita e usa fonte tabular, para as casas decimais ficarem em coluna), e
+  // `linhas` é uma lista de listas. Cada célula é texto ou {t, cor, forte}.
+  function montarTabela(g) {
+    var tab = html("table", { "class": "tabela" });
+    var thead = html("thead", {});
+    var tr = html("tr", {});
+    (g.colunas || []).forEach(function (c) {
+      tr.appendChild(html("th", { "class": c.num ? "num" : "", texto: c.rot }));
+    });
+    thead.appendChild(tr);
+    tab.appendChild(thead);
+    var tbody = html("tbody", {});
+    (g.linhas || []).forEach(function (linha) {
+      var l = html("tr", {});
+      linha.forEach(function (cel, k) {
+        var col = (g.colunas || [])[k] || {};
+        var o = (cel && typeof cel === "object") ? cel : { t: cel };
+        var td = html("td", { "class": (col.num ? "num " : "") + (o.forte ? "forte" : ""),
+                              texto: o.t === null || o.t === undefined ? "—" : String(o.t) });
+        if (o.cor) td.style.color = corNoTema(o.cor, PALETAS[tema()]);
+        l.appendChild(td);
+      });
+      tbody.appendChild(l);
+    });
+    tab.appendChild(tbody);
+    return tab;
+  }
+
   function desenhar(cartao, forcar) {
     // cartão (ou seção) fechado mede zero: redesenha quando voltar a aparecer
     if (!cartao.frame.clientWidth) { cartao.chave = null; return; }
@@ -1135,6 +1191,13 @@
     var chave = nomeLayout + "|" + tema() + "|" + cartao.periodo + "|" + cartao.variante;
     if (!forcar && cartao.chave === chave) return;
     cartao.chave = chave;
+    if (graficoDe(cartao).tipo === "tabela") {
+      // sem proporção fixa: a tabela tem a altura que o conteúdo pedir
+      cartao.frame.style.aspectRatio = "";
+      cartao.frame.innerHTML = "";
+      cartao.frame.appendChild(montarTabela(graficoDe(cartao)));
+      return;
+    }
     var L = LAYOUTS[nomeLayout];
     var d = construir(cartao, L, tema());
     ligarHover(cartao, d);
@@ -1301,7 +1364,19 @@
     // toda série desenhada entra, inclusive a que não aparece na legenda: sem
     // legenda é decisão de leitura do gráfico, não de exportação do dado
     // (linha única num cartão de uma série só). Nome repetido vira "nome (2)".
-    var g = graficoDe(cartao), cols = g.series;
+    var g = graficoDe(cartao);
+    if (g.tipo === "tabela") {
+      var cab = (g.colunas || []).map(function (c) { return c.rot.replace(/;/g, ","); });
+      var corpo = (g.linhas || []).map(function (l) {
+        return l.map(function (cel) {
+          var o = (cel && typeof cel === "object") ? cel : { t: cel };
+          return String(o.t === null || o.t === undefined ? "" : o.t).replace(/;/g, ",");
+        }).join(";");
+      });
+      return salvar(new Blob(["\ufeff" + [cab.join(";")].concat(corpo).join("\r\n")],
+                             { type: "text/csv;charset=utf-8" }), nomeArquivo(cartao, "csv"));
+    }
+    var cols = g.series;
     var meses = {};
     cols.forEach(function (s) { s.dados.forEach(function (d) { meses[d[0]] = true; }); });
     var mapas = cols.map(function (s) { return s.dados.reduce(function (o, d) { o[d[0]] = d[1]; return o; }, {}); });

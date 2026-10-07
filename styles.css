@@ -83,7 +83,7 @@ details[open] > summary > .seta, details[open] > .nav-rotulo > .seta, details[op
 }
 
 /* ---------- conteúdo ---------- */
-.conteudo { padding: 30px 26px 60px; max-width: 1400px; }
+.conteudo { padding: 30px 26px 60px; max-width: 1240px; }   /* o gráfico é 16:9: a largura daqui é que decide a altura dele */
 .sobrancelha { margin: 0; color: var(--accent); font-size: 12.5px; letter-spacing: .12em; text-transform: uppercase; }
 .titulo-pagina { margin: 4px 0 6px; font-size: 30px; }
 .lede { margin: 0 0 18px; color: var(--ink-2); max-width: 70ch; }
@@ -294,3 +294,36 @@ body.visor-aberto { overflow: hidden; }
   .visor { padding: 44px 10px; }
   .visor-palco { width: min(calc(100vw - 20px), calc((100vh - 96px) * var(--ar, 1.7778))); }
 }
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Cartão de tabela. Nem todo achado é uma linha ou uma barra: um resumo de
+   teste estatístico se lê melhor assim, e forçá-lo num gráfico esconderia o
+   número. Mora no mesmo .frame dos gráficos, só que sem proporção fixa. */
+.frame .tabela {
+  width: 100%; border-collapse: collapse;
+  font-size: 14px; line-height: 1.45; color: var(--ink);
+}
+.frame .tabela th, .frame .tabela td {
+  padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border);
+}
+.frame .tabela thead th {
+  font-weight: 600; color: var(--ink-2); white-space: nowrap;
+  border-bottom-width: 2px;
+}
+/* coluna de número: alinhada à direita e com algarismos de largura fixa, para
+   as casas decimais caírem umas sobre as outras */
+.frame .tabela th.num, .frame .tabela td.num {
+  text-align: right; font-variant-numeric: tabular-nums;
+}
+.frame .tabela tbody tr:last-child td { border-bottom: 0; }
+.frame .tabela tbody tr:hover { background: var(--accent-wash); }
+.frame .tabela td.forte { font-weight: 700; }
+
+@media (max-width: 860px) {
+  .frame .tabela { font-size: 12.5px; }
+  .frame .tabela th, .frame .tabela td { padding: 7px 8px; }
+}
+/* "1994 1T" não deve quebrar em duas linhas: dobra a altura de toda a tabela */
+.frame .tabela td:first-child, .frame .tabela th:first-child { white-space: nowrap; }
+/* parágrafos seguidos de nota: o espaço entre eles é menor que o do primeiro */
+.nota + .nota { margin-top: -6px; }

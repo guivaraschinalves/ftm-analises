@@ -170,6 +170,21 @@ scripts/    juros_eua.py (FRED e intradiário, automático)
 .github/workflows/atualizar.yml
 ```
 
+### Cartão de tabela, e as duas marcações da nota
+
+Nem todo achado é uma linha ou uma barra. `tipo: "tabela"` no gráfico troca o
+SVG por uma tabela HTML dentro do mesmo `.frame`: `colunas` é a lista de
+cabeçalhos (`{rot, num}` — `num` alinha à direita e usa algarismos de largura
+fixa, para as casas decimais caírem umas sobre as outras) e `linhas` é uma lista
+de listas, com cada célula em texto ou `{t, cor, forte}`. Tabela não tem tela
+cheia nem PNG — não há desenho para ampliar nem para rasterizar —, mas o **CSV
+sai igual** ao de qualquer cartão.
+
+A **nota** passou a aceitar duas marcações, e só duas: linha em branco separa
+parágrafo e `**assim**` fica em negrito. É o bastante para definir um termo
+técnico no meio da explicação sem o texto virar um bloco só, e de propósito não
+é Markdown — não quero abrir a porta a HTML vindo do arquivo de dados.
+
 ## A bolsa nas eleições presidenciais
 
 `python3 scripts/eleicoes.py` baixa da API OData aberta do Ipeadata (sem chave)
