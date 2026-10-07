@@ -62,7 +62,12 @@ FONTE = "Ipeadata (B3/BM&FBovespa) e TSE"
 AZUL, VERMELHO, VERDE, ROXO, LARANJA = "#4F81BD", "#C0504D", "#9BBB59", "#8064A2", "#F79646"
 BRANCO, CINZA = "#FFFFFF", "#95A5A6"
 
-# (ano, 1º turno, 2º turno ou None, vencedor)
+# (ano, 1º turno, 2º turno ou None, vencedor ou None se ainda não se sabe)
+#
+# "2º turno = None" quer dizer que o 1º turno DECIDIU a eleição (1994 e 1998).
+# Não confundir com um 2º turno marcado que ainda não aconteceu: 2026 tem data
+# ali, e é isso que faz o script classificar o 1º turno de 2026 como votação que
+# não resolveu — embora nenhuma medida do dia 25/10 exista ainda.
 ELEICOES = [
     (1994, "1994-10-03", None, "FHC"),
     (1998, "1998-10-04", None, "FHC"),
@@ -72,6 +77,7 @@ ELEICOES = [
     (2014, "2014-10-05", "2014-10-26", "Dilma"),
     (2018, "2018-10-07", "2018-10-28", "Bolsonaro"),
     (2022, "2022-10-02", "2022-10-30", "Lula"),
+    (2026, "2026-10-04", "2026-10-25", None),
 ]
 
 JANELA = 21          # pregões de cada lado, nas razões de volatilidade
@@ -153,6 +159,8 @@ def eventos(base):
             if not data:
                 continue
             d0, d1 = base.antes(data), base.depois(data)
+            if d1 is None:
+                continue          # votação ainda não ocorreu (ou não houve pregão depois)
             dp = base.dp_ano[d0[:4]]
             e = dict(ano=ano, turno=turno, data=data, d0=d0, d1=d1, vencedor=vencedor,
                      rot="%d %s" % (ano, turno), dp_ano=dp)
@@ -161,14 +169,22 @@ def eventos(base):
             # a eleição resolveu quem é o presidente?
             e["resolve"] = (turno == "2T") or (t2 is None)
             # volatilidade, janela de 21 pregões de cada lado
+            # Janela que ainda não fechou vira None, e o gráfico simplesmente
+            # não desenha aquele ponto. É o caso do 1º turno de 2026, com dois
+            # pregões de vida: a reação dele existe, a volatilidade dos 21
+            # pregões seguintes não — e inventar uma com os dias que há seria
+            # comparar um mês com dois dias.
+            fim_vol = base.desloca(d1, JANELA - 1)
             e["vol_antes"] = base.vol(base.desloca(d0, -(JANELA - 1)), d0)
-            e["vol_depois"] = base.vol(d1, base.desloca(d1, JANELA - 1))
-            e["razao"] = e["vol_depois"] / e["vol_antes"]
+            e["vol_depois"] = base.vol(d1, fim_vol) if fim_vol else None
+            e["razao"] = e["vol_depois"] / e["vol_antes"] if e["vol_depois"] else None
+            e["completo"] = fim_vol is not None
             # retorno nos 60 pregões seguintes, já sem a reação
             fim = base.desloca(d1, CAMINHO - 1)
-            e["pos60"] = base.ret(d1, fim)
+            e["pos60"] = base.ret(d1, fim) if fim else None
             dp60 = base.dp_ano60.get(d0[:4])
             e["pos60_dp"] = e["pos60"] / dp60 if (dp60 and e["pos60"] is not None) else None
+            e["completo60"] = e["pos60"] is not None
             if turno == "1T":
                 por_ano_1t[ano] = e
             else:
@@ -197,6 +213,8 @@ def caminho_vol(base, evs):
     construção — cada ponto é a média de 21 pregões."""
     grupos = {"resolve": [], "adia": []}
     for e in evs:
+        if not e.get("completo60"):
+            continue              # 2026 ainda não tem os 60 pregões seguintes
         serie = {}
         for k in range(-CAMINHO, CAMINHO + 1):
             p = base.desloca(e["d0"], k) if k <= 0 else base.desloca(e["d1"], k - 1)
@@ -277,7 +295,12 @@ def g_reacao(evs):
              "costuma andar num dia qualquer daquele ano. Serve para comparar épocas — 3% em 1994, "
              "quando a bolsa andava 3,9% por dia, é um dia morno; 3% em 2010, quando andava 1,3%, "
              "é um dia agitado. Sem essa correção os anos 1990 dominariam o gráfico por serem "
-             "simplesmente mais voláteis.")
+             "simplesmente mais voláteis.\n\n"
+             "**O 1º turno de 2026 é o maior movimento da série**: +7,70%, ou +6,06 desvios-padrão "
+             "do ano — quase o dobro do recorde anterior (+3,28 dp em 2018). Ele é o único evento "
+             "que aparece neste gráfico e não nos outros: a reação precisa de um pregão depois da "
+             "votação, e os demais precisam de 21 ou 60. O 2º turno de 2026, marcado para 25 de "
+             "outubro, ainda não aconteceu.")
 
 
 def referencia(evs):
@@ -287,7 +310,9 @@ def referencia(evs):
                  [(i, 1.0) for i in range(len(evs))], 2, largura=3, traco="pontilhado")
 
 
-def g_volatilidade(evs):
+def g_volatilidade(todos):
+    # só quem já tem os 21 pregões depois: 2026 fica de fora, e a nota diz por quê
+    evs = [e for e in todos if e.get("completo")]
     rots = [e["rot"] for e in evs]
     def barras(chave):
         return [serie("Eleição que não resolveu (foi para 2º turno)", VERMELHO,
@@ -314,7 +339,9 @@ def g_volatilidade(evs):
              "eleitoral com um “depois” limpo, e por construção faz a volatilidade parecer cair. "
              "O recorte “sem sobreposição” usa, no 2º turno, só os pregões entre as duas votações, "
              "e o mesmo número de pregões depois. A conclusão muda: na janela de 21 a volatilidade "
-             "cai em 5 das 6 segundas voltas; sem sobreposição, em 3 de 6.")
+             "cai em 5 das 6 segundas voltas; sem sobreposição, em 3 de 6.\n\n"
+             "O 1º turno de 2026 não aparece aqui: a conta precisa de 21 pregões depois da "
+             "votação e existem dois. Ele está no gráfico da reação, que só precisa de um.")
 
 
 def g_caminho(base, evs, cam):
@@ -346,10 +373,13 @@ def g_caminho(base, evs, cam):
              "**Não há um gráfico equivalente para o preço do índice** porque não há o que mostrar: "
              "o retorno acumulado em qualquer janela em torno da eleição cai entre os percentis 46 "
              "e 58 da distribuição de todas as janelas do mesmo tamanho desde 1993 — ou seja, é "
-             "indistinguível de um trecho qualquer da série.")
+             "indistinguível de um trecho qualquer da série.\n\n"
+             "O 1º turno de 2026 não entra nestas linhas: elas precisam de 60 pregões de cada "
+             "lado da votação, e dele só há dois.")
 
 
-def g_reversao(evs):
+def g_reversao(todos):
+    evs = [e for e in todos if e.get("completo60")]
     rots = [e["rot"] for e in evs]
     def par(c_reacao, c_pos, casas):
         return [serie("Reação do primeiro pregão", AZUL,
@@ -381,7 +411,8 @@ def g_reversao(evs):
              "(negativa) ou não têm relação (perto de zero). O sinal negativo sugere que reações "
              "grandes costumam ser devolvidas, mas o valor está longe de −1 e, com 14 casos, pode "
              "ser acaso: embaralhando os pares ao acaso, uma correlação desse tamanho aparece em "
-             "13% das vezes. É indício, não conclusão.")
+             "13% das vezes. É indício, não conclusão.\n\n"
+             "O 1º turno de 2026 não aparece aqui: faltam os 60 pregões seguintes.")
 
 
 # --------------------------------------------------------------------------
@@ -417,15 +448,17 @@ def main():
 
     print("\n%-9s %-11s %-11s %8s %7s %7s %7s" % ("turno", "eleição", "1º pregão", "reação", "em dp", "razão", "+60"))
     for e in evs:
-        print("%-9s %-11s %-11s %+7.2f%% %+7.2f %7.2f %+7.2f%%"
-              % (e["rot"], e["data"], e["d1"], e["reacao"], e["reacao_dp"], e["razao_limpa"], e["pos60"]))
+        n = lambda v, f: (f % v) if v is not None else "      —"
+        print("%-9s %-11s %-11s %+7.2f%% %+7.2f %s %s"
+              % (e["rot"], e["data"], e["d1"], e["reacao"], e["reacao_dp"],
+                 n(e["razao_limpa"], "%7.2f"), n(e["pos60"], "%+7.2f%%")))
 
     # os números que as notas citam
-    k, n, p = sinal([e["reacao"] for e in evs])
-    print("\nreação: %d/%d positivos, teste de sinal p=%.2f, média %+.2f%%"
-          % (k, n, p, st.mean([e["reacao"] for e in evs])))
-    adia = [e["razao_limpa"] for e in evs if not e["resolve"]]
-    resolve = [e["razao_limpa"] for e in evs if e["resolve"]]
+    k, nn, p = sinal([e["reacao"] for e in evs])
+    print("\nreação (%d turnos): %d/%d positivos, teste de sinal p=%.2f, média %+.2f%%"
+          % (len(evs), k, nn, p, st.mean([e["reacao"] for e in evs])))
+    adia = [e["razao_limpa"] for e in evs if not e["resolve"] and e["razao_limpa"]]
+    resolve = [e["razao_limpa"] for e in evs if e["resolve"] and e["razao_limpa"]]
     dif, pp = permutacao(adia, resolve)
     print("volatilidade: não resolve %.2f (n=%d) vs resolve %.2f (n=%d), diferença %+.2f, permutação p=%.3f"
           % (st.mean(adia), len(adia), st.mean(resolve), len(resolve), dif, pp))
@@ -438,12 +471,16 @@ def main():
         fonte=FONTE,
         assunto="A bolsa nas eleições presidenciais",
         apresentacao=(
-            "Oito eleições presidenciais desde o Real, 14 turnos ao todo, medidas contra os "
-            "8.315 pregões do Ibovespa que o Ipeadata guarda desde 1993. A pergunta é simples e "
+            "Nove eleições presidenciais desde o Real — 15 turnos já realizados, com o 2º turno "
+            "de 2026 ainda pela frente —, medidos contra os 8.315 pregões do Ibovespa que o "
+            "Ipeadata guarda desde 1993. A pergunta é simples e "
             "a resposta, em boa parte, é negativa: a bolsa não sobe nem cai de forma previsível "
             "com eleição, não há rali entre os turnos e nenhuma janela em torno da votação se "
             "destaca da distribuição normal de retornos. O que aparece é outra coisa — a "
             "agitação sobe quando o 1º turno **não** resolve a disputa, e não quando há eleição. "
+            "O 1º turno de 2026 produziu a maior reação da série inteira, +7,70%, e aparece só "
+            "no primeiro gráfico: os demais precisam de 21 ou 60 pregões depois da votação, e "
+            "dele há dois. "
             "Com 6 a 8 casos por grupo, tudo aqui é descritivo: os testes são de sinal e de "
             "permutação, que não dependem do formato da distribuição, e nenhuma conclusão "
             "deveria ser levada para além do que esse punhado de casos sustenta."),

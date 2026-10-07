@@ -181,8 +181,16 @@ em quatro anos.
 | `GM366_IBVSP366` | Ibovespa, fechamento diário, desde 27/04/1993 |
 | `GM366_IBVSPV366` | Ibovespa, volatilidade — **só conferência**, ver abaixo |
 
-São 8 eleições e **14 turnos** (1994 e 1998 foram decididas no 1º turno), contra
-8.315 pregões de base.
+São 9 eleições e **15 turnos já realizados**, contra 8.315 pregões de base.
+1994 e 1998 foram decididas no 1º turno (não têm segundo); o 2º turno de 2026
+está marcado para 25/10 e ainda não aconteceu.
+
+**Janela que não fechou vira `None`, e o gráfico não desenha o ponto.** O 1º
+turno de 2026 tem dois pregões de vida: a reação dele existe, a volatilidade dos
+21 pregões seguintes não, e o retorno de 60 pregões muito menos. Ele aparece no
+gráfico da reação e some dos outros três — cada um filtra por conta própria, e
+as notas dizem por quê. Inventar a conta com os dias que há seria comparar um
+mês com dois dias.
 
 ### Quatro decisões de método que mudam o resultado
 
@@ -207,13 +215,15 @@ São 8 eleições e **14 turnos** (1994 e 1998 foram decididas no 1º turno), co
 
 ### O que a análise achou — e o que não achou
 
-Não existe: direção previsível (7/14 altas, p=1,00), volatilidade elevada antes
+Não existe: direção previsível (8/15 altas, p=1,00), volatilidade elevada antes
 da eleição (8/14 acima do normal do ano, p=0,79), rali entre os turnos (+1,45%
 contra base de +2,18%) nem retorno anormal em qualquer janela de −60 a +60
 pregões (percentis 46 a 58).
 
 Existe: o dia seguinte é um dia grande (mediana de 1,42 desvios-padrão do ano;
-só 13% dos pregões do ano se mexem mais) e, o principal, **a agitação sobe
+só 13% dos pregões do ano se mexem mais), e **o 1º turno de 2026 é o maior
+movimento da série** — +7,70%, ou +6,06 desvios-padrão, quase o dobro do recorde
+anterior (+3,28 dp em 2018) e, o principal, **a agitação sobe
 quando o 1º turno não resolve a disputa** — razão de 1,27 contra 0,92 nas
 votações que definiram o presidente, permutação p=0,029. A incerteza se resolve
 quando o presidente é definido, não quando há eleição.
