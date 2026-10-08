@@ -243,6 +243,25 @@ quando o 1º turno não resolve a disputa** — razão de 1,27 contra 0,92 nas
 votações que definiram o presidente, permutação p=0,029. A incerteza se resolve
 quando o presidente é definido, não quando há eleição.
 
+### O ano eleitoral partido em dois
+
+Dois cartões respondem "quanto rendeu até a eleição e quanto depois dela": o
+ano é cortado na **véspera do 1º turno**, e os anos sem eleição levam o mesmo
+corte de calendário (a véspera do 1º domingo de outubro) para servir de régua.
+
+Nas duas metades os números são quase iguais — **+5,4%** contra **+7,1%** até a
+votação, **+5,8%** contra **+5,0%** depois. A coluna do ano todo parece dizer
+outra coisa (**+1,0%** nos anos de eleição contra **+19,9%** nos demais), mas a
+diferença **não resiste ao teste**: por permutação ela aparece em 43% das vezes
+só por acaso. São sete anos completos, dois deles de crise (1998 e 2002).
+
+**1994 fica fora destes dois cartões.** Do fim de 1993 à véspera da eleição o
+índice subiu **1.360%** — isso é a inflação do ano em que o Real estreou, não o
+mercado; em termos reais ele caiu. Um número desses não divide eixo com +6%, e
+qualquer média que o inclua vira um número sobre 1994. Nos outros cartões ele
+continua, porque lá a medida é de um dia e a inflação de um fim de semana é
+irrelevante.
+
 ### Por que não há gráfico do preço em torno da eleição
 
 Porque não há o que mostrar. O retorno acumulado em qualquer janela ao redor da

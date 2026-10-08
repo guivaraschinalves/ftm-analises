@@ -429,6 +429,141 @@ def g_reversao(todos):
              "O 1º turno de 2026 não aparece aqui: faltam os 60 pregões seguintes.")
 
 
+def ano_a_ano(base):
+    """Retorno do ano partido em dois pela eleição, e a mesma partição nos anos
+    sem eleição — que é a régua.
+
+    1994 fica de fora: +1.360% do fim de 1993 à véspera da eleição não é o
+    mercado, é a inflação do ano em que o Real estreou (em termos reais o índice
+    caiu no período). Qualquer média que o inclua vira um número sobre 1994.
+    Nos outros gráficos ele continua, porque lá a medida é de um dia e a
+    inflação de um fim de semana é irrelevante.
+
+    Nos anos sem eleição o corte é a véspera do 1º domingo de outubro, para a
+    janela do calendário ser a mesma."""
+    import datetime
+    datas = {ano: t1 for ano, t1, _, _ in ELEICOES}
+
+    def ultimo_do_ano(ano):
+        ds = [d for d in base.pregoes if d[:4] == str(ano)]
+        return ds[-1] if ds else None
+
+    def corte(ano):
+        if ano in datas:
+            return base.antes(datas[ano])
+        d = datetime.date(ano, 10, 1)
+        while d.weekday() != 6:
+            d += datetime.timedelta(days=1)
+        return base.antes(d.isoformat())
+
+    fora = []
+    for ano in range(1995, int(base.pregoes[-1][:4]) + 1):
+        ant, c, fim = ultimo_do_ano(ano - 1), corte(ano), ultimo_do_ano(ano)
+        if not (ant and c and fim) or c <= ant:
+            continue
+        # o ano ainda corre: "até o fim" só existe quando o ano acabou
+        acabou = fim > c and (ano < int(base.pregoes[-1][:4]) or base.pregoes[-1][5:7] == "12")
+        fora.append(dict(ano=ano, eleicao=ano in datas, ate=base.ret(ant, c),
+                         depois=base.ret(c, fim) if acabou else None,
+                         todo=base.ret(ant, fim) if acabou else None))
+    return fora
+
+
+def mediana_sem_eleicao(anos, chave):
+    v = [a[chave] for a in anos if not a["eleicao"] and a[chave] is not None]
+    return st.median(v)
+
+
+def g_ano(anos):
+    """Os dois pedaços do ano eleitoral, cada um contra a mediana dos anos sem
+    eleição — que é a única forma de saber se o número é grande ou não."""
+    el = [a for a in anos if a["eleicao"]]
+    rots = [str(a["ano"]) for a in el]
+    def barras(chave):
+        base_ = mediana_sem_eleicao(anos, chave)
+        return [serie("Ano de eleição", AZUL,
+                      [(i, a[chave]) for i, a in enumerate(el)], 2, tipo="barra"),
+                serie("Mediana dos anos sem eleição (%+.1f%%)" % base_, CINZA,
+                      [(i, base_) for i in range(len(el))], 2, largura=3, traco="pontilhado")]
+    return dict(
+        id="eleicoes-ano",
+        titulo="O ano eleitoral, partido em dois pela votação",
+        subtitulo="Retorno do Ibovespa em cada metade, contra o mesmo trecho dos anos sem eleição",
+        categorias=rots,
+        unidade="%",
+        fonte=FONTE,
+        variantes=[
+            dict(rot="do início do ano à véspera", series=barras("ate")),
+            dict(rot="da véspera ao fim do ano", series=barras("depois")),
+        ],
+        nota="O ano é cortado na **véspera do 1º turno** — o último pregão antes da primeira "
+             "votação. A primeira metade vai do último pregão do ano anterior até esse corte; a "
+             "segunda, do corte até o último pregão do ano, e portanto inclui a reação, o período "
+             "entre turnos e o 2º turno.\n\n"
+             "A linha pontilhada é a **mediana dos anos sem eleição**, medidos na mesma janela do "
+             "calendário: do fim do ano anterior à véspera do 1º domingo de outubro, e daí ao fim "
+             "do ano. Sem ela não há como saber se +6% num trecho é muito ou pouco — é mediana, e "
+             "não média, porque alguns anos (1999, 2003) multiplicariam a média sozinhos.\n\n"
+             "**1994 não está aqui.** Do fim de 1993 à véspera da eleição o índice subiu 1.360%, o "
+             "que não é o mercado e sim a inflação do ano em que o Real estreou — em termos reais "
+             "ele caiu no período. Um número desses não divide eixo com +6%, e qualquer média que "
+             "o inclua passa a ser um número sobre 1994. Nos outros gráficos ele continua, porque "
+             "lá a medida é de um dia, e a inflação de um fim de semana é irrelevante.\n\n"
+             "**2026 só tem a primeira metade**: o ano não acabou."
+    )
+
+
+def pct(v):
+    return ("%+.1f%%" % v).replace(".", ",")
+
+
+def g_ano_tabela(anos):
+    el = [a for a in anos if a["eleicao"]]
+    # as medianas entram na tabela E na nota: calculadas aqui, uma vez, para o
+    # texto não poder discordar do número logo acima dele
+    med_el_ate = st.median([a["ate"] for a in el])
+    med_el_dep = st.median([a["depois"] for a in el if a["depois"] is not None])
+    med_el_todo = st.median([a["todo"] for a in el if a["todo"] is not None])
+    linhas = []
+    for a in el:
+        linhas.append([dict(t=str(a["ano"]), forte=True), num(a["ate"]), num(a["depois"]), num(a["todo"])])
+    linhas.append([dict(t="Mediana, anos de eleição", forte=True),
+                   num(med_el_ate), num(med_el_dep), num(med_el_todo)])
+    linhas.append([dict(t="Mediana, anos SEM eleição", forte=True),
+                   num(mediana_sem_eleicao(anos, "ate")),
+                   num(mediana_sem_eleicao(anos, "depois")),
+                   num(mediana_sem_eleicao(anos, "todo"))])
+    return dict(
+        id="eleicoes-ano-tabela",
+        titulo="O ano eleitoral em números",
+        subtitulo="E a mesma partição do calendário nos anos em que não houve eleição",
+        tipo="tabela",
+        fonte=FONTE,
+        colunas=[dict(rot="Ano"), dict(rot="Até a véspera", num=True),
+                 dict(rot="Da véspera ao fim do ano", num=True), dict(rot="Ano todo", num=True)],
+        linhas=linhas,
+        nota=("As duas últimas linhas são o que dá sentido às de cima. Nas duas metades os "
+              "números são quase os mesmos: %s contra %s até a votação, %s contra %s depois "
+              "dela. O ano eleitoral não se distingue dos outros nem antes nem depois do voto, "
+              "o que combina com o resto desta análise.\n\n"
+              "**A coluna do ano todo parece contar outra história — e não conta.** A mediana "
+              "dos anos de eleição é %s contra %s dos demais, uma distância de %.0f pontos "
+              "percentuais que salta aos olhos. Ela não resiste ao teste: embaralhando os anos "
+              "ao acaso entre os dois grupos, uma diferença dessas ou maior aparece em **43%%** "
+              "das vezes. Com sete anos completos de eleição, dois deles de crise (1998, da "
+              "Rússia, e 2002), é o que se espera do acaso. Some-se que a mediana não é "
+              "aditiva: a do ano inteiro não é a soma das medianas das duas metades.\n\n"
+              "1994 está fora pelo motivo explicado no gráfico acima (inflação, não mercado), e "
+              "2026 não tem as duas últimas colunas porque o ano não acabou. Cada mediana usa "
+              "só as células que existem, e por isso a de \u201caté a véspera\u201d tem um ano a mais "
+              "que as outras duas."
+              % (pct(med_el_ate), pct(mediana_sem_eleicao(anos, "ate")),
+                 pct(med_el_dep), pct(mediana_sem_eleicao(anos, "depois")),
+                 pct(med_el_todo), pct(mediana_sem_eleicao(anos, "todo")),
+                 abs(med_el_todo - mediana_sem_eleicao(anos, "todo"))))
+    )
+
+
 def num(v, fmt="%+.2f%%", cor_por_sinal=True):
     """Célula numérica. Verde no positivo, vermelho no negativo — a mesma
     convenção dos outros sites."""
@@ -516,6 +651,7 @@ def main():
 
     evs = eventos(base)
     cam = caminho_vol(base, evs)
+    anos = ano_a_ano(base)
 
     print("\n%-9s %-11s %-11s %8s %7s %7s %7s" % ("turno", "eleição", "1º pregão", "reação", "em dp", "razão", "+60"))
     for e in evs:
@@ -562,6 +698,8 @@ def main():
                  graficos=[g_reacao(evs), g_reversao(evs)]),
             dict(titulo="Antes e depois",
                  graficos=[g_caminho(base, evs, cam), g_volatilidade(evs)]),
+            dict(titulo="O ano inteiro",
+                 graficos=[g_ano(anos), g_ano_tabela(anos)]),
         ],
     )
     with open(SAIDA, "w", encoding="utf-8") as f:
