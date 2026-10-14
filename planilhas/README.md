@@ -17,7 +17,7 @@ que as usam.
 | `oferta-gasolina.xlsx` | A gêmea, para gasolina A, com a ponte gasolina C → gasolina A pelo teor legal de anidro |
 | `defasagem-gasolina.xlsx` | Preço da Petrobras contra o PPI da ANP, semanal desde set/2019, nos nove pontos de entrega em que as duas pontas são o mesmo lugar |
 | `precos-combustiveis.xlsx` | Preço ao distribuidor, preço por refinaria e por UF, e a composição do preço na bomba decomposta em produto, anidro, tributos e margem |
-| `ipca-defasagem.xlsx` | O modelo contábil de quanto da defasagem está represado no IPCA |
+| `ipca-defasagem.xlsx` | Quanto da defasagem está represado no IPCA, por três caminhos independentes: o contábil (teto), a Bahia como grupo de controle (piso) e o método da FGV estendido para série mensal. Traz também o IPCA em 12 meses sob cada estimativa |
 | `ppi-anp.xlsx` | O arquivo bruto da ANP: PPI semanal de gasolina, diesel, QAV e GLP. Insumo, não produto, e por isso não é versionado |
 | `PPI_combustiveis_2016-2026.xlsx` | A planilha antiga, de setembro de 2026. Substituída em quase tudo pelas outras, **menos** na aba "Brent e Câmbio", que não existe em lugar nenhum. Não se atualiza sozinha |
 
@@ -37,7 +37,21 @@ eles baixam vai para `dados/`, e o que é grande demais para versionar está no
 `.gitignore` da raiz, com o motivo escrito em cada linha.
 
 A ordem importa só para o `ipca_defasagem.py`, que lê a defasagem, o preço de
-bomba e o teor de anidro dos outros.
+bomba e o teor de anidro dos outros. Ele é o único que baixa o IPCA por praça,
+e por isso demora mais que os demais.
+
+## O que é nosso e o que é emprestado
+
+A terceira estimativa do `ipca-defasagem.xlsx` é o método de Francisco Pessoa
+Faria, no artigo "Impacto da defasagem da gasolina no IPCA e reflexos de sua
+subvenção nos resultados da Petrobras", do Blog do IBRE. A aba "Praças e pesos"
+reproduz a tabela T.2 dele número a número justamente para que dê para checar
+que é a mesma conta, e não uma variação nossa. O que é nosso ali é só a
+extensão para série mensal.
+
+A segunda estimativa, a da Bahia por nível de preço, é inspirada no mesmo
+artigo mas não é o método dele: ele compara variação, nós comparamos nível, e
+por isso precisamos estimar um spread estrutural que na conta dele não existe.
 
 ## O que cada script é
 
