@@ -15,6 +15,12 @@ No ar: <https://guivaraschinalves.github.io/ftm-analises/>
 O acervo intradiário fica à parte, em `dados/intradiario-10a.json`: é o arquivo
 que **acumula** as cotações de 15 em 15 minutos (veja abaixo).
 
+Fora do site, em **[`planilhas/`](planilhas/)**, ficam sete planilhas de
+petróleo, derivados e Petrobras: oferta de diesel e de gasolina, defasagem
+contra o PPI, composição do preço na bomba e o modelo contábil do represamento
+no IPCA. Elas não alimentam gráfico nenhum daqui, são material de análise, e
+têm o próprio [README](planilhas/README.md).
+
 O motor de desenho é o mesmo do [ftm-dados](https://github.com/guivaraschinalves/ftm-dados):
 
 - **Menu na lateral** — um assunto retrátil por arquivo de dados, com as seções

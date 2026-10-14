@@ -1,2 +1,26 @@
 __pycache__/
 .DS_Store
+
+# ── planilhas/ ────────────────────────────────────────────────────────────
+# As planilhas FICAM versionadas: são o produto. O que o script baixa
+# sozinho, não.
+#
+# O PPI da ANP (740 KB) o planilhas/scripts/defasagem.py baixa sozinho.
+planilhas/ppi-anp.xlsx
+# Os dois .xls de preços da ANP (3 MB) e o CSV de preços ao produtor, que é o
+# mesmo dado que já está na planilha.
+planilhas/dados/precos-ponderados-semanais-*.xls
+planilhas/dados/precos-medios-ponderados-semanais-*.xls
+planilhas/dados/anp-precos-produtor.csv
+# As tabelas da Petrobras em PDF saem da biblioteca pública deles.
+planilhas/dados/Tabelas de Preco*.pdf
+# Os CSV de vendas, produção e comércio exterior da ANP (13 MB).
+planilhas/dados/.cache-anp-oferta/
+# O Levantamento de Preços da ANP é dado POR POSTO, em zips semestrais desde
+# 2004: são 2,6 GB. O que interessa — a média semanal por UF — fica no
+# revenda-semanal.csv dentro do próprio cache, e é remontado em minutos.
+planilhas/dados/.cache-anp-revenda/
+#
+# Já os dois acervos de composição (planilhas/dados/anp-composicao-*.csv) e o
+# .cache-acelen/ FICAM versionados: refazê-los do zero custa 260 MB de PDF da
+# Síntese Semanal. Veja o cabeçalho de planilhas/scripts/composicao_anp.py.
