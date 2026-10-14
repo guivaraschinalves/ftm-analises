@@ -223,6 +223,87 @@ def modelo(defas, bomba, idx, ponto, margem_escala=False):
 MARGEM = 0.23
 
 
+# ─── Segunda estimativa: a Bahia como grupo de controle ──────────────────────
+#
+# A ideia é do artigo da FGV, não minha, mas a execução é: ele não documenta o
+# cálculo, então isto é uma reconstrução da ideia, não uma réplica do método.
+#
+# Na Bahia quem domina é a Acelen, que segue o PPI. Então o preço de bomba
+# baiano é uma leitura de mercado do que o preço seria sem defasagem, e o
+# excesso do spread BA − Brasil mede o represamento sem precisar de nenhuma
+# hipótese sobre mistura, tributo ou margem. É uma segunda medida do mesmo
+# fenômeno, por um caminho que não compartilha nenhuma suposição com o
+# contábil — e é por isso que vale a pena ter as duas.
+#
+# O spread tem uma parte estrutural, que é frete e margem e existe sempre, e
+# uma parte que responde à defasagem. A regressão separa as duas: o intercepto
+# é a estrutural, a inclinação é a resposta.
+#
+# A janela da estimação começa em junho de 2023, quando o ICMS virou
+# monofásico e passou a ser o MESMO valor por litro em todo estado. Antes
+# disso o spread carregava diferença de alíquota, e isso aparece no ajuste: o
+# R² sai de 0,13 no regime antigo para 0,71 no novo, com a mesma inclinação.
+ICMS_MONOFASICO = "2023-06"
+CONTROLE = "BA"
+
+
+def regressao(pares):
+    """(inclinação, intercepto, R², n) de y contra x."""
+    x = [a for a, _ in pares]
+    y = [b for _, b in pares]
+    n = len(x)
+    mx, my = sum(x) / n, sum(y) / n
+    b = sum((a - mx) * (c - my) for a, c in zip(x, y)) / sum((a - mx) ** 2 for a in x)
+    a0 = my - b * mx
+    sst = sum((c - my) ** 2 for c in y)
+    sse = sum((c - (a0 + b * a)) ** 2 for a, c in zip(x, y))
+    return b, a0, (1 - sse / sst) if sst else float("nan"), n
+
+
+def bahia(linhas, precos):
+    """A segunda estimativa, e os parâmetros que a geraram.
+
+    Devolve ([linha…], (inclinação, estrutural, R², n))."""
+    pares = [(l["defasagem_efetiva"],
+              precos[l["mes"]][CONTROLE] - precos[l["mes"]]["Brasil"])
+             for l in linhas
+             if l["mes"] in precos and l["mes"] >= ICMS_MONOFASICO]
+    par = regressao(pares)
+    inclinacao, estrutural, _r2, _n = par
+
+    fora = []
+    for l in linhas:
+        if l["mes"] not in precos:
+            continue
+        p = precos[l["mes"]]
+        spread = p[CONTROLE] - p["Brasil"]
+        # A parte do spread que a defasagem explica. Com defasagem negativa e
+        # inclinação negativa, o excesso é positivo: é o que falta no Brasil.
+        excesso = inclinacao * l["defasagem_efetiva"]
+        gap = excesso / l["preco"] * 100
+        fora.append({
+            "mes": l["mes"], "defasagem_efetiva": l["defasagem_efetiva"],
+            "ba": p[CONTROLE], "brasil": p["Brasil"], "spread": spread,
+            "estrutural": estrutural, "excesso": excesso, "gap": gap,
+            "peso": l["peso"], "nivel": l["peso"] * gap / 100,
+            "nivel_contabil": l["nivel"],
+        })
+    return fora, par
+
+
+def precos_por_mes():
+    """{mês: {'BA': R$/l, 'Brasil': R$/l}} da gasolina, média das semanas."""
+    bruto = pr.ler_agregado()
+    acc = {}
+    for (semana, ambito, produto), (preco, _c) in bruto.items():
+        if produto != "gasolina" or ambito not in (CONTROLE, "Brasil"):
+            continue
+        acc.setdefault(semana[:7], {}).setdefault(ambito, []).append(preco)
+    return {m: {a: sum(v) / len(v) for a, v in d.items()}
+            for m, d in acc.items()
+            if len(d) == 2 and all(len(v) >= 3 for v in d.values())}
+
+
 def acumulado(valores):
     f = 1.0
     for v in valores:
@@ -230,7 +311,7 @@ def acumulado(valores):
     return (f - 1) * 100
 
 
-def escrever(linhas, sensivel, pontos, ultima, hoje):
+def escrever(linhas, sensivel, pontos, bah, par, ultima, hoje):
     wb = openpyxl.Workbook()
     neg = Font(bold=True)
 
@@ -296,7 +377,21 @@ def escrever(linhas, sensivel, pontos, ultima, hoje):
         ("ABAS", True),
         ("Modelo mensal | A corrente inteira, mês a mês, em Paulínia", False),
         ("Por ponto | O nível represado em cada ponto de entrega", False),
+        ("Contrafactual Bahia | A segunda estimativa, por grupo de controle", False),
         ("Sensibilidade | O mesmo cálculo com a margem escalando junto", False),
+        ("", False),
+        ("DUAS ESTIMATIVAS, E ELAS NÃO BATEM", True),
+        ("A contábil supõe que R$ 1,00 na refinaria vira R$ 0,70 na bomba, "
+         "porque 70% do litro é gasolina A.", False),
+        ("A da Bahia MEDE quanto aparece, usando a Acelen (que segue o PPI) "
+         "como controle, e acha R$ 0,26.", False),
+        ("A contábil é teto e a da Bahia é piso. O teto supõe repasse integral "
+         "e imediato; o piso subestima", False),
+        ("porque a Acelen não atende a Bahia inteira, não segue o PPI "
+         "perfeitamente e também recebeu as", False),
+        ("subvenções de 2026, que encolhem o próprio spread que serve de "
+         "medida. A verdade mora no meio,", False),
+        ("e a largura entre as duas é a sua incerteza honesta.", False),
         ("", False),
         ("ATENÇÃO — a tabela mais recente da Petrobras é de %s."
          % ultima.strftime("%d/%m/%Y"), True),
@@ -335,6 +430,57 @@ def escrever(linhas, sensivel, pontos, ultima, hoje):
     for m in meses:
         ws.append([m] + [pontos[p].get(m) for p in sorted(pontos)])
     formatar(ws, cab2)
+
+    ws = wb.create_sheet("Contrafactual Bahia")
+    inclinacao, estrutural, r2, n = par
+    ws.append(["Segunda estimativa: a Bahia como grupo de controle"])
+    ws.cell(ws.max_row, 1).font = neg
+    for t in [
+        "Na Bahia quem domina é a Acelen, que segue o PPI. O preço de bomba "
+        "baiano é, então, uma leitura de",
+        "mercado do que o preço seria sem defasagem. O excesso do spread "
+        "BA − Brasil mede o represamento SEM",
+        "nenhuma hipótese sobre mistura, tributo ou margem: é um caminho que "
+        "não divide suposição nenhuma",
+        "com o modelo contábil, e por isso serve de segunda opinião.",
+        "",
+        "Estimado de %s em diante, quando o ICMS virou monofásico e passou a "
+        "ser o mesmo valor por litro em" % ICMS_MONOFASICO,
+        "todo estado. Antes disso o spread carregava diferença de alíquota: o "
+        "R² era 0,13, contra %.2f agora." % r2,
+        "",
+        "spread BA − Brasil = R$ %.3f estrutural %+.3f × defasagem   "
+        "(R² %.2f, n=%d meses)" % (estrutural, inclinacao, r2, n),
+        "",
+        "Leia a inclinação assim: a cada R$ 1,00 de defasagem na refinaria, "
+        "R$ %.3f aparecem como" % abs(inclinacao),
+        "diferença de preço entre a Bahia e o Brasil. O contábil supõe R$ 0,70 "
+        "(o teor de gasolina A).",
+        "A distância entre os dois é o tamanho da sua incerteza, e as razões "
+        "estão no LEIA-ME.",
+        "",
+    ]:
+        ws.append([t])
+    inicio = ws.max_row + 1
+    cab4 = ["mês", "defasagem R$/l", "bomba BA R$/l", "bomba Brasil R$/l",
+            "spread observado R$/l", "spread estrutural R$/l",
+            "excesso atribuído R$/l", "falta no preço %", "peso do item %",
+            "nível represado (Bahia) p.p.", "nível represado (contábil) p.p."]
+    ws.append(cab4)
+    for l in bah:
+        ws.append([l["mes"], l["defasagem_efetiva"], l["ba"], l["brasil"],
+                   l["spread"], l["estrutural"], l["excesso"], l["gap"],
+                   l["peso"], l["nivel"], l["nivel_contabil"]])
+    for i, nome in enumerate(cab4, start=1):
+        c = ws.cell(inicio, i)
+        c.font = Font(bold=True)
+        c.alignment = Alignment(wrap_text=True, vertical="top")
+        ws.column_dimensions[get_column_letter(i)].width = max(10, min(22, len(nome) + 2))
+    ws.freeze_panes = "A%d" % (inicio + 1)
+    for linha in ws.iter_rows(min_row=inicio + 1):
+        for c in linha:
+            if isinstance(c.value, float):
+                c.number_format = "0.000"
 
     ws = wb.create_sheet("Sensibilidade")
     cab3 = ["mês", "nível represado (p.p.) — margem fixa",
@@ -383,18 +529,29 @@ def main():
 
     linhas = modelo(defas, bomba, idx, df.PRINCIPAL)
     sensivel = modelo(defas, bomba, idx, df.PRINCIPAL, margem_escala=True)
+    bah, par = bahia(linhas, precos_por_mes())
     pontos = {p: {m: v for m, v in
                   ((l["mes"], l["nivel"]) for l in modelo(defas, bomba, idx, p))}
               for p in defas}
 
-    escrever(linhas, sensivel, pontos, ultima, hoje)
+    escrever(linhas, sensivel, pontos, bah, par, ultima, hoje)
 
     u = linhas[-1]
     print("\n%s: defasagem efetiva de R$ %.3f/l em %s, repasse de R$ %.3f na "
           "bomba" % (u["mes"], u["defasagem_efetiva"], df.PRINCIPAL, u["repasse"]))
     print("  falta %.1f%% no preço da gasolina; peso do item %.3f%%"
           % (u["gap"], u["peso"]))
-    print("  NÍVEL REPRESADO: %.2f p.p. do IPCA" % u["nivel"])
+    print("  NÍVEL REPRESADO (contábil): %.2f p.p. do IPCA" % u["nivel"])
+    inclinacao, estrutural, r2, n = par
+    print("\nsegunda estimativa, Bahia como controle:")
+    print("  spread BA−Brasil = R$ %.3f estrutural %+.3f × defasagem "
+          "(R² %.2f, n=%d)" % (estrutural, inclinacao, r2, n))
+    if bah and bah[-1]["mes"] == u["mes"]:
+        b = bah[-1]
+        print("  %s: excesso de R$ %.3f/l, falta %.1f%% no preço"
+              % (b["mes"], b["excesso"], b["gap"]))
+        print("  NÍVEL REPRESADO (Bahia): %.2f p.p. — contábil diz %.2f"
+              % (b["nivel"], b["nivel_contabil"]))
     if u["efeito12"] is not None:
         print("  efeito no IPCA 12m: %+.2f p.p." % u["efeito12"])
     doze = [l for l in linhas[-12:] if l["ipca"] is not None]
