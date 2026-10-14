@@ -304,6 +304,75 @@ def bahia(linhas, precos):
     return fora, par
 
 
+# ─── Pesar os pontos de entrega por volume ───────────────────────────────────
+#
+# Se a Petrobras fechar a defasagem, cada ponto sobe o tanto da defasagem dele
+# e o preço nacional sobe a MÉDIA PONDERADA PELO VOLUME que sai de cada lugar,
+# não a média simples. A diferença não é acadêmica: a média simples dá a
+# Manaus o mesmo peso de Paulínia, e Manaus não tem produção da Petrobras
+# atrás (a REAM é da Atem desde 2022) enquanto Paulínia sozinha é um quarto da
+# gasolina A da empresa. Em set/2026 a simples dá 0,59 e a ponderada 0,63.
+#
+# O peso é a produção de gasolina A da refinaria que está atrás de cada ponto.
+# É aproximação, porque a Petrobras também entrega de terminal e não só da
+# refinaria do lado, mas erra pouco e erra parelho: o que ela resolve é o peso
+# dos dois pontos sem refinaria dela atrás, que é onde mora a distorção.
+REFINARIA = {
+    "Paulínia (SP)": "REPLAN",
+    "Araucária (PR)": "REPAR",
+    "Canoas (RS)": "REFAP",
+    "São José dos Campos (SP)": "REVAP",
+    "Cubatão (SP)": "RPBC",
+    "Betim (MG)": "REGAP",
+    "Duque de Caxias (RJ)": "REDUC",
+}
+# Manaus (REAM, da Atem) e Guamaré (3R) ficam fora de propósito: a Petrobras
+# entrega ali, mas não refina, então não há volume dela para pesar.
+JANELA_VOLUME = 12
+
+
+def producao_por_ponto():
+    """{mês: {ponto: m³}} de gasolina A em janela de 12 meses."""
+    ordem, prod = og.por_refinaria()
+    col = {nome: i + 1 for i, nome in enumerate(ordem)}
+    faltam = sorted(p for p, r in REFINARIA.items() if r not in col)
+    if faltam:
+        raise SystemExit("refinaria sem coluna na produção da ANP: %s" % faltam)
+    meses = [l[0] for l in prod]
+    bruto = {l[0]: {p: (l[col[r]] or 0.0) for p, r in REFINARIA.items()}
+             for l in prod}
+    fora = {}
+    for i, m in enumerate(meses):
+        if i + 1 >= JANELA_VOLUME:
+            janela = meses[i + 1 - JANELA_VOLUME:i + 1]
+            fora[m] = {p: sum(bruto[j][p] for j in janela) for p in REFINARIA}
+    return fora
+
+
+def medias_por_ponto(pontos, volumes):
+    """{mês: (ponderada por produção, simples)} do nível represado.
+
+    A produção da ANP sai com um ou dois meses de atraso em relação ao resto,
+    então os meses do fim usam a última janela de volume que existir. Peso de
+    volume anda devagar, e usar a janela anterior erra menos que não ter
+    coluna nenhuma nos meses mais recentes, que são os que interessam."""
+    if not volumes:
+        return {}
+    ultimo = max(volumes)
+    fora = {}
+    for m in sorted({m for p in pontos.values() for m in p}):
+        peso = volumes.get(min(m, ultimo))
+        itens = [(pontos[p][m], peso.get(p, 0.0)) for p in REFINARIA
+                 if pontos.get(p, {}).get(m) is not None]
+        itens = [(v, w) for v, w in itens if w > 0]
+        todos = [d[m] for d in pontos.values() if d.get(m) is not None]
+        if itens and todos:
+            soma = sum(w for _v, w in itens)
+            fora[m] = (sum(v * w for v, w in itens) / soma,
+                       sum(todos) / len(todos))
+    return fora
+
+
 def precos_por_mes():
     """{mês: {'BA': R$/l, 'Brasil': R$/l}} da gasolina, média das semanas."""
     bruto = pr.ler_agregado()
@@ -558,7 +627,7 @@ def doze_meses(linhas, bah, sal):
     return fora
 
 
-def escrever(linhas, sensivel, pontos, bah, par, sal, pesos, diag,
+def escrever(linhas, sensivel, pontos, medias, bah, par, sal, pesos, diag,
              t2, doze, ultima, hoje):
     wb = openpyxl.Workbook()
     neg = Font(bold=True)
@@ -624,7 +693,8 @@ def escrever(linhas, sensivel, pontos, bah, par, sal, pesos, diag,
         ("", False),
         ("ABAS", True),
         ("Modelo mensal | A corrente inteira, mês a mês, em Paulínia", False),
-        ("Por ponto | O nível represado em cada ponto de entrega", False),
+        ("Por ponto | O nível represado em cada ponto de entrega, com a "
+         "média ponderada por produção", False),
         ("Contrafactual Bahia | Segunda estimativa: preço de bomba baiano "
          "como controle", False),
         ("Contrafactual Salvador | Terceira estimativa: o método da FGV, "
@@ -696,12 +766,47 @@ def escrever(linhas, sensivel, pontos, bah, par, sal, pesos, diag,
     formatar(ws, cab)
 
     ws = wb.create_sheet("Por ponto")
-    cab2 = ["mês"] + sorted(pontos)
+    ws.append(["O nível represado em cada ponto de entrega da Petrobras"])
+    ws.cell(ws.max_row, 1).font = neg
+    for t in [
+        "Mesma conta do Modelo mensal, repetida nos nove pontos em que a "
+        "tabela da Petrobras e o PPI da ANP",
+        "existem no mesmo lugar. O Modelo mensal é Paulínia, e só.",
+        "",
+        "QUAL MÉDIA USAR. Se a empresa fechar a defasagem, cada ponto sobe o "
+        "tanto do dele e o preço nacional",
+        "sobe a média PONDERADA PELO VOLUME, não a simples. A simples dá a "
+        "Manaus o mesmo peso de Paulínia, e",
+        "os dois não se parecem: a REAM é da Atem desde 2022 e não tem "
+        "produção da Petrobras atrás, enquanto",
+        "Paulínia sozinha é um quarto da gasolina A da empresa. Por isso a "
+        "simples sai sempre mais baixa.",
+        "",
+        "O peso é a produção de gasolina A, em janela de doze meses, da "
+        "refinaria atrás de cada ponto:",
+        "   " + ", ".join("%s = %s" % (REFINARIA[p], p.split(" (")[0])
+                          for p in sorted(REFINARIA, key=REFINARIA.get)) + ".",
+        "Manaus e Guamaré entram nas colunas e na média simples, mas não na "
+        "ponderada: a Petrobras entrega",
+        "ali e não refina, então não há volume dela para pesar.",
+        "",
+        "É aproximação, porque a empresa também entrega de terminal e não só "
+        "da refinaria do lado. Erra pouco",
+        "e erra parelho; o que ela conserta é o peso dos dois pontos sem "
+        "refinaria dela atrás, que é onde",
+        "a média simples se perde.",
+        "",
+    ]:
+        ws.append([t])
+    inicio = ws.max_row + 1
+    cab2 = (["mês"] + sorted(pontos)
+            + ["média ponderada por produção", "média simples"])
     ws.append(cab2)
-    meses = sorted({m for p in pontos.values() for m in p})
-    for m in meses:
-        ws.append([m] + [pontos[p].get(m) for p in sorted(pontos)])
-    formatar(ws, cab2)
+    for m in sorted({m for p in pontos.values() for m in p}):
+        med = medias.get(m, (None, None))
+        ws.append([m] + [pontos[p].get(m) for p in sorted(pontos)]
+                  + [med[0], med[1]])
+    cabecalho(ws, cab2, inicio)
 
     ws = wb.create_sheet("Contrafactual Bahia")
     inclinacao, estrutural, r2, n = par
@@ -995,15 +1100,22 @@ def main():
     t2 = replica_t2(reg, pesos)
     doze = doze_meses(linhas, bah, sal)
 
-    escrever(linhas, sensivel, pontos, bah, par, sal, pesos, (soma, pior),
-             t2, doze, ultima, hoje)
+    medias = medias_por_ponto(pontos, producao_por_ponto())
+
+    escrever(linhas, sensivel, pontos, medias, bah, par, sal, pesos,
+             (soma, pior), t2, doze, ultima, hoje)
 
     u = linhas[-1]
     print("\n%s: defasagem efetiva de R$ %.3f/l em %s, repasse de R$ %.3f na "
           "bomba" % (u["mes"], u["defasagem_efetiva"], df.PRINCIPAL, u["repasse"]))
     print("  falta %.1f%% no preço da gasolina; peso do item %.3f%%"
           % (u["gap"], u["peso"]))
-    print("  NÍVEL REPRESADO (contábil): %.2f p.p. do IPCA" % u["nivel"])
+    print("  NÍVEL REPRESADO (contábil, Paulínia): %.2f p.p. do IPCA"
+          % u["nivel"])
+    if u["mes"] in medias:
+        pond, simples = medias[u["mes"]]
+        print("  nos nove pontos: %.2f ponderada por produção, %.2f simples"
+              % (pond, simples))
     inclinacao, estrutural, r2, n = par
     print("\nsegunda estimativa, Bahia como controle:")
     print("  spread BA−Brasil = R$ %.3f estrutural %+.3f × defasagem "
