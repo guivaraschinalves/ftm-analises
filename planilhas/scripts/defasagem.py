@@ -459,10 +459,16 @@ def escrever(linhas, ultima_tabela, acelen, resumos, revenda, hoje):
             "É o gráfico G.3 do artigo da FGV, refeito e estendido. Média "
             "mensal das semanas, R$/litro, sem tributos.",
             "A coluna 'com subvenção' é o que a distribuidora de fato pagou "
-            "depois da MP 1.358, e por isso só existe",
-            "de junho de 2026 em diante. Ela fica fora do gráfico de "
-            "propósito, para a linha ser comparável de ponta",
-            "a ponta; para incluí-la, é só estendê-la à seleção de dados.",
+            "depois da MP 1.358. Ela só existe de",
+            "13/8/2026 em diante: a Petrobras começou a descontar os R$ 0,44 "
+            "em 29/5/2026 e a Acelen dois meses e",
+            "meio depois. Esse atraso é o que explica a queda do preço de "
+            "bomba baiano em agosto, com a tabela da",
+            "Acelen praticamente parada, e é também o que derruba a terceira "
+            "estimativa do ipca-defasagem.xlsx.",
+            "Ela fica fora do gráfico de propósito, para a linha ser "
+            "comparável de ponta a ponta; para incluí-la,",
+            "é só estendê-la à seleção de dados.",
             "",
         ]:
             ws.append([t])

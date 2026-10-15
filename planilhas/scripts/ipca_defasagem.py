@@ -896,11 +896,22 @@ def escrever(linhas, sensivel, pontos, medias, bah, par, sal, pesos, diag,
         "tudo: Salvador repassou na hora e o resto do país não. Depois duas "
         "coisas estreitaram a diferença.",
         "Primeiro, as outras praças correram atrás, e correr atrás some do "
-        "acumulado em doze meses. Segundo, a",
-        "subvenção da MP 1.358 vale para TODO produtor e importador desde "
-        "junho de 2026, Acelen inclusive: o",
-        "preço baiano também passou a ser segurado, e o controle deixou de ser "
-        "controle.",
+        "acumulado em doze meses. Segundo, e",
+        "sobretudo, a subvenção da MP 1.358 chegou à Bahia. A Petrobras passou "
+        "a descontar os R$ 0,44 por litro em",
+        "29/5/2026; a Acelen, só em 13/8/2026, dois meses e meio depois. Nas "
+        "duas semanas seguintes o preço de",
+        "bomba baiano caiu R$ 0,25 enquanto o do Brasil ficou parado, e o IPCA "
+        "Gasolina de Salvador fez -4,4% em",
+        "agosto, o maior recuo das dezesseis praças. A tabela da Acelen mal se "
+        "mexeu nesse período: o que mudou",
+        "foi o que a distribuidora pagou. Ver a aba 'Acelen vs PPI' do "
+        "defasagem-gasolina.xlsx.",
+        "",
+        "Ou seja, o controle recebeu o mesmo remédio que o resto do país "
+        "tomava desde maio, só que de uma vez e",
+        "atrasado. A diferença entre as praças sumiu, e com ela o "
+        "contrafactual.",
         "",
         "É por isso que o acumulado em 12 meses por este caminho vai a zero em "
         "setembro de 2026 enquanto o",
@@ -1008,7 +1019,8 @@ def escrever(linhas, sensivel, pontos, medias, bah, par, sal, pesos, diag,
         "de defasagem, mede diferença de",
         "ritmo entre praças, então ela zera quando todo mundo repassa igual — "
         "inclusive quando todo mundo está",
-        "igualmente segurado, que é o caso desde a subvenção de junho de 2026.",
+        "igualmente segurado, que é o caso desde 13/8/2026, quando a subvenção "
+        "da MP 1.358 chegou à Acelen.",
         "",
     ]:
         ws.append([t])
