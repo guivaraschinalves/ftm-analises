@@ -23,7 +23,9 @@ Dois alertas de leitura. A Abicom divide a defasagem pelo preço da Petrobras, n
 
 Ou seja, boa parte do buraco não é política de preço da Petrobras, é subsídio. O que sobra vem da estratégia comercial que a empresa adotou em maio de 2023, quando abandonou a paridade estrita com o PPI.
 
-Antes de estimar o impacto, é preciso saber se ele tem chance de acontecer: **estimativa sem probabilidade não serve de nada**. Nas próximas seções, a estrutura do mercado, as diferenças entre regiões, a situação da Petrobras e o custo fiscal.
+Antes de estimar o impacto, precisamos entender a probabilidade de ele acontecer. Com probabilidade irrelevante, o cálculo do impacto também é irrelevante.
+
+Para saber o que precisaria ocorrer para a Petrobras fechar a defasagem da gasolina ou do diesel, vamos passar pela estrutura do mercado de petróleo e derivados no Brasil, pelas diferenças entre as regiões (de onde nasceu um exercício muito interessante da FGV), pela situação da Petrobras e pelo lado fiscal, com as subvenções e os gastos.
 
 ## Probabilidade de fechar: gasolina
 chave: gasolina-probabilidade
