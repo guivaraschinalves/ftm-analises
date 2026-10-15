@@ -103,8 +103,13 @@ details[open] > summary > .seta, details[open] > .nav-rotulo > .seta, details[op
 .categoria[open] > .categoria-rotulo { padding-bottom: 8px; }
 /* o parágrafo de abertura do assunto: é uma análise, não só um painel */
 .apresentacao { margin: 0 0 10px; padding-left: 26px; color: var(--ink-2); max-width: 78ch; line-height: 1.5; }
+.apresentacao + .apresentacao { margin-top: -4px; }
 .secao { padding-left: 21px; border-left: 1px solid var(--border); margin-left: 5px; }
 .secao-rotulo { padding: 10px 2px; font-size: 19px; font-weight: 700; }
+/* o texto da seção: a análise em si, entre o título e os gráficos dela */
+.secao-texto { margin: 0 0 10px; padding-left: 26px; color: var(--ink-2); max-width: 78ch; line-height: 1.55; }
+.secao-texto + .secao-texto { margin-top: -4px; }
+.secao-texto b { color: var(--ink); }
 .secao-graficos { display: grid; gap: 22px; padding: 6px 0 16px; }
 
 /* ---------- cartão do gráfico (retrátil) ---------- */

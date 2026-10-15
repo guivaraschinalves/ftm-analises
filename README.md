@@ -11,6 +11,7 @@ No ar: <https://guivaraschinalves.github.io/ftm-analises/>
 |---|---|---|
 | **Taxa de 10 anos dos EUA** | `dados/juros-eua.json` | Baixados **sozinhos** todo dia do FRED (St. Louis Fed), séries `DGS10` e `GS10`, e do investing.com (intradiário) |
 | **A bolsa nas eleições presidenciais** | `dados/eleicoes.json` | Baixados da API aberta do Ipeadata (Ibovespa diário desde 1993); `scripts/eleicoes.py`, rodado à mão |
+| **A defasagem dos combustíveis** | `dados/defasagem-combustiveis.json` | Montados a partir das planilhas de [`planilhas/`](planilhas/); `scripts/defasagem_combustiveis.py`, rodado à mão |
 
 O acervo intradiário fica à parte, em `dados/intradiario-10a.json`: é o arquivo
 que **acumula** as cotações de 15 em 15 minutos (veja abaixo).

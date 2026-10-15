@@ -71,7 +71,7 @@
   // Um arquivo por assunto. Cada um traz assunto, fonte, data de referência,
   // uma apresentação e as suas seções; um que faltar é só ignorado. A ordem
   // aqui é a ordem da página.
-  var FONTES = ["dados/juros-eua.json", "dados/eleicoes.json"];
+  var FONTES = ["dados/juros-eua.json", "dados/eleicoes.json", "dados/defasagem-combustiveis.json"];
   var docs = [];
   var logoSvg = null;   // {viewBox, nos}
 
@@ -96,6 +96,23 @@
     (filhos || []).forEach(function (f) { n.appendChild(f); });
     return n;
   }
+  // Prosa vinda do arquivo de dados. Aceita duas marcações, e só duas: linha
+  // em branco separa parágrafo, **assim** fica em negrito. É o suficiente para
+  // definir um termo técnico no meio da explicação sem o texto virar um bloco
+  // só — e não é Markdown, para não abrir a porta a HTML vindo do arquivo.
+  // Usada na apresentação do assunto, no texto da seção e na nota do gráfico.
+  function paragrafos(txt, classe) {
+    if (!txt) return [];
+    return String(txt).split(/\n\s*\n/).map(function (paragrafo) {
+      var p = html("p", { "class": classe });
+      paragrafo.split(/\*\*/).forEach(function (pedaco, i) {
+        if (!pedaco) return;
+        p.appendChild(i % 2 ? html("b", { texto: pedaco }) : document.createTextNode(pedaco));
+      });
+      return p;
+    });
+  }
+
   function tema() { return document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark"; }
 
   var medidor = document.createElement("canvas").getContext("2d");
@@ -1114,20 +1131,7 @@
 
     cartao.frame = html("div", { "class": "frame" });
     raiz.appendChild(cartao.frame);
-    // A nota aceita duas marcações, e só duas: linha em branco separa parágrafo,
-    // **assim** fica em negrito. É o suficiente para definir um termo técnico no
-    // meio da explicação sem o texto virar um bloco só — e não é Markdown, para
-    // não abrir a porta a HTML vindo do arquivo de dados.
-    if (g.nota) {
-      g.nota.split(/\n\s*\n/).forEach(function (paragrafo) {
-        var p = html("p", { "class": "nota" });
-        paragrafo.split(/\*\*/).forEach(function (pedaco, i) {
-          if (!pedaco) return;
-          p.appendChild(i % 2 ? html("b", { texto: pedaco }) : document.createTextNode(pedaco));
-        });
-        raiz.appendChild(p);
-      });
-    }
+    paragrafos(g.nota, "nota").forEach(function (p) { raiz.appendChild(p); });
     // o gráfico leva o rótulo curto do acontecimento; a explicação inteira fica
     // aqui embaixo, em lista, na ordem em que aconteceu
     var comTexto = (g.eventos || []).filter(function (e) { return e.texto; });
@@ -1501,7 +1505,9 @@
     rotulo.appendChild(seta());
     rotulo.appendChild(html("span", { texto: dados.assunto }));
     cat.appendChild(rotulo);
-    if (dados.apresentacao) cat.appendChild(html("p", { "class": "apresentacao", texto: dados.apresentacao }));
+    paragrafos(dados.apresentacao, "apresentacao").forEach(function (p) {
+      cat.appendChild(p);
+    });
 
     dados.secoes.forEach(function (sec, k) {
       var secao = html("details", { "class": "secao", id: "secao-" + slug(dados.assunto) + "-" + k });
@@ -1509,6 +1515,11 @@
       rotuloSecao.appendChild(seta());
       rotuloSecao.appendChild(html("span", { texto: sec.titulo }));
       secao.appendChild(rotuloSecao);
+      // O texto da seção é onde mora a análise: fica entre o título e os
+      // gráficos, e some junto com eles quando a seção está fechada.
+      paragrafos(sec.texto, "secao-texto").forEach(function (p) {
+        secao.appendChild(p);
+      });
 
       var listaGraficos = html("div", { "class": "secao-graficos" });
       var daSecao = [];
