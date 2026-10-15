@@ -109,11 +109,38 @@
       return paragrafo1(paragrafo, classe);
     });
   }
+  // "[trecho](fonte:id)" marca de onde veio a informação. O trecho fica
+  // sublinhado e a fonte vai para a margem na altura dele, ligada por uma
+  // linha. A marcação é tratada ANTES do negrito, e o que sobra de cada
+  // pedaço continua passando pelo **negrito** normalmente.
+  var MARCA_CITA = /\[([^\]]+)\]\(fonte:([\w-]+)\)/g;
+
+  // O negrito é resolvido ANTES da citação, e não ao contrário: o ** alterna
+  // um estado que vale para o parágrafo inteiro, então "**[x](fonte:y)**"
+  // precisa fechar o negrito no ** de fora. Processar a citação primeiro
+  // quebrava o par e pintava o resto do parágrafo de negrito.
+  function trecho(texto, forte, destino) {
+    var fim = 0, m;
+    MARCA_CITA.lastIndex = 0;
+    var por = function (t, fonte) {
+      if (!t) return;
+      var no = forte ? html("b", { texto: t }) : document.createTextNode(t);
+      if (!fonte) return destino.appendChild(no);
+      var marca = html("span", { "class": "cita", "data-fonte": fonte });
+      marca.appendChild(no);
+      destino.appendChild(marca);
+    };
+    while ((m = MARCA_CITA.exec(texto)) !== null) {
+      por(texto.slice(fim, m.index), null);
+      por(m[1], m[2]);
+      fim = m.index + m[0].length;
+    }
+    por(texto.slice(fim), null);
+  }
   function paragrafo1(paragrafo, classe) {
     var p = html("p", { "class": classe });
     paragrafo.split(/\*\*/).forEach(function (pedaco, i) {
-      if (!pedaco) return;
-      p.appendChild(i % 2 ? html("b", { texto: pedaco }) : document.createTextNode(pedaco));
+      if (pedaco) trecho(pedaco, i % 2 === 1, p);
     });
     return p;
   }
@@ -1511,6 +1538,66 @@
     });
   }
 
+  // ---------- notas de margem ----------
+  //
+  // Cada nota vai para a altura do trecho que a cita. Isso não dá para fazer
+  // em CSS: depende de onde a palavra caiu depois de quebrar a linha, o que
+  // só se sabe com o layout pronto. Daí ser recalculado aqui, e de novo a
+  // cada redimensionamento.
+  //
+  // Abaixo de 1240px as notas voltam ao fluxo (o CSS cuida disso) e esta
+  // função não mexe em nada: na coluna estreita não há margem para ocupar.
+  var secoesComNotas = [];
+  function posicionarNotas(secoes) {
+    if (!window.matchMedia || !window.matchMedia("(min-width: 1240px)").matches) {
+      (secoes || []).forEach(function (secao) {
+        [].forEach.call(secao.querySelectorAll(".nota-margem"), function (n) {
+          n.style.top = "";
+        });
+      });
+      return;
+    }
+    (secoes || []).forEach(function (secao) {
+      var base = secao.getBoundingClientRect().top;
+      // A ordem na margem é a da CITAÇÃO, não a da declaração no arquivo de
+      // texto. Sem isto, declarar as fontes numa ordem e citá-las em outra
+      // empurrava cada nota para longe do trecho dela.
+      var fila = [].map.call(secao.querySelectorAll(".nota-margem"), function (nota) {
+        var id = nota.getAttribute("data-fonte");
+        var alvo = id && secao.querySelector('.cita[data-fonte="' + id + '"]');
+        return {
+          nota: nota,
+          // sem citação no texto, a nota vai para o fim da fila
+          alvo: alvo ? alvo.getBoundingClientRect().top - base : Infinity
+        };
+      });
+      fila.sort(function (a, b) { return a.alvo - b.alvo; });
+      var piso = 0;                       // onde a nota anterior terminou
+      fila.forEach(function (item) {
+        var topo = Math.max(item.alvo === Infinity ? piso : item.alvo, piso);
+        item.nota.style.top = topo + "px";
+        piso = topo + item.nota.offsetHeight + 12;
+      });
+    });
+  }
+
+  // Passar o mouse num dos dois acende o outro: é o que confirma ao leitor
+  // qual fonte pertence a qual trecho quando há várias por perto.
+  function ligarRealce(raiz) {
+    raiz.addEventListener("mouseover", function (ev) {
+      var alvo = ev.target.closest && ev.target.closest(".cita, .nota-margem");
+      if (!alvo) return;
+      var id = alvo.getAttribute("data-fonte");
+      if (!id) return;
+      [].forEach.call(raiz.querySelectorAll('[data-fonte="' + id + '"]'),
+        function (n) { n.classList.add("aceso"); });
+    });
+    raiz.addEventListener("mouseout", function () {
+      [].forEach.call(raiz.querySelectorAll(".aceso"),
+        function (n) { n.classList.remove("aceso"); });
+    });
+  }
+
   function fecharIndice() {
     var d = document.querySelector(".indice");
     if (d) d.open = false;
@@ -1563,12 +1650,13 @@
   // nascem abertos.
   function montarArtigo(dados, host) {
     var art = html("article", { "class": "artigo", id: idAssunto(dados) });
+    ligarRealce(art);
     art.appendChild(html("h2", { "class": "artigo-titulo", texto: dados.assunto }));
     paragrafos(dados.apresentacao, "artigo-lede").forEach(function (p) {
       art.appendChild(p);
     });
 
-    var aDesenhar = [];
+    var aDesenhar = [], comNotas = [];
     dados.secoes.forEach(function (sec, k) {
       // Seção sem título é legítima: a primeira costuma continuar o título
       // do assunto, e repetir um cabeçalho ali só empurra o texto para baixo.
@@ -1583,17 +1671,14 @@
       // uma linha discreta embaixo do título em tela estreita. Ficam fora do
       // texto de propósito: quem lê não tropeça nelas, e quem quer conferir
       // acha sem caçar.
-      if ((sec.fontes || []).length) {
-        var fontes = html("aside", { "class": "secao-fontes" });
-        fontes.appendChild(html("p", { "class": "secao-fontes-titulo", texto: "Fontes" }));
-        sec.fontes.forEach(function (f) {
-          var item = f.url
-            ? html("a", { href: f.url, target: "_blank", rel: "noopener noreferrer", texto: f.rot })
-            : html("span", { texto: f.rot });
-          fontes.appendChild(html("p", {}, [item]));
-        });
-        secao.appendChild(fontes);
-      }
+      var notas = (sec.fontes || []).map(function (f) {
+        var nota = html("aside", { "class": "nota-margem", "data-fonte": f.id || "" });
+        var item = f.url
+          ? html("a", { href: f.url, target: "_blank", rel: "noopener noreferrer", texto: f.rot })
+          : html("span", { texto: f.rot });
+        nota.appendChild(item);
+        return nota;
+      });
       blocos(sec.texto, "artigo-texto", sec.figuras).forEach(function (p) {
         secao.appendChild(p);
       });
@@ -1605,6 +1690,9 @@
         aDesenhar.push(c);
         secao.appendChild(c.raiz);
       });
+      // as notas entram por último para ficarem por cima na pilha
+      notas.forEach(function (n) { secao.appendChild(n); });
+      if (notas.length) comNotas.push(secao);
       art.appendChild(secao);
     });
 
@@ -1612,10 +1700,15 @@
     // No quadro seguinte, não agora: desenhar() desiste se o frame ainda tem
     // largura zero (veja o clientWidth lá embaixo), e logo depois do
     // appendChild o navegador pode não ter feito o layout. Com o rAF o
-    // desenho acontece depois dele.
-    var pintar = function () { aDesenhar.forEach(function (c) { desenhar(c, true); }); };
+    // desenho acontece depois dele. As notas de margem vêm depois dos
+    // gráficos pelo mesmo motivo, e porque o gráfico muda a altura da seção.
+    var pintar = function () {
+      aDesenhar.forEach(function (c) { desenhar(c, true); });
+      posicionarNotas(comNotas);
+    };
     if (window.requestAnimationFrame) window.requestAnimationFrame(pintar);
     else setTimeout(pintar, 0);
+    secoesComNotas = comNotas;
   }
 
   // Monta um assunto inteiro na página: assunto > seções > gráficos, tudo
@@ -1725,7 +1818,10 @@
     var espera;
     window.addEventListener("resize", function () {
       clearTimeout(espera);
-      espera = setTimeout(function () { cartoes.forEach(function (c) { desenhar(c, false); }); }, 120);
+      espera = setTimeout(function () {
+        cartoes.forEach(function (c) { desenhar(c, false); });
+        posicionarNotas(secoesComNotas);
+      }, 120);
     });
   }
 

@@ -1,27 +1,27 @@
 # A defasagem dos combustíveis
 
 ## 
-fonte: Abicom, PPI de 14/10/2026 | https://abicom.com.br/ppi/ppi-14-10-2026/
-fonte: Petrobras, tabela de preços do diesel S500 e S10, vigência de 01/10/2026 | https://precos.petrobras.com.br/
-fonte: MP 1.363/2026 e MP 1.391/2026, com a Portaria MF 2.813
-fonte: ANP, preços de paridade de importação | https://www.gov.br/anp/pt-br/assuntos/precos-e-defesa-da-concorrencia/precos/precos-de-paridade-de-importacao
-fonte: ⟨FALTA: a fonte da mudança de política de 2023⟩
+fonte: abicom | Abicom, PPI de 14/10/2026 | https://abicom.com.br/ppi/ppi-14-10-2026/
+fonte: tabela-petrobras | Petrobras, tabela de preços do diesel S500 e S10, vigência de 01/10/2026 | https://precos.petrobras.com.br/
+fonte: mps-diesel | MP 1.363/2026 e MP 1.391/2026, com a Portaria MF 2.813
+fonte: anp-ppi | ANP, preços de paridade de importação | https://www.gov.br/anp/pt-br/assuntos/precos-e-defesa-da-concorrencia/precos/precos-de-paridade-de-importacao
+fonte: politica-2023 | ⟨FALTA: a fonte da mudança de política de 2023⟩
 figura: abicom-tabela | assets/abicom-ppi-14-10-2026.png | Acompanhamento diário da Abicom em 14/10/2026: preço, PPI e defasagem por ponto de entrega. | Abicom, em parceria com a StoneX Brasil | https://abicom.com.br/ppi/ppi-14-10-2026/
 figura: abicom-serie | assets/abicom-diesel-paulinia.png | O preço do diesel A em Paulínia contra o PPI. A linha verde tem dois degraus e eles são coisas diferentes: o de março é a Petrobras subindo a tabela de R$ 3,30 para R$ 3,68, e o de junho é a subvenção entrando e derrubando para R$ 3,33 o que a distribuidora paga. | Abicom | https://abicom.com.br/ppi/ppi-14-10-2026/
 
-Há tempos mostro no canal a defasagem de preços da Petrobras reportada pela Abicom. Muitos de vocês pediram uma análise do impacto no IPCA caso a empresa feche essa diferença.
+Há tempos mostro no canal a defasagem de preços da Petrobras reportada pela [Abicom](fonte:abicom). Muitos de vocês pediram uma análise do impacto no IPCA caso a empresa feche essa diferença.
 
-Os dados de 14 de outubro mostram o diesel em Paulínia a R$ 3,33 o litro contra um PPI de R$ 6,77, defasagem de **103% do preço cobrado**. Na gasolina, R$ 3,06 contra R$ 3,80, ou 24%. Paulínia é a maior refinaria do país: um quarto do diesel e um quinto da gasolina A que o Brasil produz.
+Os [dados de 14 de outubro](fonte:abicom) mostram o diesel em Paulínia a R$ 3,33 o litro contra um PPI de R$ 6,77, defasagem de **103% do preço cobrado**. Na gasolina, R$ 3,06 contra R$ 3,80, ou 24%. Paulínia é a maior refinaria do país: um quarto do diesel e um quinto da gasolina A que o Brasil produz.
 
 [figura:abicom-tabela]
 
-**PPI** é o custo estimado de importar o produto, com cotação internacional, câmbio, logística e, dependendo da metodologia, um prêmio de risco. Os preços são os cobrados das distribuidoras, antes de tributos, etanol anidro e margens.
+**[PPI](fonte:anp-ppi)** é o custo estimado de importar o produto, com cotação internacional, câmbio, logística e, dependendo da metodologia, um prêmio de risco. Os preços são os cobrados das distribuidoras, antes de tributos, etanol anidro e margens.
 
-Dois alertas de leitura. A Abicom divide a defasagem pelo preço da Petrobras, não pelo PPI: contra o PPI o diesel é −51%, não −103%. E os R$ 3,33 já são o preço **com** a subvenção de R$ 2,12 por litro bancada pelo Tesouro. A tabela cheia é R$ 5,45; sem o subsídio a defasagem do diesel seria 24%, igual à da gasolina.
+Dois alertas de leitura. A Abicom divide a defasagem pelo preço da Petrobras, não pelo PPI: contra o PPI o diesel é −51%, não −103%. E os R$ 3,33 já são o preço **com** a [subvenção de R$ 2,12 por litro](fonte:mps-diesel) bancada pelo Tesouro. A [tabela cheia é R$ 5,45](fonte:tabela-petrobras); sem o subsídio a defasagem do diesel seria 24%, igual à da gasolina.
 
 [figura:abicom-serie]
 
-Ou seja, boa parte do buraco não é política de preço da Petrobras, é subsídio. O que sobra vem da estratégia comercial que a empresa adotou em maio de 2023, quando abandonou a paridade estrita com o PPI.
+Ou seja, boa parte do buraco não é política de preço da Petrobras, é subsídio. O que sobra vem da [estratégia comercial que a empresa adotou em maio de 2023](fonte:politica-2023), quando abandonou a paridade estrita com o PPI.
 
 Antes de estimar o impacto, precisamos entender a probabilidade de ele acontecer. Com probabilidade irrelevante, o cálculo do impacto também é irrelevante.
 
@@ -29,10 +29,10 @@ Para saber o que precisaria ocorrer para a Petrobras fechar a defasagem da gasol
 
 ## Probabilidade de fechar: gasolina
 chave: gasolina-probabilidade
-fonte: ANP, produção e vendas de derivados | https://www.gov.br/anp/pt-br/centrais-de-conteudo/dados-estatisticos
-fonte: ANP, Relatório de Desembaraços (Siscomex) | https://www.gov.br/anp/pt-br/centrais-de-conteudo/dados-estatisticos
-fonte: Francisco Pessoa Faria, “Impacto da defasagem da gasolina no IPCA e reflexos de sua subvenção nos resultados da Petrobras”, Blog do IBRE (FGV) | https://blogdoibre.fgv.br/
-fonte: ⟨FALTA: exportação de petróleo da Petrobras⟩
+fonte: anp-producao | ANP, produção e vendas de derivados | https://www.gov.br/anp/pt-br/centrais-de-conteudo/dados-estatisticos
+fonte: anp-desembaracos | ANP, Relatório de Desembaraços (Siscomex) | https://www.gov.br/anp/pt-br/centrais-de-conteudo/dados-estatisticos
+fonte: fgv | Francisco Pessoa Faria, “Impacto da defasagem da gasolina no IPCA e reflexos de sua subvenção nos resultados da Petrobras”, Blog do IBRE (FGV) | https://blogdoibre.fgv.br/
+fonte: petroleo-exportacao | ⟨FALTA: exportação de petróleo da Petrobras⟩
 
 Na gasolina a probabilidade de a defasagem fechar é baixa, e o motivo é estrutural: o Brasil depende pouco de importação. Em 2026, até agosto, **14,4% da gasolina A** veio de fora. No diesel foram 22,7%, e em 2025, 26,8%.
 
@@ -42,10 +42,10 @@ Isso muda quem manda no preço. Com pouca importação, o importador que desiste
 
 ## Probabilidade de fechar: diesel
 chave: diesel-probabilidade
-fonte: ANP, produção e vendas de derivados | https://www.gov.br/anp/pt-br/centrais-de-conteudo/dados-estatisticos
-fonte: ANP, Relatório de Desembaraços (Siscomex) | https://www.gov.br/anp/pt-br/centrais-de-conteudo/dados-estatisticos
-fonte: MME, abastecimento de diesel em outubro | https://agenciagov.ebc.com.br/noticias/202610/governo-federal-prorroga-desoneracao-da-gasolina-e-do-etanol
-fonte: MPs 1.388, 1.389, 1.391 e 1.395, e portaria do Ministério da Fazenda de 13/10/2026
+fonte: anp-producao | ANP, produção e vendas de derivados | https://www.gov.br/anp/pt-br/centrais-de-conteudo/dados-estatisticos
+fonte: anp-desembaracos | ANP, Relatório de Desembaraços (Siscomex) | https://www.gov.br/anp/pt-br/centrais-de-conteudo/dados-estatisticos
+fonte: mme-abastecimento | MME, abastecimento de diesel em outubro | https://agenciagov.ebc.com.br/noticias/202610/governo-federal-prorroga-desoneracao-da-gasolina-e-do-etanol
+fonte: mps-credito | MPs 1.388, 1.389, 1.391 e 1.395, e portaria do Ministério da Fazenda de 13/10/2026
 
 No diesel a história é outra, e é aqui que mora o problema. O país importa perto de um quarto do que consome, e isso dá ao importador um poder que ele não tem na gasolina: **se o preço interno não compensa, ele simplesmente para de trazer**.
 
@@ -59,11 +59,11 @@ A métrica oficial de desabastecimento é **oferta confirmada contra demanda pro
 
 ## Quanto vale fechar: gasolina
 chave: gasolina-estimativa
-fonte: IBGE, IPCA (SIDRA, tabela 7060) | https://sidra.ibge.gov.br/tabela/7060
-fonte: Francisco Pessoa Faria, “Impacto da defasagem da gasolina no IPCA e reflexos de sua subvenção nos resultados da Petrobras”, Blog do IBRE (FGV) | https://blogdoibre.fgv.br/
-fonte: Petrobras, tabelas de preços | https://precos.petrobras.com.br/
-fonte: ANP, Levantamento de Preços (revenda) | https://www.gov.br/anp/pt-br/centrais-de-conteudo/dados-abertos/serie-historica-de-precos-de-combustiveis
-fonte: ⟨FALTA: efeitos indiretos, Relatório de Política Monetária do Banco Central⟩
+fonte: sidra | IBGE, IPCA (SIDRA, tabela 7060) | https://sidra.ibge.gov.br/tabela/7060
+fonte: fgv | Francisco Pessoa Faria, “Impacto da defasagem da gasolina no IPCA e reflexos de sua subvenção nos resultados da Petrobras”, Blog do IBRE (FGV) | https://blogdoibre.fgv.br/
+fonte: tabela-petrobras | Petrobras, tabelas de preços | https://precos.petrobras.com.br/
+fonte: anp-revenda | ANP, Levantamento de Preços (revenda) | https://www.gov.br/anp/pt-br/centrais-de-conteudo/dados-abertos/serie-historica-de-precos-de-combustiveis
+fonte: bc-indiretos | ⟨FALTA: efeitos indiretos, Relatório de Política Monetária do Banco Central⟩
 
 Duas contas, por caminhos que não dividem nenhuma suposição.
 
@@ -79,9 +79,9 @@ A Acelen justifica o papel de régua: desde março de 2026 ela vende, em média,
 
 ## Quanto vale fechar: diesel
 chave: diesel-estimativa
-fonte: IBGE, IPCA (SIDRA, tabela 7060) | https://sidra.ibge.gov.br/tabela/7060
-fonte: Petrobras, tabelas de preços | https://precos.petrobras.com.br/
-fonte: ⟨FALTA: efeitos indiretos, Relatório de Política Monetária do Banco Central⟩
+fonte: sidra | IBGE, IPCA (SIDRA, tabela 7060) | https://sidra.ibge.gov.br/tabela/7060
+fonte: tabela-petrobras | Petrobras, tabelas de preços | https://precos.petrobras.com.br/
+fonte: bc-indiretos | ⟨FALTA: efeitos indiretos, Relatório de Política Monetária do Banco Central⟩
 
 No diesel a conta direta é pequena, e por um motivo simples: **família não compra diesel**. O item existe no IPCA — subitem 5104003, Óleo diesel — mas pesa **0,2562%** contra 5,1285% da gasolina. Vinte vezes menos.
 

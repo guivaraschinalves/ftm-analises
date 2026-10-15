@@ -50,7 +50,8 @@ O formato é pobre de propósito, e são cinco regras:
 | `# Título` | o nome do assunto, uma vez no topo |
 | `## Título` | abre uma seção; `##` sozinho é uma seção **sem** título, que não aparece no índice |
 | `chave: nome` | liga a seção aos gráficos que o script monta para ela |
-| `fonte: rótulo \| url` | uma linha por fonte, e elas saem na margem |
+| `fonte: id \| rótulo \| url` | uma linha por fonte |
+| `[trecho](fonte:id)` | sublinha o trecho e puxa a fonte para a margem, na altura dele, com uma linha de chamada |
 | `figura: id \| arquivo \| legenda \| crédito \| url` | declara uma imagem; `[figura:id]` num parágrafo sozinho é onde ela entra |
 
 No corpo: linha em branco separa parágrafo e `**assim**` fica em negrito. Nada

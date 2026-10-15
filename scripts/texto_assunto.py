@@ -9,7 +9,7 @@ O FORMATO, que é de propósito pobre
 
     ## Título da seção
     chave: gasolina-probabilidade
-    fonte: ANP, produção e vendas | https://...
+    fonte: anp-producao | ANP, produção e vendas | https://...
     figura: abicom-tabela | assets/x.png | legenda | crédito | https://...
 
     Primeiro parágrafo, com **negrito** quando precisar.
@@ -31,6 +31,9 @@ Regras, todas elas:
   - `chave:` liga a seção aos gráficos que o gerador monta para ela. Sem
     chave, a seção não recebe gráfico nenhum.
   - Um parágrafo que seja só `[figura:id]` vira a imagem declarada na seção.
+  - `[trecho](fonte:id)` no meio da prosa sublinha o trecho e puxa a fonte de
+    mesmo id para a margem, na altura dele, com uma linha de chamada. Fonte
+    declarada e nunca citada continua aparecendo, só que sem a linha.
 
 O QUE ESTE MÓDULO NÃO FAZ
 
@@ -83,8 +86,13 @@ def ler(nome):
             atual["chave"] = resto.strip()
         elif tipo == "fonte":
             p = partes(resto)
-            atual["fontes"].append(
-                {"rot": p[0], "url": p[1]} if len(p) > 1 and p[1] else {"rot": p[0]})
+            if len(p) < 2:
+                raise SystemExit("%s linha %d: fonte precisa de id e rótulo "
+                                 "(`fonte: id | rótulo | url`)" % (caminho, n))
+            f = {"id": p[0], "rot": p[1]}
+            if len(p) > 2 and p[2]:
+                f["url"] = p[2]
+            atual["fontes"].append(f)
         else:
             p = partes(resto)
             if len(p) < 3:
