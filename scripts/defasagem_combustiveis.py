@@ -120,7 +120,12 @@ def cor_de(v):
 # ─── a defasagem do diesel, que ainda não tem planilha ───────────────────────
 
 def defasagem_diesel():
-    """[(semana, defasagem % de tabela)] em Paulínia, para o gráfico 1.
+    """[(semana, defasagem % de tabela)] em Paulínia.
+
+    NÃO ESTÁ EM USO. O gráfico que ela alimentava saiu da introdução, porque
+    ali ele disputava espaço com as duas imagens da Abicom e usava outro
+    denominador. Fica porque a conta é o que custou a fazer, e ela volta
+    quando houver seção para ela.
 
     A planilha defasagem-gasolina.xlsx só cobre gasolina. A tabela de diesel da
     Petrobras só ficou acessível em 15/10/2026, quando a busca na biblioteca
@@ -150,12 +155,6 @@ def defasagem_diesel():
 # ─── seção 1: o que é defasagem ──────────────────────────────────────────────
 
 def secao_introducao():
-    wb = planilha("defasagem-gasolina.xlsx")
-    gas = [(l["semana (fim)"].strftime("%Y-%m-%d"), 100 * l["defasagem %"])
-           for l in linhas_da_aba(wb["Defasagem Paulínia"], "semana (fim)")
-           if l.get("defasagem %") is not None]
-    die = defasagem_diesel()
-
     # O texto é dele, com as correções conferidas contra a tabela da
     # Petrobras: o denominador da Abicom, a subvenção dentro do -103% e a
     # fatia da REPLAN na produção nacional. Curto de propósito — parede de
@@ -212,50 +211,25 @@ def secao_introducao():
     fontes = [
         {"rot": "Abicom, PPI de 14/10/2026",
          "url": "https://abicom.com.br/ppi/ppi-14-10-2026/"},
-        {"rot": "Petrobras, tabelas de preços",
+        # O R$ 2,12 está no rodapé da própria tabela: "Desconto
+        # correspondente ao valor da subvenção de R$ 1,12/litro […] MP 1.363"
+        # mais "R$ 1,00/litro […] MP 1.391 e Portaria MF nº 2.813".
+        {"rot": "Petrobras, tabela de preços do diesel S500 e S10, "
+                "vigência de 01/10/2026",
          "url": "https://precos.petrobras.com.br/"},
+        {"rot": "MP 1.363/2026 e MP 1.391/2026, com a Portaria MF 2.813"},
         {"rot": "ANP, preços de paridade de importação",
          "url": "https://www.gov.br/anp/pt-br/assuntos/precos-e-defesa-da-concorrencia/precos/precos-de-paridade-de-importacao"},
         {"rot": "⟨FALTA: a fonte da mudança de política de 2023⟩"},
     ]
 
-    g = {
-        "id": "defasagem-semanal",
-        "titulo": "A defasagem contra o preço de importação",
-        "subtitulo": "Preço da Petrobras menos o PPI da ANP, em % do PPI, "
-                     "em Paulínia. Negativo é vender abaixo da paridade",
-        "unidade": "%",
-        "fonte": FONTE_ANP,
-        "diario": True,
-        # A série é SEMANAL num eixo diário: dois pontos vizinhos ficam 7 dias
-        # um do outro, e o padrão do app corta a linha em buraco maior que 6.
-        # Sem isto o gráfico sai em cacos.
-        "buracoMax": 10,
-        "series": [serie("Gasolina A", AZUL, gas)],
-        "nota": "Preço de tabela, sem a subvenção descontada. A modalidade é "
-                "EXA, no duto dentro da refinaria, que é onde o PPI dos pontos "
-                "interiores também chega.\n\n"
-                "CUIDADO COM 2026. A defasagem parece encolher quando a "
-                "subvenção entra — na gasolina em maio, no diesel em setembro "
-                "—, mas o que subiu foi a tabela, não o preço que a "
-                "distribuidora paga. A subvenção é paga ao produtor com a "
-                "condição de ser descontada do preço: a empresa sobe a tabela "
-                "e o comprador paga o mesmo. Medida pelo que a distribuidora "
-                "desembolsa, a defasagem ficou **maior**, não menor.\n\n"
-                "POR QUE NÃO BATE COM A ABICOM. Duas razões, e as duas são "
-                "de método, não de dado. O denominador: aqui a defasagem é "
-                "dividida pelo PPI, e a Abicom divide pelo preço da "
-                "Petrobras, o que dá um número maior (−51% contra −103% no "
-                "diesel em 14/10). E o PPI: cada casa calcula o seu, com "
-                "porto, frete, custo de internação e dia de cotação "
-                "diferentes. O daqui é o da ANP, estimado pela S&P Global, "
-                "que é público e auditável.",
-    }
-    if die:
-        g["series"].append(serie("Diesel S-10", VERMELHO, die))
+    # Sem gráfico nosso aqui, a pedido dele: as duas imagens da Abicom já
+    # mostram a defasagem, e pôr ao lado a nossa série, que usa outro
+    # denominador, confundiria em vez de somar. A conta de como montá-la
+    # continua em defasagem_diesel(), logo acima, para quando voltar.
     return {"titulo": "O que é defasagem, e por que ela importa",
             "texto": texto, "fontes": fontes, "figuras": figuras,
-            "graficos": [g]}
+            "graficos": []}
 
 
 # ─── seção 2: probabilidade de fechar, gasolina ──────────────────────────────
@@ -739,16 +713,10 @@ def main():
         # levado na ordem, e obrigá-lo a abrir capítulo é atrito. Ver
         # montarArtigo() no app.js.
         "formato": "artigo",
-        "apresentacao":
-            "A Petrobras vende gasolina e diesel abaixo do preço de "
-            "importação. Quanto isso segura do IPCA, e qual a chance de a "
-            "conta chegar. São duas perguntas, e a segunda vem primeiro na "
-            "ordem de importância: **estimativa sem probabilidade não serve "
-            "de nada**.\n\n"
-            "O que se mede aqui: a defasagem semana a semana contra o PPI da "
-            "ANP, quem fornece o combustível do país, duas estimativas "
-            "independentes do represamento no IPCA — uma nossa e uma refeita "
-            "a partir do artigo da FGV — e o que a subvenção custa.",
+        # Sem apresentação: o texto começa na primeira seção. Um resumo
+        # antes da introdução repete o que a introdução já faz, e numa
+        # página de leitura isso é só mais parágrafo entre o leitor e o
+        # assunto. O campo continua existindo para os outros assuntos.
         "secoes": secoes,
     }
     faltas = sum(s["texto"].count("⟨") for s in secoes)
