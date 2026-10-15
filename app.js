@@ -1498,6 +1498,7 @@
 
       if (i !== atual) return;
       dados.secoes.forEach(function (sec, k) {
+        if (!sec.titulo) return;          // seção sem título não vira linha do índice
         var destino = "secao-" + slug(dados.assunto) + "-" + k;
         var a = html("a", { "class": "nav-secao", href: "#" + destino, texto: sec.titulo });
         a.addEventListener("click", function (ev) {
@@ -1569,11 +1570,15 @@
 
     var aDesenhar = [];
     dados.secoes.forEach(function (sec, k) {
+      // Seção sem título é legítima: a primeira costuma continuar o título
+      // do assunto, e repetir um cabeçalho ali só empurra o texto para baixo.
       var secao = html("section", {
-        "class": "artigo-secao",
+        "class": "artigo-secao" + (sec.titulo ? "" : " sem-titulo"),
         id: "secao-" + slug(dados.assunto) + "-" + k
       });
-      secao.appendChild(html("h3", { "class": "artigo-secao-titulo", texto: sec.titulo }));
+      if (sec.titulo) {
+        secao.appendChild(html("h3", { "class": "artigo-secao-titulo", texto: sec.titulo }));
+      }
       // As fontes da seção vão para a margem esquerda em tela larga e viram
       // uma linha discreta embaixo do título em tela estreita. Ficam fora do
       // texto de propósito: quem lê não tropeça nelas, e quem quer conferir

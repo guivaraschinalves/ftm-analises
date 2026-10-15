@@ -26,12 +26,18 @@ O QUE AINDA FALTA
 import datetime
 import json
 import os
+import re
 import sys
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PLANILHAS = os.path.join(RAIZ, "planilhas")
 sys.path.insert(0, os.path.join(PLANILHAS, "scripts"))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import texto_assunto as ta                                    # noqa: E402
 SAIDA = os.path.join(RAIZ, "dados", "defasagem-combustiveis.json")
+# A prosa mora aqui, fora do código, para que mudar uma palavra não exija
+# mexer em Python. Ver scripts/texto_assunto.py para o formato.
+ARQUIVO_TEXTO = "defasagem-combustiveis.md"
 
 # A paleta da casa, a mesma do scripts/eleicoes.py. Os três primeiros passam na
 # checagem de daltonismo com folga (ΔE 16,8 no pior par, deuteranopia), que é o
@@ -154,84 +160,6 @@ def defasagem_diesel():
 
 # ─── seção 1: o que é defasagem ──────────────────────────────────────────────
 
-def secao_introducao():
-    # O texto é dele, com as correções conferidas contra a tabela da
-    # Petrobras: o denominador da Abicom, a subvenção dentro do -103% e a
-    # fatia da REPLAN na produção nacional. Curto de propósito — parede de
-    # texto afasta quem chegou pelo vídeo. O que é detalhe de método desceu
-    # para a nota do gráfico, e o que é referência saiu para a margem.
-    texto = (
-        "Há tempos mostro no canal a defasagem de preços da Petrobras "
-        "reportada pela Abicom. Muitos de vocês pediram uma análise do "
-        "impacto no IPCA caso a empresa feche essa diferença.\n\n"
-        "Os dados de 14 de outubro mostram o diesel em Paulínia a R$ 3,33 o "
-        "litro contra um PPI de R$ 6,77, defasagem de **103% do preço "
-        "cobrado**. Na gasolina, R$ 3,06 contra R$ 3,80, ou 24%. Paulínia é a "
-        "maior refinaria do país: um quarto do diesel e um quinto da gasolina "
-        "A que o Brasil produz.\n\n"
-        "[figura:abicom-tabela]\n\n"
-        "**PPI** é o custo estimado de importar o produto, com cotação "
-        "internacional, câmbio, logística e, dependendo da metodologia, um "
-        "prêmio de risco. Os preços são os cobrados das distribuidoras, antes "
-        "de tributos, etanol anidro e margens.\n\n"
-        "Dois alertas de leitura. A Abicom divide a defasagem pelo preço da "
-        "Petrobras, não pelo PPI: contra o PPI o diesel é −51%, não −103%. E "
-        "os R$ 3,33 já são o preço **com** a subvenção de R$ 2,12 por litro "
-        "bancada pelo Tesouro. A tabela cheia é R$ 5,45; sem o subsídio a "
-        "defasagem do diesel seria 24%, igual à da gasolina.\n\n"
-        "[figura:abicom-serie]\n\n"
-        "Ou seja, boa parte do buraco não é política de preço da Petrobras, é "
-        "subsídio. O que sobra vem da estratégia comercial que a empresa "
-        "adotou em maio de 2023, quando abandonou a paridade estrita com o "
-        "PPI.\n\n"
-        "Antes de estimar o impacto, é preciso saber se ele tem chance de "
-        "acontecer: **estimativa sem probabilidade não serve de nada**. Nas "
-        "próximas seções, a estrutura do mercado, as diferenças entre "
-        "regiões, a situação da Petrobras e o custo fiscal."
-    )
-
-    figuras = [
-        {"id": "abicom-tabela",
-         "arquivo": "assets/abicom-ppi-14-10-2026.png",
-         "legenda": "Acompanhamento diário da Abicom em 14/10/2026: preço, "
-                    "PPI e defasagem por ponto de entrega.",
-         "fonte": "Abicom, em parceria com a StoneX Brasil",
-         "url": "https://abicom.com.br/ppi/ppi-14-10-2026/"},
-        {"id": "abicom-serie",
-         "arquivo": "assets/abicom-diesel-paulinia.png",
-         "legenda": "O preço do diesel A em Paulínia contra o PPI. A linha "
-                    "verde tem dois degraus e eles são coisas diferentes: o "
-                    "de março é a Petrobras subindo a tabela de R$ 3,30 para "
-                    "R$ 3,68, e o de junho é a subvenção entrando e "
-                    "derrubando para R$ 3,33 o que a distribuidora paga.",
-         "fonte": "Abicom",
-         "url": "https://abicom.com.br/ppi/ppi-14-10-2026/"},
-    ]
-
-    fontes = [
-        {"rot": "Abicom, PPI de 14/10/2026",
-         "url": "https://abicom.com.br/ppi/ppi-14-10-2026/"},
-        # O R$ 2,12 está no rodapé da própria tabela: "Desconto
-        # correspondente ao valor da subvenção de R$ 1,12/litro […] MP 1.363"
-        # mais "R$ 1,00/litro […] MP 1.391 e Portaria MF nº 2.813".
-        {"rot": "Petrobras, tabela de preços do diesel S500 e S10, "
-                "vigência de 01/10/2026",
-         "url": "https://precos.petrobras.com.br/"},
-        {"rot": "MP 1.363/2026 e MP 1.391/2026, com a Portaria MF 2.813"},
-        {"rot": "ANP, preços de paridade de importação",
-         "url": "https://www.gov.br/anp/pt-br/assuntos/precos-e-defesa-da-concorrencia/precos/precos-de-paridade-de-importacao"},
-        {"rot": "⟨FALTA: a fonte da mudança de política de 2023⟩"},
-    ]
-
-    # Sem gráfico nosso aqui, a pedido dele: as duas imagens da Abicom já
-    # mostram a defasagem, e pôr ao lado a nossa série, que usa outro
-    # denominador, confundiria em vez de somar. A conta de como montá-la
-    # continua em defasagem_diesel(), logo acima, para quando voltar.
-    return {"titulo": "O que é defasagem, e por que ela importa",
-            "texto": texto, "fontes": fontes, "figuras": figuras,
-            "graficos": []}
-
-
 # ─── seção 2: probabilidade de fechar, gasolina ──────────────────────────────
 
 def importado_por_ano():
@@ -267,31 +195,10 @@ def perfil_mensal(arq, desde="2021-01"):
             for c in ("Petrobras", "Importações", "Tradings")}
 
 
-def secao_gasolina_probabilidade():
+def graficos_gasolina_probabilidade():
     anos, imp = importado_por_ano()
     perfil = perfil_mensal("oferta-gasolina.xlsx")
-    texto = (
-        "Na gasolina a probabilidade de a defasagem fechar é baixa, e o "
-        "motivo é estrutural: o Brasil depende pouco de importação. Em 2026, "
-        "até agosto, **14,4% da gasolina A** veio de fora. No diesel foram "
-        "22,7%, e em 2025, 26,8%.\n\n"
-        "Isso muda quem manda no preço. Com pouca importação, o importador que "
-        "desiste de trazer gasolina não cria buraco de abastecimento: a "
-        "Petrobras absorve, e ela tem de onde. A participação dela oscila "
-        "entre 70% e 80% do fornecimento e sobe justamente quando o "
-        "importador sai.\n\n"
-        "⟨FALTA: quanto do petróleo que extrai a Petrobras exporta. É a outra "
-        "perna do argumento: com o petróleo caro, o lucro da exportação de cru "
-        "financia o prejuízo do refino vendido abaixo da paridade. Esse dado "
-        "não está nas nossas planilhas, que cobrem derivados e não petróleo "
-        "bruto — precisa vir da ANP ou do release trimestral da empresa.⟩"
-    )
-    return {
-        "titulo": "Probabilidade de fechar: gasolina",
-        "texto": texto,
-        "fontes": [F_ANP_PRODUCAO, F_ANP_DESEMBARACOS, F_FGV,
-                   {"rot": "⟨FALTA: exportação de petróleo da Petrobras⟩"}],
-        "graficos": [
+    return [
             {
                 "id": "importado-por-ano",
                 "titulo": "Quanto do combustível vem de fora",
@@ -333,47 +240,15 @@ def secao_gasolina_probabilidade():
                         "Pessoa Faria no Blog do IBRE: a linha da Petrobras "
                         "inclui o que a própria empresa importa.",
             },
-        ],
-    }
+    ]
 
 
 # ─── seção 3: probabilidade de fechar, diesel ────────────────────────────────
 
-def secao_diesel_probabilidade():
+def graficos_diesel_probabilidade():
     perfil = perfil_mensal("oferta-diesel.xlsx")
     mensal = planilha("oferta-diesel.xlsx")["Perfil mensal"]
     pm = {str(l["mês"]): l for l in linhas_da_aba(mensal)}
-
-    texto = (
-        "No diesel a história é outra, e é aqui que mora o problema. O país "
-        "importa perto de um quarto do que consome, e isso dá ao importador um "
-        "poder que ele não tem na gasolina: **se o preço interno não compensa, "
-        "ele simplesmente para de trazer**.\n\n"
-        "O mecanismo não é teoria. Entre abril e agosto de 2026, com a "
-        "defasagem aberta, a participação das importações no fornecimento de "
-        "diesel caiu de 18,7% para 6,8%, e a das tradings de 14,7% para 3,8%. "
-        "No mesmo intervalo a Petrobras subiu de 68,4% para 83,2%. Quem saiu "
-        "foi substituído por ela, vendendo abaixo da paridade.\n\n"
-        "É isso que o governo responde quando edita uma subvenção. Vale aqui a "
-        "régua do Druckenmiller: julgue uma intervenção pelo que ela está "
-        "respondendo. A subvenção não responde à inflação, responde ao risco "
-        "de a Petrobras ter de cobrir sozinha o que o importador deixou de "
-        "trazer.\n\n"
-        "A métrica oficial de desabastecimento é **oferta confirmada contra "
-        "demanda projetada do mês**, em mil m³. Para outubro de 2026 o MME "
-        "declarou demanda de 3.950 e oferta confirmada de 4.184, com 1.126 "
-        "vindo de importação. Repare no que essa métrica não mede: estoque. "
-        "Não existe painel público de dias de cobertura, e é justamente o "
-        "estoque que a Abicom aponta como frágil — segundo ela, as "
-        "importações de setembro cobriram o consumo do mês mas não "
-        "recompuseram o que havia sido queimado.\n\n"
-        "⟨VERIFICAR antes de publicar: a ameaça americana de cortar exportação "
-        "de diesel e os 92% de origem EUA citados na sala de monitoramento de "
-        "agosto; a declaração sobre tradings que não aderem à subvenção por "
-        "causa da burocracia e do ressarcimento em 30 dias; a formulação exata "
-        "da frase do Druckenmiller. Nenhuma das três tem fonte confirmada "
-        "ainda.⟩"
-    )
 
     def linha_mes(m, rot, forte=False):
         l = pm.get(m)
@@ -388,16 +263,7 @@ def secao_diesel_probabilidade():
                               linha_mes("2026-08", "Agosto de 2026", True))
                   if x]
 
-    return {
-        "titulo": "Probabilidade de fechar: diesel",
-        "texto": texto,
-        "fontes": [F_ANP_PRODUCAO, F_ANP_DESEMBARACOS,
-                   {"rot": "MME, abastecimento de diesel em outubro",
-                    "url": "https://agenciagov.ebc.com.br/noticias/202610/"
-                           "governo-federal-prorroga-desoneracao-da-gasolina-e-do-etanol"},
-                   {"rot": "MPs 1.388, 1.389, 1.391 e 1.395, e portaria do "
-                           "Ministério da Fazenda de 13/10/2026"}],
-        "graficos": [
+    return [
             {
                 "id": "perfil-diesel",
                 "titulo": "O importador sai e a Petrobras cobre",
@@ -457,13 +323,12 @@ def secao_diesel_probabilidade():
                         "cada litro, e a linha de ganho daquela planilha é "
                         "teto, não pagamento.",
             },
-        ],
-    }
+    ]
 
 
 # ─── seção 4: estimativa, gasolina ───────────────────────────────────────────
 
-def secao_gasolina_estimativa():
+def graficos_gasolina_estimativa():
     wb = planilha("ipca-defasagem.xlsx")
     modelo = linhas_da_aba(wb["Modelo mensal"])
     nivel = [(str(l["mês"]), l["nível represado (p.p.)"]) for l in modelo
@@ -502,45 +367,7 @@ def secao_gasolina_estimativa():
                 100 * l["defasagem Acelen %"]) for l in ace
                if l.get("defasagem Acelen %") is not None]
 
-    texto = (
-        "Duas contas, por caminhos que não dividem nenhuma suposição.\n\n"
-        "A **contábil** é aritmética pura. A Petrobras vende R$ 1,17 abaixo da "
-        "paridade; como 68% do litro de gasolina C é gasolina A, isso são "
-        "R$ 0,80 por litro, ou 12% do preço na bomba; a gasolina pesa 5,13% no "
-        "IPCA. Resultado: **0,63 ponto do índice está represado**, e contando "
-        "a partir de março de 2026, quando a guerra abriu a defasagem, "
-        "**0,70 ponto do IPCA acumulado em 12 meses**.\n\n"
-        "A segunda é da FGV, de Francisco Pessoa Faria, e não usa preço de "
-        "combustível nenhum: usa o IPCA de Salvador. Na Bahia a Petrobras não "
-        "tem ponto de entrega — quem forma preço é a Acelen, refinaria privada "
-        "que segue o mercado. Então a variação do IPCA Gasolina em Salvador é "
-        "uma leitura do que o país teria feito sem defasagem. No bimestre do "
-        "choque a gasolina subiu **18,2% em Salvador e 6,3% em São Paulo**. "
-        "Ponderado pelo peso de cada praça, dá **0,59 ponto**.\n\n"
-        "Reproduzimos a tabela dele praça a praça, e bate na casa decimal. É a "
-        "terceira tabela abaixo.\n\n"
-        "A Acelen justifica o papel de régua: desde março de 2026 ela vende, "
-        "em média, 5,1% **acima** da paridade, enquanto a Petrobras vende "
-        "22,5% abaixo. Com uma ressalva que vale escrever: a subvenção chegou "
-        "à Acelen em 13 de agosto de 2026, dois meses e meio depois da "
-        "Petrobras. Dali em diante o preço baiano também passou a ser "
-        "segurado, e Salvador parou de servir de controle — é por isso que "
-        "esta estimativa só vale até o começo de agosto.\n\n"
-        "⟨FALTA: os efeitos indiretos do Relatório de Política Monetária do "
-        "Banco Central. As duas contas acima medem só o efeito direto, o "
-        "preço na bomba. O repasse para transporte, alimentação e o resto da "
-        "cesta é o que falta somar.⟩"
-    )
-    return {
-        "titulo": "Quanto vale fechar: gasolina",
-        "texto": texto,
-        "fontes": [F_SIDRA, F_FGV, F_PETROBRAS,
-                   {"rot": "ANP, Levantamento de Preços (revenda)",
-                    "url": "https://www.gov.br/anp/pt-br/centrais-de-conteudo/"
-                           "dados-abertos/serie-historica-de-precos-de-combustiveis"},
-                   {"rot": "⟨FALTA: efeitos indiretos, Relatório de Política "
-                           "Monetária do Banco Central⟩"}],
-        "graficos": [
+    return [
             {
                 "id": "nivel-represado",
                 "titulo": "Quanto do IPCA está represado",
@@ -617,90 +444,53 @@ def secao_gasolina_estimativa():
                         "É o par de gráficos G.3 e G.4 do artigo da FGV, em "
                         "série semanal no lugar de mensal.",
             },
-        ],
-    }
+    ]
 
 
 # ─── seção 5: estimativa, diesel ─────────────────────────────────────────────
 
-def secao_diesel_estimativa():
-    texto = (
-        "No diesel a conta direta é pequena, e por um motivo simples: "
-        "**família não compra diesel**. O item existe no IPCA — subitem "
-        "5104003, Óleo diesel — mas pesa **0,2562%** contra 5,1285% da "
-        "gasolina. Vinte vezes menos.\n\n"
-        "Então, mesmo com uma defasagem muito maior que a da gasolina, o "
-        "efeito direto do diesel no índice é de segunda ordem. O que importa "
-        "é o indireto: diesel caro vira frete caro, e frete caro vira "
-        "alimento, transporte e quase tudo o mais.\n\n"
-        "Sobre o método: a lógica de Salvador vale aqui também. A Petrobras "
-        "não tem ponto de entrega na Bahia em nenhum dos dois produtos — são "
-        "17 unidades da federação na gasolina e 16 no diesel, e nenhuma delas "
-        "é a Bahia. E o IPCA publica o item de óleo diesel nas 16 praças. "
-        "Fica de fora só o contrafactual da Bahia por nível de preço, que "
-        "exigiria preço de bomba de diesel por estado, e o agregado da ANP que "
-        "montamos cobre apenas gasolina e etanol.\n\n"
-        "⟨FALTA: esta seção ainda não tem número. Faltam duas coisas, nesta "
-        "ordem de importância. Primeiro os efeitos indiretos do Relatório de "
-        "Política Monetária do Banco Central, que são o número central da "
-        "seção. Segundo as nossas duas contas para o diesel — a contábil com "
-        "peso 0,2562% e a de Salvador com o item 5104003 —, que são trabalho "
-        "de planilha ainda por fazer.⟩"
-    )
-    return {"titulo": "Quanto vale fechar: diesel", "texto": texto,
-            "fontes": [F_SIDRA, F_PETROBRAS,
-                       {"rot": "⟨FALTA: efeitos indiretos, Relatório de "
-                               "Política Monetária do Banco Central⟩"}],
-            "graficos": []}
-
-
 # ─── seção 6: o que monitorar ────────────────────────────────────────────────
-
-def secao_conclusao():
-    texto = (
-        "A defasagem da gasolina vale entre 0,59 e 0,70 ponto do IPCA "
-        "acumulado em 12 meses, por duas contas independentes. Mas ela "
-        "provavelmente não vai fechar: o país importa pouca gasolina, e quando "
-        "o importador sai a Petrobras cobre sem esforço.\n\n"
-        "No diesel é o contrário. O efeito direto é pequeno, o indireto não é, "
-        "e a probabilidade de a defasagem fechar é alta — porque um quarto do "
-        "consumo depende de quem só traz o produto se o preço compensar. É por "
-        "isso que as subvenções do ano todo foram para o diesel, e é por isso "
-        "que a última foi só para importador.\n\n"
-        "**O que monitorar, em ordem de antecedência:**\n\n"
-        "1. **Contratação de importação do mês seguinte.** É o indicador mais "
-        "à frente de todos. O abastecimento de um mês pode estar garantido e o "
-        "do seguinte depender de contrato que ainda não foi fechado.\n\n"
-        "2. **Recomposição de estoque, não só cobertura do consumo.** Cobrir o "
-        "mês queimando estoque fecha a conta de hoje e deixa amanhã mais "
-        "frágil. É o ponto que a métrica oficial não mede.\n\n"
-        "3. **Participação das tradings no fornecimento mensal.** É o termômetro "
-        "mais direto de se o preço interno está atrativo. Quando cai forte, a "
-        "subvenção vem em seguida.\n\n"
-        "4. **Prorrogação, ou não, da portaria de 30 dias.** Desde a MP 1.391 "
-        "o valor por litro é definido por ato do Ministro da Fazenda, em "
-        "janelas renováveis. Cada renovação é uma decisão nova.\n\n"
-        "5. **A defasagem semanal contra o PPI**, nos dois combustíveis. É o "
-        "primeiro gráfico deste texto, e é o que se move antes de tudo."
-    )
-    return {"titulo": "O que monitorar", "texto": texto, "graficos": []}
-
 
 def ultima_data(secoes):
     """A data mais recente que aparece em qualquer série, em ISO."""
-    import re
     datas = [k for s in secoes for g in s["graficos"]
              for se in g.get("series", []) for k, _v in se["dados"]
              if re.match(r"^\d{4}-\d{2}(-\d{2})?$", str(k))]
     return max(datas) if datas else None
 
 
+# Cada chave do arquivo de texto aponta para quem monta os gráficos daquela
+# seção. Seção sem chave, ou com chave que não está aqui, fica só com texto —
+# é assim que a introdução e a conclusão existem sem gráfico nenhum.
+GRAFICOS = {
+    "gasolina-probabilidade": graficos_gasolina_probabilidade,
+    "diesel-probabilidade": graficos_diesel_probabilidade,
+    "gasolina-estimativa": graficos_gasolina_estimativa,
+}
+
+
+def montar(doc_texto, fonte_padrao=FONTE_ANP):
+    """Junta a prosa do arquivo de texto com os gráficos que o código monta."""
+    secoes = []
+    for sec in doc_texto["secoes"]:
+        montador = GRAFICOS.get(sec["chave"])
+        secoes.append({
+            "titulo": sec["titulo"],
+            "texto": sec["texto"],
+            "fontes": sec["fontes"],
+            "figuras": sec["figuras"],
+            "graficos": montador() if montador else [],
+        })
+    return secoes
+
+
 def main():
     hoje = datetime.date.today()
+    print("Lendo o texto…")
+    dt = ta.ler(ARQUIVO_TEXTO)
+    print("  %s: %d seções" % (dt["assunto"], len(dt["secoes"])))
     print("Lendo as planilhas…")
-    secoes = [secao_introducao(), secao_gasolina_probabilidade(),
-              secao_diesel_probabilidade(), secao_gasolina_estimativa(),
-              secao_diesel_estimativa(), secao_conclusao()]
+    secoes = montar(dt)
     doc = {
         "atualizado": hoje.isoformat(),
         # A referência é a data do dado mais fresco, não a de hoje, e vai em
@@ -708,25 +498,19 @@ def main():
         # vira "undefined de nan" no rodapé).
         "referencia": ultima_data(secoes) or hoje.isoformat(),
         "fonte": FONTE_ANP,
-        "assunto": "A defasagem dos combustíveis",
+        "assunto": dt["assunto"],
         # Este assunto é uma análise, não um painel: o leitor precisa ser
         # levado na ordem, e obrigá-lo a abrir capítulo é atrito. Ver
         # montarArtigo() no app.js.
         "formato": "artigo",
-        # Sem apresentação: o texto começa na primeira seção. Um resumo
-        # antes da introdução repete o que a introdução já faz, e numa
-        # página de leitura isso é só mais parágrafo entre o leitor e o
-        # assunto. O campo continua existindo para os outros assuntos.
         "secoes": secoes,
     }
     faltas = sum(s["texto"].count("⟨") for s in secoes)
-    vazias = [s["titulo"] for s in secoes if not s["graficos"]]
     with open(SAIDA, "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False, separators=(",", ":"))
-    print("  %d seções, %d gráficos, %d marcadores de pendência"
-          % (len(secoes), sum(len(s["graficos"]) for s in secoes), faltas))
-    if vazias:
-        print("  ainda sem gráfico: %s" % "; ".join(vazias))
+    print("  %d gráficos, %d figuras, %d marcadores de pendência"
+          % (sum(len(s["graficos"]) for s in secoes),
+             sum(len(s["figuras"]) for s in secoes), faltas))
     print("escrito: %s (%.0f KB)" % (SAIDA, os.path.getsize(SAIDA) / 1024))
 
 

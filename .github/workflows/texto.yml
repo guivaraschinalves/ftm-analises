@@ -1,0 +1,47 @@
+name: Publica o texto
+
+# Dispara quando o texto muda, e só ele. A ideia é poder corrigir uma frase
+# pelo editor do próprio GitHub, do computador ou do celular, e o site sair
+# atualizado sem ninguém abrir terminal.
+on:
+  push:
+    paths:
+      - "textos/**"
+      - "scripts/texto_assunto.py"
+      - "scripts/aplicar_texto.py"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publica-texto
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Só biblioteca padrão, e nenhuma fonte externa: este passo não abre
+      # planilha, não baixa PDF da Petrobras nem consulta o SIDRA. É por isso
+      # que uma correção de vírgula não falha quando a ANP está fora do ar.
+      - name: Costura o texto no JSON
+        run: python scripts/aplicar_texto.py
+
+      - name: Commita, se o texto mudou
+        run: |
+          if git diff --quiet -- dados; then
+            echo "O JSON já estava em dia."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dados
+          git commit -m "Publica o texto"
+          git push

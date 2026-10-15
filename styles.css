@@ -157,6 +157,9 @@ details[open] > summary > .seta, details[open] > .nav-rotulo > .seta, details[op
 .artigo-texto { margin: 0 0 20px; color: var(--ink-2); font-size: 18.5px; line-height: 1.72; }
 .artigo-lede b, .artigo-texto b { color: var(--ink); font-weight: 600; }
 .artigo-secao { margin-top: 52px; position: relative; }
+/* sem cabeçalho, a seção não precisa do respiro que separa um título do
+   texto anterior: ela continua o que veio antes */
+.artigo-secao.sem-titulo { margin-top: 4px; }
 
 /* ---------- as fontes da seção ----------
    Em tela estreita, uma linha discreta sob o título. Em tela larga, elas

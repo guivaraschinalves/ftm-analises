@@ -36,6 +36,36 @@ O motor de desenho é o mesmo do [ftm-dados](https://github.com/guivaraschinalve
   apresentação 16:9 ou de Instagram) e **período** (Tudo / 20 / 10 / 5 / 2 / 1
   ano) como no ftm-dados.
 
+## Como mudar o texto de uma análise
+
+A prosa não mora no código. Ela fica em **[`textos/`](textos/)**, um arquivo
+por assunto, e dá para editar pelo editor do próprio GitHub, no navegador ou
+no celular. Ao salvar, a Action **Publica o texto** costura o texto novo no
+JSON de `dados/` e o site sai atualizado sozinho.
+
+O formato é pobre de propósito, e são cinco regras:
+
+| | |
+|---|---|
+| `# Título` | o nome do assunto, uma vez no topo |
+| `## Título` | abre uma seção; `##` sozinho é uma seção **sem** título, que não aparece no índice |
+| `chave: nome` | liga a seção aos gráficos que o script monta para ela |
+| `fonte: rótulo \| url` | uma linha por fonte, e elas saem na margem |
+| `figura: id \| arquivo \| legenda \| crédito \| url` | declara uma imagem; `[figura:id]` num parágrafo sozinho é onde ela entra |
+
+No corpo: linha em branco separa parágrafo e `**assim**` fica em negrito. Nada
+mais. Não é Markdown de verdade, e é melhor assim, porque o que o site aceita
+é exatamente isto.
+
+**O que a Action NÃO faz:** ela não recalcula número nenhum. Não abre
+planilha, não baixa PDF da Petrobras, não consulta o SIDRA. Roda em segundos e
+nunca quebra porque uma fonte saiu do ar. Quando os números mudarem, rode o
+gerador completo à mão:
+
+```bash
+python scripts/defasagem_combustiveis.py
+```
+
 ## A taxa de 10 anos dos EUA
 
 Três gráficos: a história inteira, o ano corrente e o mês em detalhe. Os dois
