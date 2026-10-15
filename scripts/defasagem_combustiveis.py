@@ -41,6 +41,31 @@ AZUL, VERMELHO, VERDE, ROXO, LARANJA = (
 
 FONTE_ANP = "ANP e Petrobras. Elaboração: Follow the Money"
 
+# As fontes que aparecem na margem das seções. Link quando existe página
+# pública estável; só o rótulo quando é arquivo que se baixa.
+F_ANP_PRODUCAO = {
+    "rot": "ANP, produção e vendas de derivados",
+    "url": "https://www.gov.br/anp/pt-br/centrais-de-conteudo/dados-estatisticos",
+}
+F_ANP_DESEMBARACOS = {
+    "rot": "ANP, Relatório de Desembaraços (Siscomex)",
+    "url": "https://www.gov.br/anp/pt-br/centrais-de-conteudo/dados-estatisticos",
+}
+F_SIDRA = {
+    "rot": "IBGE, IPCA (SIDRA, tabela 7060)",
+    "url": "https://sidra.ibge.gov.br/tabela/7060",
+}
+F_FGV = {
+    "rot": "Francisco Pessoa Faria, “Impacto da defasagem da gasolina no "
+           "IPCA e reflexos de sua subvenção nos resultados da Petrobras”, "
+           "Blog do IBRE (FGV)",
+    "url": "https://blogdoibre.fgv.br/",
+}
+F_PETROBRAS = {
+    "rot": "Petrobras, tabelas de preços",
+    "url": "https://precos.petrobras.com.br/",
+}
+
 
 def planilha(nome):
     from openpyxl import load_workbook
@@ -131,57 +156,48 @@ def secao_introducao():
            if l.get("defasagem %") is not None]
     die = defasagem_diesel()
 
-    # O texto é dele, com as correções de fato conferidas contra a tabela da
+    # O texto é dele, com as correções conferidas contra a tabela da
     # Petrobras: o denominador da Abicom, a subvenção dentro do -103% e a
-    # fatia da REPLAN na produção nacional.
+    # fatia da REPLAN na produção nacional. Curto de propósito — parede de
+    # texto afasta quem chegou pelo vídeo. O que é detalhe de método desceu
+    # para a nota do gráfico, e o que é referência saiu para a margem.
     texto = (
-        "Há tempos venho mostrando no canal a defasagem de preços da gasolina "
-        "e do diesel praticada pela Petrobras e reportada pela Abicom "
-        "(Associação Brasileira dos Importadores de Combustíveis). Muitos de "
-        "vocês pediram uma análise do impacto no IPCA caso a empresa decida "
-        "fechar essa diferença.\n\n"
-        "Os últimos dados da Abicom, de 14 de outubro, mostram o diesel em "
-        "Paulínia a R$ 3,33 o litro contra um PPI de R$ 6,77. A defasagem é de "
-        "R$ 3,44, ou **103% do preço que a Petrobras cobra**. Na gasolina, no "
-        "mesmo ponto, são R$ 3,06 contra R$ 3,80: defasagem de R$ 0,74, ou "
-        "24%.\n\n"
-        "Paulínia é onde fica a maior refinaria do país, a REPLAN, responsável "
-        "por cerca de um quarto do diesel e um quinto da gasolina A "
-        "produzidos no Brasil.\n\n"
-        "**Preço de Paridade de Importação (PPI)** é o custo estimado de "
-        "trazer o produto de fora, considerando a cotação internacional, o "
-        "câmbio, a logística e, dependendo da metodologia, um prêmio de "
-        "risco. Os preços da tabela são os que a Petrobras e a Acelen cobram "
-        "das distribuidoras, portanto antes dos impostos estaduais e "
-        "federais, do etanol anidro e das margens.\n\n"
-        "Duas coisas importam na leitura desses números, e nenhuma é "
-        "óbvia.\n\n"
-        "A primeira é o **denominador**. A Abicom divide a defasagem pelo "
-        "preço da Petrobras, não pelo PPI. É por isso que o diesel aparece "
-        "como −103%: a diferença é maior que o próprio preço cobrado. Medida "
-        "contra o PPI, a mesma defasagem é de −51%.\n\n"
-        "A segunda é a **subvenção**, e ela é decisiva. Os R$ 3,33 do diesel "
-        "já são o preço COM o desconto das MPs 1.363 e 1.391, R$ 2,12 por "
-        "litro bancados pelo Tesouro. A tabela cheia da Petrobras em Paulínia "
-        "é R$ 5,45. Sem a subvenção, a defasagem do diesel cairia de 103% "
-        "para 24%, exatamente o patamar da gasolina.\n\n"
-        "Ou seja: pelos dados da Abicom a Petrobras precisaria dobrar o preço "
-        "do diesel para chegar ao custo de importação. Mas boa parte desse "
-        "buraco não é política de preço da empresa, é subsídio do governo. "
-        "Pela tabela cheia faltariam 24%.\n\n"
-        "Isso vem da política de preços adotada pela Petrobras em maio de "
-        "2023, quando a empresa abandonou a paridade estrita com o PPI. "
-        "⟨FALTA: a fonte dessa mudança de política.⟩\n\n"
-        "⟨FALTA: a tabela e a série da Abicom, para entrar aqui ao lado do "
-        "nosso gráfico.⟩\n\n"
-        "Antes de estimar o impacto, precisamos entender a probabilidade de "
-        "ele acontecer. Com probabilidade irrelevante, o cálculo do impacto "
-        "também é irrelevante. Para saber o que precisaria ocorrer para a "
-        "Petrobras fechar a defasagem, vamos falar da estrutura do mercado de "
-        "petróleo e derivados no Brasil, das diferenças entre as regiões (de "
-        "onde nasceu um exercício muito interessante da FGV), da situação da "
-        "Petrobras e do lado fiscal, com as subvenções e os gastos."
+        "Há tempos mostro no canal a defasagem de preços da Petrobras "
+        "reportada pela Abicom. Muitos de vocês pediram uma análise do "
+        "impacto no IPCA caso a empresa feche essa diferença.\n\n"
+        "Os dados de 14 de outubro mostram o diesel em Paulínia a R$ 3,33 o "
+        "litro contra um PPI de R$ 6,77, defasagem de **103% do preço "
+        "cobrado**. Na gasolina, R$ 3,06 contra R$ 3,80, ou 24%. Paulínia é a "
+        "maior refinaria do país: um quarto do diesel e um quinto da gasolina "
+        "A que o Brasil produz.\n\n"
+        "**PPI** é o custo estimado de importar o produto, com cotação "
+        "internacional, câmbio, logística e, dependendo da metodologia, um "
+        "prêmio de risco. Os preços são os cobrados das distribuidoras, antes "
+        "de tributos, etanol anidro e margens.\n\n"
+        "Dois alertas de leitura. A Abicom divide a defasagem pelo preço da "
+        "Petrobras, não pelo PPI: contra o PPI o diesel é −51%, não −103%. E "
+        "os R$ 3,33 já são o preço **com** a subvenção de R$ 2,12 por litro "
+        "bancada pelo Tesouro. A tabela cheia é R$ 5,45; sem o subsídio a "
+        "defasagem do diesel seria 24%, igual à da gasolina.\n\n"
+        "Ou seja, boa parte do buraco não é política de preço da Petrobras, é "
+        "subsídio. O que sobra vem da estratégia comercial que a empresa "
+        "adotou em maio de 2023, quando abandonou a paridade estrita com o "
+        "PPI.\n\n"
+        "Antes de estimar o impacto, é preciso saber se ele tem chance de "
+        "acontecer: **estimativa sem probabilidade não serve de nada**. Nas "
+        "próximas seções, a estrutura do mercado, as diferenças entre "
+        "regiões, a situação da Petrobras e o custo fiscal."
     )
+
+    fontes = [
+        {"rot": "Abicom, PPI de 14/10/2026",
+         "url": "https://abicom.com.br/ppi/ppi-14-10-2026/"},
+        {"rot": "Petrobras, tabelas de preços",
+         "url": "https://precos.petrobras.com.br/"},
+        {"rot": "ANP, preços de paridade de importação",
+         "url": "https://www.gov.br/anp/pt-br/assuntos/precos-e-defesa-da-concorrencia/precos/precos-de-paridade-de-importacao"},
+        {"rot": "⟨FALTA: a fonte da mudança de política de 2023⟩"},
+    ]
 
     g = {
         "id": "defasagem-semanal",
@@ -218,7 +234,7 @@ def secao_introducao():
     if die:
         g["series"].append(serie("Diesel S-10", VERMELHO, die))
     return {"titulo": "O que é defasagem, e por que ela importa",
-            "texto": texto, "graficos": [g]}
+            "texto": texto, "fontes": fontes, "graficos": [g]}
 
 
 # ─── seção 2: probabilidade de fechar, gasolina ──────────────────────────────
@@ -278,6 +294,8 @@ def secao_gasolina_probabilidade():
     return {
         "titulo": "Probabilidade de fechar: gasolina",
         "texto": texto,
+        "fontes": [F_ANP_PRODUCAO, F_ANP_DESEMBARACOS, F_FGV,
+                   {"rot": "⟨FALTA: exportação de petróleo da Petrobras⟩"}],
         "graficos": [
             {
                 "id": "importado-por-ano",
@@ -378,6 +396,12 @@ def secao_diesel_probabilidade():
     return {
         "titulo": "Probabilidade de fechar: diesel",
         "texto": texto,
+        "fontes": [F_ANP_PRODUCAO, F_ANP_DESEMBARACOS,
+                   {"rot": "MME, abastecimento de diesel em outubro",
+                    "url": "https://agenciagov.ebc.com.br/noticias/202610/"
+                           "governo-federal-prorroga-desoneracao-da-gasolina-e-do-etanol"},
+                   {"rot": "MPs 1.388, 1.389, 1.391 e 1.395, e portaria do "
+                           "Ministério da Fazenda de 13/10/2026"}],
         "graficos": [
             {
                 "id": "perfil-diesel",
@@ -515,6 +539,12 @@ def secao_gasolina_estimativa():
     return {
         "titulo": "Quanto vale fechar: gasolina",
         "texto": texto,
+        "fontes": [F_SIDRA, F_FGV, F_PETROBRAS,
+                   {"rot": "ANP, Levantamento de Preços (revenda)",
+                    "url": "https://www.gov.br/anp/pt-br/centrais-de-conteudo/"
+                           "dados-abertos/serie-historica-de-precos-de-combustiveis"},
+                   {"rot": "⟨FALTA: efeitos indiretos, Relatório de Política "
+                           "Monetária do Banco Central⟩"}],
         "graficos": [
             {
                 "id": "nivel-represado",
@@ -623,6 +653,9 @@ def secao_diesel_estimativa():
         "de planilha ainda por fazer.⟩"
     )
     return {"titulo": "Quanto vale fechar: diesel", "texto": texto,
+            "fontes": [F_SIDRA, F_PETROBRAS,
+                       {"rot": "⟨FALTA: efeitos indiretos, Relatório de "
+                               "Política Monetária do Banco Central⟩"}],
             "graficos": []}
 
 

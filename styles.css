@@ -156,7 +156,33 @@ details[open] > summary > .seta, details[open] > .nav-rotulo > .seta, details[op
 .artigo-lede { margin: 0 0 18px; color: var(--ink-2); font-size: 19.5px; line-height: 1.62; }
 .artigo-texto { margin: 0 0 20px; color: var(--ink-2); font-size: 18.5px; line-height: 1.72; }
 .artigo-lede b, .artigo-texto b { color: var(--ink); font-weight: 600; }
-.artigo-secao { margin-top: 52px; }
+.artigo-secao { margin-top: 52px; position: relative; }
+
+/* ---------- as fontes da seção ----------
+   Em tela estreita, uma linha discreta sob o título. Em tela larga, elas
+   saem do fluxo e vão para a margem esquerda, na altura do título: quem lê
+   não tropeça, quem quer conferir acha sem caçar. */
+.secao-fontes {
+  margin: 0 0 18px; padding: 10px 12px;
+  border-left: 2px solid var(--border);
+  font-size: 13px; line-height: 1.45; color: var(--ink-2);
+}
+.secao-fontes p { margin: 0 0 4px; }
+.secao-fontes p:last-child { margin-bottom: 0; }
+.secao-fontes-titulo {
+  font-size: 11px; font-weight: 700; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--ink-2); opacity: .75;
+}
+.secao-fontes a { color: var(--accent); text-decoration: none; overflow-wrap: anywhere; }
+.secao-fontes a:hover { text-decoration: underline; }
+
+@media (min-width: 1240px) {
+  .secao-fontes {
+    position: absolute; top: 4px; left: -218px; width: 196px;
+    margin: 0; padding: 0 12px 0 0; text-align: right;
+    border-left: none; border-right: 2px solid var(--border);
+  }
+}
 .artigo-secao-titulo {
   margin: 0 0 16px; font-size: 23px; font-weight: 700; color: var(--ink);
   line-height: 1.25; letter-spacing: -.01em;

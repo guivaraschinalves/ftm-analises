@@ -1540,6 +1540,21 @@
         id: "secao-" + slug(dados.assunto) + "-" + k
       });
       secao.appendChild(html("h3", { "class": "artigo-secao-titulo", texto: sec.titulo }));
+      // As fontes da seção vão para a margem esquerda em tela larga e viram
+      // uma linha discreta embaixo do título em tela estreita. Ficam fora do
+      // texto de propósito: quem lê não tropeça nelas, e quem quer conferir
+      // acha sem caçar.
+      if ((sec.fontes || []).length) {
+        var fontes = html("aside", { "class": "secao-fontes" });
+        fontes.appendChild(html("p", { "class": "secao-fontes-titulo", texto: "Fontes" }));
+        sec.fontes.forEach(function (f) {
+          var item = f.url
+            ? html("a", { href: f.url, target: "_blank", rel: "noopener noreferrer", texto: f.rot })
+            : html("span", { texto: f.rot });
+          fontes.appendChild(html("p", {}, [item]));
+        });
+        secao.appendChild(fontes);
+      }
       paragrafos(sec.texto, "artigo-texto").forEach(function (p) {
         secao.appendChild(p);
       });
