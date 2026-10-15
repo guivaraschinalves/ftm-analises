@@ -627,8 +627,69 @@ def doze_meses(linhas, bah, sal):
     return fora
 
 
+# ─── Datar o efeito no choque ────────────────────────────────────────────────
+#
+# A pergunta da aba "IPCA 12 meses" é "e se a defasagem não existisse nos
+# últimos doze meses". Esta aqui é outra: "e se ela não existisse a partir do
+# choque, e antes dele tudo tivesse sido como foi". Os meses anteriores ao
+# corte entram com o IPCA observado; os de lá para cá, com o contrafactual.
+#
+# Serve para não misturar o represamento do choque com movimentos de preço de
+# antes, que respondiam a outra conjuntura. É o mesmo espírito do artigo da
+# FGV, que roda a conta só no bimestre março-abril de 2026.
+#
+# O RISCO, QUE É REAL: escolher a data olhando a série é selecionar pelo
+# resultado. Os meses que ficam de fora são justamente os de contribuição
+# negativa, e o número sobe sozinho. A defesa é escolher a data por um evento,
+# não pelo gráfico, e publicar a sensibilidade — é o que a tabela de baixo da
+# aba faz, varrendo o corte mês a mês para o leitor ver o quanto a escolha
+# decide.
+INICIO_CHOQUE = "2026-03"
+
+
+def serie_desde(obs, cf, inicio):
+    """{mês: variação} com o contrafactual só a partir de `inicio`."""
+    return {m: (cf[m] if m >= inicio and cf.get(m) is not None else v)
+            for m, v in obs.items()}
+
+
+def doze_meses_desde(linhas, bah, sal, inicio):
+    """[{mês, observado, um contrafactual por estimativa}] datando no corte."""
+    obs = {l["mes"]: l["ipca"] for l in linhas if l["ipca"] is not None}
+    fontes = {
+        "contabil": {l["mes"]: l["ipca_cf"] for l in linhas},
+        "bahia": {l["mes"]: l["ipca_cf"] for l in bah},
+        "salvador": {l["mes"]: l["ipca_cf"] for l in sal},
+    }
+    base = acumulado12(obs)
+    series = {k: acumulado12(serie_desde(obs, cf, inicio))
+              for k, cf in fontes.items()}
+    fora = []
+    for m in sorted(base):
+        linha = {"mes": m, "obs": base[m]}
+        for k, serie in series.items():
+            linha[k] = serie.get(m)
+            linha["efeito_" + k] = (None if linha[k] is None
+                                    else linha[k] - base[m])
+        fora.append(linha)
+    return fora
+
+
+def sensibilidade_inicio(linhas, bah, sal, cortes):
+    """[(corte, efeito contábil, Bahia, Salvador)] no último mês com dado."""
+    fora = []
+    for corte in cortes:
+        doze = doze_meses_desde(linhas, bah, sal, corte)
+        if not doze:
+            continue
+        u = doze[-1]
+        fora.append((corte, u["mes"], u["efeito_contabil"], u["efeito_bahia"],
+                     u["efeito_salvador"]))
+    return fora
+
+
 def escrever(linhas, sensivel, pontos, medias, bah, par, sal, pesos, diag,
-             t2, doze, ultima, hoje):
+             t2, doze, desde, corte, ultima, hoje):
     wb = openpyxl.Workbook()
     neg = Font(bold=True)
 
@@ -703,6 +764,8 @@ def escrever(linhas, sensivel, pontos, medias, bah, par, sal, pesos, diag,
          "tabela T.2 do artigo", False),
         ("IPCA 12 meses | O acumulado observado e como ficaria em cada "
          "estimativa", False),
+        ("IPCA 12m desde o choque | O mesmo, contando o contrafactual só de "
+         "%s em diante" % INICIO_CHOQUE, False),
         ("Sensibilidade | O mesmo cálculo com a margem escalando junto", False),
         ("", False),
         ("TRÊS ESTIMATIVAS, E ELAS NÃO BATEM", True),
@@ -1036,6 +1099,84 @@ def escrever(linhas, sensivel, pontos, medias, bah, par, sal, pesos, diag,
                    l["efeito_salvador"]])
     cabecalho(ws, cab8, inicio)
 
+    ws = wb.create_sheet("IPCA 12m desde o choque")
+    ws.append(["O IPCA em 12 meses contando o contrafactual só a partir de %s"
+               % INICIO_CHOQUE])
+    ws.cell(ws.max_row, 1).font = neg
+    for t in [
+        "A aba 'IPCA 12 meses' pergunta: e se a defasagem não existisse nos "
+        "últimos doze meses? Esta pergunta",
+        "outra coisa: e se ela não existisse A PARTIR DO CHOQUE, e antes dele "
+        "tudo tivesse sido como foi?",
+        "",
+        "Os meses anteriores a %s entram com o IPCA observado; os de lá para "
+        "cá, com o contrafactual. Assim o" % INICIO_CHOQUE,
+        "represamento do choque não fica diluído por meses que respondiam a "
+        "outra conjuntura. É o espírito do",
+        "artigo da FGV, que roda a conta só no bimestre março-abril de 2026.",
+        "",
+        "O RISCO, E ELE É REAL: escolher a data olhando a série é selecionar "
+        "pelo resultado. Os meses que ficam",
+        "de fora são justamente os de contribuição negativa, e o número sobe "
+        "sozinho. Por isso março de 2026 não",
+        "foi escolhido pelo gráfico: é o mês em que o PPI salta. Em Paulínia "
+        "ele sai de R$ 2,573 em fevereiro para",
+        "R$ 3,630 em março, enquanto a tabela da Petrobras fica em R$ 2,5808, "
+        "onde estava desde 27/1/2026 e onde",
+        "ficaria até maio. O choque está no PPI, e a data vem dele.",
+        "",
+        "E a tabela de baixo varre o corte mês a mês, para você ver quanto a "
+        "escolha decide. Ela anda MUITO:",
+        "cortando em março o contábil dá +0,70 p.p., cortando em abril dá "
+        "+0,08. Quase todo o efeito está num mês só.",
+        "",
+        "Isso não é defeito da conta, é o que a conta mede. O efeito no "
+        "acumulado em doze meses é a MUDANÇA do",
+        "represamento, não o nível dele. Março é o mês em que a defasagem "
+        "abre; quem começa a contar em abril já",
+        "encontra a defasagem aberta nas duas pontas da comparação, e por "
+        "isso não vê nada.",
+        "",
+        "A consequência para quem for citar o número: ele é 'o efeito de a "
+        "defasagem TER ABERTO em março', não",
+        "'o efeito de a defasagem existir'. Para o segundo, a coluna certa é "
+        "'nível represado' da aba Modelo",
+        "mensal, que em setembro de 2026 está em 0,63 p.p. e não depende de "
+        "data de corte nenhuma.",
+        "",
+    ]:
+        ws.append([t])
+    inicio = ws.max_row + 1
+    cab9 = ["mês", "IPCA 12m observado %", "contrafactual contábil %",
+            "contrafactual Bahia %", "contrafactual Salvador %",
+            "efeito contábil (p.p.)", "efeito Bahia (p.p.)",
+            "efeito Salvador (p.p.)"]
+    ws.append(cab9)
+    for l in desde:
+        ws.append([l["mes"], l["obs"], l["contabil"], l["bahia"],
+                   l["salvador"], l["efeito_contabil"], l["efeito_bahia"],
+                   l["efeito_salvador"]])
+    cabecalho(ws, cab9, inicio)
+
+    if corte:
+        base = ws.max_row + 3
+        ws.cell(base, 1, "Sensibilidade à data de corte").font = neg
+        ws.cell(base + 1, 1, "O mesmo efeito, no último mês disponível, "
+                             "mudando só o mês em que o contrafactual começa.")
+        topo = base + 3
+        cab10 = ["corte", "até", "efeito contábil (p.p.)",
+                 "efeito Bahia (p.p.)", "efeito Salvador (p.p.)"]
+        for i, nome in enumerate(cab10, start=1):
+            c = ws.cell(topo, i, nome)
+            c.font = Font(bold=True)
+            c.alignment = Alignment(wrap_text=True, vertical="top")
+        for linha in corte:
+            ws.append(list(linha))
+        for linha in ws.iter_rows(min_row=topo + 1):
+            for c in linha:
+                if isinstance(c.value, float):
+                    c.number_format = "0.000"
+
     ws = wb.create_sheet("Sensibilidade")
     cab3 = ["mês", "nível represado (p.p.) — margem fixa",
             "nível represado (p.p.) — margem escalando", "diferença (p.p.)"]
@@ -1113,9 +1254,13 @@ def main():
     doze = doze_meses(linhas, bah, sal)
 
     medias = medias_por_ponto(pontos, producao_por_ponto())
+    desde = doze_meses_desde(linhas, bah, sal, INICIO_CHOQUE)
+    cortes = [m for m in sorted({l["mes"] for l in sal})
+              if "2025-10" <= m <= "2026-06"]
+    corte = sensibilidade_inicio(linhas, bah, sal, cortes)
 
     escrever(linhas, sensivel, pontos, medias, bah, par, sal, pesos,
-             (soma, pior), t2, doze, ultima, hoje)
+             (soma, pior), t2, doze, desde, corte, ultima, hoje)
 
     u = linhas[-1]
     print("\n%s: defasagem efetiva de R$ %.3f/l em %s, repasse de R$ %.3f na "
@@ -1161,6 +1306,15 @@ def main():
             if d[chave] is not None:
                 print("  contrafactual %-9s %.2f%%  (%+.2f p.p.)"
                       % (nome, d[chave], d["efeito_" + chave]))
+    if desde:
+        d = desde[-1]
+        print("\ncontando o contrafactual só de %s em diante, em %s:"
+              % (INICIO_CHOQUE, d["mes"]))
+        for chave, nome in (("contabil", "contábil"), ("bahia", "Bahia"),
+                            ("salvador", "Salvador")):
+            if d[chave] is not None:
+                print("  %-9s %.2f%% contra %.2f%% observado  (%+.2f p.p.)"
+                      % (nome, d[chave], d["obs"], d["efeito_" + chave]))
     print("\nescrito: %s" % SAIDA)
 
 
