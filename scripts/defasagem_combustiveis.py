@@ -172,6 +172,10 @@ def secao_introducao():
         "unidade": "%",
         "fonte": FONTE_ANP,
         "diario": True,
+        # A série é SEMANAL num eixo diário: dois pontos vizinhos ficam 7 dias
+        # um do outro, e o padrão do app corta a linha em buraco maior que 6.
+        # Sem isto o gráfico sai em cacos.
+        "buracoMax": 10,
         "series": [serie("Gasolina A", AZUL, gas)],
         "nota": "Preço de tabela, sem a subvenção descontada. A modalidade é "
                 "EXA, no duto dentro da refinaria, que é onde o PPI dos pontos "
@@ -257,17 +261,24 @@ def secao_gasolina_probabilidade():
                 "unidade": "%",
                 "fonte": FONTE_ANP,
                 "categorias": anos,
+                # Linha, e não barra: no app a barra é sempre EMPILHADA,
+                # porque serve a composição. Empilhar gasolina com diesel
+                # somaria 14,4% com 22,7% e daria a entender que 37% do
+                # combustível do país é importado, o que é falso — são dois
+                # denominadores diferentes.
                 "series": [
                     serie("Gasolina A", AZUL,
                           [(str(i), v) for i, (_a, v) in enumerate(imp["Gasolina A"])],
-                          tipo="barra"),
+                          largura=3),
                     serie("Diesel A", VERMELHO,
                           [(str(i), v) for i, (_a, v) in enumerate(imp["Diesel A"])],
-                          tipo="barra"),
+                          largura=3),
                 ],
-                "nota": "2026 cobre oito meses, de janeiro a agosto. "
-                        "Importação dividida pela oferta (produção nacional "
-                        "mais importação menos exportação).",
+                "nota": "Cada linha é a importação daquele combustível "
+                        "dividida pela oferta dele (produção nacional mais "
+                        "importação menos exportação). São denominadores "
+                        "diferentes: **não se somam**.\n\n"
+                        "2026 cobre oito meses, de janeiro a agosto.",
             },
             {
                 "id": "perfil-gasolina",
@@ -415,10 +426,12 @@ def secao_gasolina_estimativa():
              if l.get("nível represado (p.p.)") is not None]
 
     desde = linhas_da_aba(wb["IPCA 12m desde o choque"])
+    # Começa em 2024: antes de março de 2026 as duas linhas são a mesma por
+    # construção, e arrastar a série inteira esconde a divergência num canto.
     obs = [(str(l["mês"]), l["IPCA 12m observado %"]) for l in desde
-           if l.get("IPCA 12m observado %") is not None]
+           if l.get("IPCA 12m observado %") is not None and str(l["mês"]) >= "2024-01"]
     cf = [(str(l["mês"]), l["contrafactual contábil %"]) for l in desde
-          if l.get("contrafactual contábil %") is not None]
+          if l.get("contrafactual contábil %") is not None and str(l["mês"]) >= "2024-01"]
 
     # a réplica da T.2: a aba traz o bloco depois da tabela de pesos
     grade = [list(r) for r in wb["Praças e pesos"].iter_rows(values_only=True)]
@@ -500,12 +513,18 @@ def secao_gasolina_estimativa():
                              "quando a guerra abriu a defasagem",
                 "unidade": "%",
                 "fonte": "IBGE, ANP e Petrobras. Elaboração: Follow the Money",
+                # O contrafactual vem PRIMEIRO na lista porque o app desenha
+                # na ordem e a última fica por cima: assim a linha observada,
+                # que é o dado de verdade, fica visível no trecho em que as
+                # duas coincidem.
                 "series": [
-                    serie("Observado", AZUL, obs),
                     serie("Sem a defasagem", VERMELHO, cf),
+                    serie("Observado", AZUL, obs),
                 ],
-                "nota": "Os meses anteriores a março de 2026 entram com o IPCA "
-                        "observado; os de lá para cá, com o contrafactual.\n\n"
+                "nota": "As duas linhas são a mesma coisa até fevereiro de "
+                        "2026, e isso é por construção: os meses anteriores ao "
+                        "corte entram com o IPCA observado nos dois cenários. "
+                        "O que interessa é a abertura a partir de março.\n\n"
                         "A data vem da guerra, não do gráfico. O PPI de "
                         "Paulínia atravessa fevereiro parado entre R$ 2,46 e "
                         "R$ 2,60 e faz **+15,7%** na semana encerrada em 6 de "
@@ -537,6 +556,7 @@ def secao_gasolina_estimativa():
                 "unidade": "%",
                 "fonte": FONTE_ANP,
                 "diario": True,
+                "buracoMax": 10,          # semanal em eixo diário, como acima
                 "series": [
                     serie("Acelen, em Candeias (BA)", VERDE, ace_ace),
                     serie("Petrobras, em Paulínia (SP)", AZUL, ace_pet),
@@ -613,6 +633,15 @@ def secao_conclusao():
     return {"titulo": "O que monitorar", "texto": texto, "graficos": []}
 
 
+def ultima_data(secoes):
+    """A data mais recente que aparece em qualquer série, em ISO."""
+    import re
+    datas = [k for s in secoes for g in s["graficos"]
+             for se in g.get("series", []) for k, _v in se["dados"]
+             if re.match(r"^\d{4}-\d{2}(-\d{2})?$", str(k))]
+    return max(datas) if datas else None
+
+
 def main():
     hoje = datetime.date.today()
     print("Lendo as planilhas…")
@@ -621,9 +650,16 @@ def main():
               secao_diesel_estimativa(), secao_conclusao()]
     doc = {
         "atualizado": hoje.isoformat(),
-        "referencia": hoje.strftime("%d/%m/%Y"),
+        # A referência é a data do dado mais fresco, não a de hoje, e vai em
+        # ISO porque é o que o rotuloRef() do app.js sabe ler ("15/10/2026"
+        # vira "undefined de nan" no rodapé).
+        "referencia": ultima_data(secoes) or hoje.isoformat(),
         "fonte": FONTE_ANP,
         "assunto": "A defasagem dos combustíveis",
+        # Este assunto é uma análise, não um painel: o leitor precisa ser
+        # levado na ordem, e obrigá-lo a abrir capítulo é atrito. Ver
+        # montarArtigo() no app.js.
+        "formato": "artigo",
         "apresentacao":
             "A Petrobras vende gasolina e diesel abaixo do preço de "
             "importação. Quanto isso segura do IPCA, e qual a chance de a "

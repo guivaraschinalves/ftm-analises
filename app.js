@@ -1497,9 +1497,59 @@
     });
   }
 
+  // Dois formatos, e a escolha é do arquivo de dados.
+  //
+  // O padrão é o índice retrátil: assunto > seções > gráficos, tudo fechado, a
+  // tela inicial é o sumário. Serve a um painel, onde o leitor sabe o que
+  // procura e não quer ler nada.
+  //
+  // `"formato": "artigo"` monta a mesma árvore aberta e sem setas, como um
+  // texto: título, lede, e cada seção com a sua prosa e os gráficos dela no
+  // meio. Serve a uma análise, onde o leitor precisa ser levado na ordem e
+  // obrigá-lo a abrir capítulo é atrito. Os cartões continuam retráteis, mas
+  // nascem abertos.
+  function montarArtigo(dados, host) {
+    var art = html("article", { "class": "artigo", id: idAssunto(dados) });
+    art.appendChild(html("h2", { "class": "artigo-titulo", texto: dados.assunto }));
+    paragrafos(dados.apresentacao, "artigo-lede").forEach(function (p) {
+      art.appendChild(p);
+    });
+
+    var aDesenhar = [];
+    dados.secoes.forEach(function (sec, k) {
+      var secao = html("section", {
+        "class": "artigo-secao",
+        id: "secao-" + slug(dados.assunto) + "-" + k
+      });
+      secao.appendChild(html("h3", { "class": "artigo-secao-titulo", texto: sec.titulo }));
+      paragrafos(sec.texto, "artigo-texto").forEach(function (p) {
+        secao.appendChild(p);
+      });
+      sec.graficos.forEach(function (g) {
+        g.fonte = g.fonte || dados.fonte;
+        var c = criarCartao(g);
+        c.raiz.open = true;
+        cartoes.push(c);
+        aDesenhar.push(c);
+        secao.appendChild(c.raiz);
+      });
+      art.appendChild(secao);
+    });
+
+    host.appendChild(art);
+    // No quadro seguinte, não agora: desenhar() desiste se o frame ainda tem
+    // largura zero (veja o clientWidth lá embaixo), e logo depois do
+    // appendChild o navegador pode não ter feito o layout. Com o rAF o
+    // desenho acontece depois dele.
+    var pintar = function () { aDesenhar.forEach(function (c) { desenhar(c, true); }); };
+    if (window.requestAnimationFrame) window.requestAnimationFrame(pintar);
+    else setTimeout(pintar, 0);
+  }
+
   // Monta um assunto inteiro na página: assunto > seções > gráficos, tudo
   // fechado — a página inicial é o índice.
   function montarAssunto(dados, host) {
+    if (dados.formato === "artigo") return montarArtigo(dados, host);
     var cat = html("details", { "class": "categoria", id: idAssunto(dados) });
     var rotulo = html("summary", { "class": "categoria-rotulo" });
     rotulo.appendChild(seta());

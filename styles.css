@@ -106,6 +106,21 @@ details[open] > summary > .seta, details[open] > .nav-rotulo > .seta, details[op
 .apresentacao + .apresentacao { margin-top: -4px; }
 .secao { padding-left: 21px; border-left: 1px solid var(--border); margin-left: 5px; }
 .secao-rotulo { padding: 10px 2px; font-size: 19px; font-weight: 700; }
+/* ---------- formato artigo: a análise lida como texto, não como índice ----------
+   Mesma árvore do índice retrátil, só que aberta e sem setas. A prosa fica
+   presa em 78ch, que é a largura em que se lê sem perder a linha; o gráfico
+   não, porque ele precisa de espaço. */
+.artigo { border-top: 1px solid var(--border); padding-top: 18px; }
+.artigo-titulo { margin: 0 0 14px; font-size: 25px; font-weight: 700; color: var(--ink); line-height: 1.2; }
+.artigo-lede { margin: 0 0 12px; max-width: 78ch; color: var(--ink-2); font-size: 17px; line-height: 1.55; }
+.artigo-lede b { color: var(--ink); }
+.artigo-secao { margin-top: 34px; }
+.artigo-secao-titulo { margin: 0 0 12px; font-size: 21px; font-weight: 700; color: var(--ink); line-height: 1.25; }
+.artigo-texto { margin: 0 0 13px; max-width: 78ch; color: var(--ink-2); line-height: 1.6; }
+.artigo-texto b { color: var(--ink); }
+/* respiro entre a prosa e o gráfico que ela introduz, e depois dele */
+.artigo-secao > .card { margin: 20px 0 24px; }
+
 /* o texto da seção: a análise em si, entre o título e os gráficos dela */
 .secao-texto { margin: 0 0 10px; padding-left: 26px; color: var(--ink-2); max-width: 78ch; line-height: 1.55; }
 .secao-texto + .secao-texto { margin-top: -4px; }
