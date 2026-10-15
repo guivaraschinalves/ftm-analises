@@ -84,6 +84,74 @@ PONTOS = {
 PRINCIPAL = "Paulínia (SP)"
 
 
+# ─── A outra ponta do balcão: a Acelen ───────────────────────────────────────
+#
+# A Acelen assumiu a refinaria de Mataripe em 1/12/2021 e publica a tabela
+# dela pela mesma Resolução ANP 795/2019 que obriga a Petrobras. Então dá para
+# fazer com ela exatamente a conta que se faz com a Petrobras, e é essa
+# comparação que sustenta as estimativas 2 e 3 do ipca-defasagem.xlsx: as duas
+# supõem que o preço baiano é uma leitura de mercado, e aqui isso vira medida
+# em vez de suposição.
+#
+# Aratu é o porto, em Candeias, e é lá que a ANP estima o PPI da Bahia. Por
+# isso o ponto principal é Candeias. São Francisco do Conde é a refinaria em
+# si, dois décimos de centavo abaixo de Candeias em toda a série, e entra
+# junto. Jequié é interior, uns sete centavos acima, e entra com o aviso de
+# que a diferença ali é frete, não política de preço.
+ACELEN_PONTOS = {
+    "Candeias (BA)": "Aratu",
+    "São Francisco do Conde (BA)": "Aratu",
+    "Jequié (BA)": "Aratu",
+}
+ACELEN_PRINCIPAL = "Candeias (BA)"
+ACELEN_COM_FRETE = ("Jequié (BA)",)
+
+
+def variacoes(serie):
+    """[(x, y)] de variações percentuais semana a semana, para a correlação."""
+    fora = []
+    for (_d0, a0, b0), (_d1, a1, b1) in zip(serie, serie[1:]):
+        if a0 and b0:
+            fora.append((a1 / a0 - 1, b1 / b0 - 1))
+    return fora
+
+
+def correlacao(pares):
+    """Pearson. Mede se as duas pontas se MEXEM juntas, que é outra pergunta
+    que o nível da defasagem não responde: dá para estar sempre R$ 0,50 abaixo
+    do PPI e ainda assim acompanhar cada subida dele."""
+    n = len(pares)
+    if n < 3:
+        return float("nan")
+    mx = sum(a for a, _ in pares) / n
+    my = sum(b for _, b in pares) / n
+    sxy = sum((a - mx) * (b - my) for a, b in pares)
+    sxx = sum((a - mx) ** 2 for a, _ in pares)
+    syy = sum((b - my) ** 2 for _, b in pares)
+    return sxy / (sxx * syy) ** 0.5 if sxx and syy else float("nan")
+
+
+def resumo_contra_ppi(linhas, ponto, desde=None):
+    """(n, defasagem % média, mediana, |defasagem| média, correlação).
+
+    `desde` existe para comparar na mesma janela: a série da Petrobras começa
+    em set/2019 e a da Acelen em dez/2021, e média de períodos diferentes não
+    compara nada."""
+    sel = sorted((l for l in linhas if l[0] == ponto
+                  and (desde is None or l[1] >= desde)), key=lambda l: l[1])
+    if not sel:
+        return None
+    pcts = sorted(100 * l[6] for l in sel)
+    n = len(pcts)
+    mediana = (pcts[n // 2] if n % 2 else (pcts[n // 2 - 1] + pcts[n // 2]) / 2)
+    serie = [(l[1], l[2], l[4]) for l in sel]
+    # "A menos de 5% da paridade" é a estatística que mais diz: média esconde
+    # compensação entre semana acima e semana abaixo, e esta não esconde.
+    perto = 100 * sum(1 for x in pcts if abs(x) < 5) / n
+    return (n, sum(pcts) / n, mediana, sum(abs(p) for p in pcts) / n,
+            perto, correlacao(variacoes(serie)))
+
+
 def baixar_ppi():
     if not os.path.exists(PPI_ARQUIVO):
         print("  baixando ppi.xlsx da ANP…")
@@ -129,19 +197,32 @@ def ler_ppi(caminho):
     return fora
 
 
-def escadas_petrobras(linhas, ponto):
+PRODUTO = "Gasolina A"
+
+
+def escadas_de(linhas, empresa, ponto, modalidade=MODALIDADE, produto=PRODUTO):
     """(escada do preço de tabela, escada do preço com subvenção).
 
     Desde 29/5/2026 a tabela da Petrobras traz as duas colunas, e nas
     vigências de agosto e setembro de 2026 só a com desconto — o preço cheio
     daqueles meses não foi republicado. Como a escada carrega o último valor
     para a frente, o preço de tabela continua sendo o de 29/5, que é o certo:
-    o que mudou foi a subvenção, não o preço da empresa."""
+    o que mudou foi a subvenção, não o preço da empresa. A Acelen publica no
+    mesmo formato, e também recebe a subvenção da MP 1.358."""
     tabela, subvencionado = {}, {}
-    for e, _p, d, _uf, mod, loc, v, desc in linhas:
-        if e == "Petrobras" and loc == ponto and mod == MODALIDADE:
+    for e, prod, d, _uf, mod, loc, v, desc in linhas:
+        # O filtro de produto não é decorativo: o PDF da Petrobras só traz
+        # gasolina, mas a tabela da Acelen traz também os dois diesel, no
+        # mesmo ponto e na mesma modalidade. Sem ele o diesel sobrescreve a
+        # gasolina e a defasagem sai inventada.
+        if (e == empresa and prod == produto and loc == ponto
+                and mod == modalidade):
             (subvencionado if desc else tabela)[d] = v
     return sorted(tabela.items()), sorted(subvencionado.items())
+
+
+def escadas_petrobras(linhas, ponto):
+    return escadas_de(linhas, "Petrobras", ponto)
 
 
 def preco_em(escada, dia):
@@ -166,11 +247,11 @@ def media_na_semana(escada, ini, fim):
     return sum(valores) / len(valores) if len(valores) == len(dias) and dias else None
 
 
-def montar(ppi, escadas, ultima_tabela):
+def montar(ppi, escadas, ultima_tabela, pontos=None):
     """[(ponto, fim, tabela, subvenção, ppi, dif, %, % com subvenção, extrap.)]."""
     fora = []
     for ini, fim, valores in ppi:
-        for ponto, coluna in PONTOS.items():
+        for ponto, coluna in (pontos or PONTOS).items():
             tabela, subv = escadas.get(ponto, ([], []))
             p = valores.get(coluna)
             b = media_na_semana(tabela, ini, fim)
@@ -183,7 +264,7 @@ def montar(ppi, escadas, ultima_tabela):
     return fora
 
 
-def escrever(linhas, ultima_tabela, revenda, hoje):
+def escrever(linhas, ultima_tabela, acelen, resumos, revenda, hoje):
     from openpyxl import Workbook
     from openpyxl.styles import Font
     wb = Workbook()
@@ -253,6 +334,26 @@ def escrever(linhas, ultima_tabela, revenda, hoje):
         [],
         ["Só gasolina. A tabela da Petrobras que está em dados/ é só de gasolina; com o "
          "PDF do diesel, o mesmo script monta a dele."],
+        [],
+        ["A ACELEN, DO OUTRO LADO"],
+        ["A Acelen assumiu Mataripe em 1/12/2021 e publica pela mesma Resolução ANP "
+         "795/2019. Então dá para fazer com ela a"],
+        ["mesma conta, contra o PPI de Aratu, que é o porto da Bahia. Isso importa "
+         "porque as estimativas 2 e 3 do"],
+        ["ipca-defasagem.xlsx supõem que o preço baiano é leitura de mercado. Aqui "
+         "isso vira medida, não suposição."],
+        [],
+    ] + resumos + [
+        [],
+        ["Leia assim: a defasagem média diz o quanto cada empresa fica abaixo da "
+         "paridade; a correlação diz se ela se"],
+        ["MEXE junto com o PPI. São perguntas diferentes, e dá para acompanhar cada "
+         "subida do PPI vivendo sempre abaixo dele."],
+        [],
+        ["Aratu fica em Candeias, e por isso Candeias é o ponto principal. São "
+         "Francisco do Conde é a refinaria em si,"],
+        ["colada em Candeias. Jequié é interior: os centavos a mais ali são frete, "
+         "não política de preço."],
     ]:
         leia.append(linha)
     leia["A1"].font = Font(bold=True, size=14)
@@ -289,6 +390,30 @@ def escrever(linhas, ultima_tabela, revenda, hoje):
            [(n, f, b / n, s_ / n, p / n, (b - p) / n, b / p - 1, (b - s_) / p - 1, x)
             for f, (b, s_, p, n, x) in sorted(por_semana.items())],
            larguras=[9] + larg, formato={k + 1: v for k, v in fmt.items()})
+
+    if acelen:
+        cab_a = ["semana (fim)", "Acelen R$/l (tabela)", "subvenção R$/l",
+                 "PPI Aratu R$/l", "defasagem R$/l", "defasagem %",
+                 "defasagem % com subvenção", "preço extrapolado"]
+        pc.aba(wb, "Acelen vs PPI", ["ponto de entrega"] + cab_a, acelen,
+               larguras=[28] + larg, formato={k + 1: v for k, v in fmt.items()})
+
+        # O lado a lado que responde a pergunta inteira: a mesma semana, o
+        # mesmo produto, duas empresas, cada uma contra o PPI do lugar dela.
+        pet = {l[1]: l for l in linhas if l[0] == PRINCIPAL}
+        ace = {l[1]: l for l in acelen if l[0] == ACELEN_PRINCIPAL}
+        juntas = []
+        for f in sorted(set(pet) & set(ace)):
+            a, b = ace[f], pet[f]
+            juntas.append((f, a[4], a[2], a[6], b[4], b[2], b[6], a[6] - b[6]))
+        pc.aba(wb, "Acelen vs Petrobras",
+               ["semana (fim)", "PPI Aratu R$/l", "Acelen Candeias R$/l",
+                "defasagem Acelen %", "PPI Paulínia R$/l",
+                "Petrobras Paulínia R$/l", "defasagem Petrobras %",
+                "diferença (p.p.)"],
+               juntas, larguras=[14, 16, 21, 19, 17, 24, 22, 17],
+               formato={1: "DD/MM/YYYY", 2: "0.0000", 3: "0.0000", 4: "0.0%",
+                        5: "0.0000", 6: "0.0000", 7: "0.0%", 8: "0.0%"})
 
     if revenda:
         # A defasagem é o preço na refinaria; esta aba é o que o motorista vê na
@@ -345,6 +470,49 @@ def main():
           % (u[1], u[2], u[3], u[4], u[5], 100 * u[6], 100 * u[7],
              "  [preço extrapolado]" if u[8] else ""))
 
+    print("Acelen, da tabela publicada no site…")
+    acelen, resumos = [], []
+    try:
+        linhas_a = pc.ler_acelen()
+        escadas_a = {pt: escadas_de(linhas_a, "Acelen", pt)
+                     for pt in ACELEN_PONTOS}
+        ultima_a = max(d for tab, sub in escadas_a.values()
+                       for d, _v in tab + sub)
+        acelen = montar(ppi, escadas_a, ultima_a, ACELEN_PONTOS)
+        # Mesma janela para as duas: a da Acelen, que é a mais curta.
+        comum = min(l[1] for l in acelen) if acelen else None
+        # A janela do choque do Oriente Médio, que é onde as duas políticas de
+        # preço se separam de vez.
+        choque = datetime.date(2026, 3, 1)
+        for rotulo, dados, ponto, desde in (
+                ("Acelen, Candeias (BA), contra o PPI de Aratu", acelen,
+                 ACELEN_PRINCIPAL, comum),
+                ("Petrobras, %s, na mesma janela" % PRINCIPAL, tudo,
+                 PRINCIPAL, comum),
+                ("", None, None, None),
+                ("Acelen, de março de 2026 em diante", acelen,
+                 ACELEN_PRINCIPAL, choque),
+                ("Petrobras, de março de 2026 em diante", tudo,
+                 PRINCIPAL, choque)):
+            if dados is None:
+                resumos.append([])
+                continue
+            r = resumo_contra_ppi(dados, ponto, desde)
+            if not r:
+                continue
+            n, media, mediana, absoluta, perto, corr = r
+            resumos.append([rotulo, "%d semanas | defasagem média %+.1f%% | "
+                                    "mediana %+.1f%% | em módulo %.1f%% | a "
+                                    "menos de 5%% da paridade em %.0f%% das "
+                                    "semanas | correlação das variações "
+                                    "semanais com o PPI %.2f"
+                            % (n, media, mediana, absoluta, perto, corr)])
+            print("  %-46s %3d sem | média %+6.1f%% | perto %3.0f%% | corr %+.2f"
+                  % (rotulo, n, media, perto, corr))
+        print("  última vigência da Acelen: %s" % ultima_a)
+    except Exception as e:              # fonte web: não derruba o resto
+        print("  tabela da Acelen falhou: %s" % e, file=sys.stderr)
+
     print("ANP, preço de bomba (etanol e gasolina)…")
     try:
         # Só Brasil e São Paulo: a planilha é da defasagem, e a série completa
@@ -356,7 +524,7 @@ def main():
         print("  Levantamento de Preços falhou: %s" % e, file=sys.stderr)
         revenda = []
 
-    escrever(tudo, ultima, revenda, hoje)
+    escrever(tudo, ultima, acelen, resumos, revenda, hoje)
     print("gravado %s (%.0f KB)"
           % (os.path.relpath(SAIDA, RAIZ), os.path.getsize(SAIDA) / 1024))
 
