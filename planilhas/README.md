@@ -15,7 +15,7 @@ que as usam.
 |---|---|
 | `oferta-diesel.xlsx` | Quem fornece o diesel do Brasil, mês a mês: produção por refinaria, importação por agente e por empresa, vendas por tipo, e o perfil do fornecimento no formato da tabela T.1 da FGV |
 | `oferta-gasolina.xlsx` | A gêmea, para gasolina A, com a ponte gasolina C → gasolina A pelo teor legal de anidro |
-| `defasagem-gasolina.xlsx` | Preço da Petrobras contra o PPI da ANP, semanal desde set/2019, nos nove pontos de entrega em que as duas pontas são o mesmo lugar. E a mesma conta para a Acelen na Bahia, contra o PPI de Aratu, que é o que mede (em vez de supor) se o preço baiano segue o mercado |
+| `defasagem-gasolina.xlsx` | Preço da Petrobras contra o PPI da ANP, semanal desde set/2019, nos nove pontos de entrega em que as duas pontas são o mesmo lugar. E a mesma conta para a Acelen na Bahia, contra o PPI de Aratu, que é o que mede (em vez de supor) se o preço baiano segue o mercado. A aba "Gráfico Acelen vs PPI" traz a reconstrução do G.3 do artigo da FGV, mensal, já com o gráfico montado |
 | `precos-combustiveis.xlsx` | Preço ao distribuidor, preço por refinaria e por UF, e a composição do preço na bomba decomposta em produto, anidro, tributos e margem |
 | `ipca-defasagem.xlsx` | Quanto da defasagem está represado no IPCA, por três caminhos independentes: o contábil (teto), a Bahia como grupo de controle (piso) e o método da FGV estendido para série mensal. Traz também o IPCA em 12 meses sob cada estimativa |
 | `ppi-anp.xlsx` | O arquivo bruto da ANP: PPI semanal de gasolina, diesel, QAV e GLP. Insumo, não produto, e por isso não é versionado |

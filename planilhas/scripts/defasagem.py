@@ -107,6 +107,63 @@ ACELEN_PRINCIPAL = "Candeias (BA)"
 ACELEN_COM_FRETE = ("Jequié (BA)",)
 
 
+# As duas cores do gráfico mensal. Passam na checagem de daltonismo com folga
+# (ΔE 24,7 no pior caso, protanopia), que é o que garante que as duas linhas
+# continuem distinguíveis para quem não separa vermelho de verde — o gráfico
+# do artigo usa preto e vermelho, que não passa.
+COR_PPI = "2A78D6"
+COR_EMPRESA = "EB6834"
+
+
+def mensal(linhas, ponto, minimo=3):
+    """[(mês, PPI, preço de tabela, preço com subvenção ou None)].
+
+    Média das semanas que terminam no mês. Exige três semanas, senão um mês
+    recém-começado entraria como se fosse mês inteiro."""
+    acc = {}
+    for pt, fim, tab, desc, ppi, _d, _r, _r2, _x in linhas:
+        if pt != ponto:
+            continue
+        a = acc.setdefault(fim.strftime("%Y-%m"), [[], [], []])
+        a[0].append(ppi)
+        a[1].append(tab)
+        a[2].append(tab - desc)
+    fora = []
+    for mes, (ps, ts, ls) in sorted(acc.items()):
+        if len(ps) < minimo:
+            continue
+        liquido = sum(ls) / len(ls)
+        tabela = sum(ts) / len(ts)
+        fora.append((mes, sum(ps) / len(ps), tabela,
+                     liquido if abs(liquido - tabela) > 1e-9 else None))
+    return fora
+
+
+def grafico_mensal(ws, dados, titulo, rotulo_empresa, primeira, ultima):
+    """Reconstrói o G.3 do artigo: duas linhas, PPI e preço ao distribuidor."""
+    from openpyxl.chart import LineChart, Reference
+    from openpyxl.chart.marker import Marker
+    from openpyxl.drawing.line import LineProperties
+
+    ch = LineChart()
+    ch.title = titulo
+    ch.height, ch.width = 9.5, 24
+    ch.y_axis.title = "R$/litro"
+    ch.y_axis.scaling.min = max(0.0, min(min(d[1], d[2]) for d in dados) - 0.4)
+    ch.y_axis.majorGridlines = None          # grade recessiva: nenhuma
+    ch.x_axis.tickLblSkip = 3                # senão os rótulos se atropelam
+    ch.x_axis.tickMarkSkip = 3
+
+    ch.add_data(Reference(ws, min_col=2, max_col=3, min_row=primeira - 1,
+                          max_row=ultima), titles_from_data=True)
+    ch.set_categories(Reference(ws, min_col=1, min_row=primeira, max_row=ultima))
+    for serie, cor in zip(ch.series, (COR_PPI, COR_EMPRESA)):
+        serie.graphicalProperties.line = LineProperties(solidFill=cor, w=19050)
+        serie.marker = Marker(symbol="none")
+        serie.smooth = False
+    return ch
+
+
 def variacoes(serie):
     """[(x, y)] de variações percentuais semana a semana, para a correlação."""
     fora = []
@@ -392,6 +449,47 @@ def escrever(linhas, ultima_tabela, acelen, resumos, revenda, hoje):
            larguras=[9] + larg, formato={k + 1: v for k, v in fmt.items()})
 
     if acelen:
+        # A reconstrução do gráfico G.3 do artigo, estendida: ele vai até
+        # abr/2026 e esta vai até onde a ANP e a Acelen publicaram.
+        ws = wb.create_sheet("Gráfico Acelen vs PPI")
+        for t in [
+            "Gasolina A: PPI em Aratu (BA) contra o preço da Acelen aos "
+            "distribuidores em Candeias (BA)",
+            "",
+            "É o gráfico G.3 do artigo da FGV, refeito e estendido. Média "
+            "mensal das semanas, R$/litro, sem tributos.",
+            "A coluna 'com subvenção' é o que a distribuidora de fato pagou "
+            "depois da MP 1.358, e por isso só existe",
+            "de junho de 2026 em diante. Ela fica fora do gráfico de "
+            "propósito, para a linha ser comparável de ponta",
+            "a ponta; para incluí-la, é só estendê-la à seleção de dados.",
+            "",
+        ]:
+            ws.append([t])
+        ws["A1"].font = Font(bold=True)
+        primeira = ws.max_row + 2
+        ws.append(["mês", "PPI Aratu", "Acelen Candeias",
+                   "Acelen com subvenção", "defasagem %"])
+        for c in ws[primeira - 1]:
+            c.font = Font(bold=True)
+        dados = mensal(acelen, ACELEN_PRINCIPAL)
+        for mes, ppi_m, tab, liq in dados:
+            ws.append([mes, ppi_m, tab, liq, tab / ppi_m - 1])
+        ultima_linha = ws.max_row
+        for linha in ws.iter_rows(min_row=primeira, min_col=2, max_col=4):
+            for c in linha:
+                c.number_format = "0.000"
+        for linha in ws.iter_rows(min_row=primeira, min_col=5, max_col=5):
+            linha[0].number_format = "0.0%"
+        for col, w in zip("ABCDE", (10, 13, 17, 20, 13)):
+            ws.column_dimensions[col].width = w
+        if dados:
+            ws.add_chart(grafico_mensal(
+                ws, dados,
+                "Gasolina A: PPI Aratu-BA vs. preço aos distribuidores "
+                "Acelen na Bahia (R$/litro)",
+                "Acelen", primeira, ultima_linha), "G2")
+
         cab_a = ["semana (fim)", "Acelen R$/l (tabela)", "subvenção R$/l",
                  "PPI Aratu R$/l", "defasagem R$/l", "defasagem %",
                  "defasagem % com subvenção", "preço extrapolado"]
