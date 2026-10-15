@@ -289,15 +289,34 @@ def escrever(resultados, hoje):
         ("O TETO, QUE É A RESSALVA MAIS IMPORTANTE", True),
         ("A linha do ganho supõe que a subvenção é paga sobre TODO o volume "
          "produzido. É a suposição do artigo,", False),
-        ("e para a gasolina ela passa despercebida; para o diesel ela "
-         "estoura. Pelo nosso cálculo o diesel renderia", False),
-        ("R$ 14 bilhões em três meses, e a MP 1.395, de 9/10/2026, abriu "
-         "crédito de R$ 7,5 bilhões para o programa", False),
-        ("inteiro. Ou seja, a subvenção não é paga em cada litro: há limite "
-         "orçamentário, e provavelmente limite", False),
-        ("de volume por empresa que não está nesta planilha.", False),
+        ("e na gasolina ela passa despercebida: R$ 882 milhões por mês cabe "
+         "no orçamento. No diesel ela quebra.", False),
         ("", False),
-        ("Leia a linha do ganho como TETO: é quanto a medida valeria se "
+        ("Pela nossa conta o diesel renderia R$ 14 bilhões em três meses, só "
+         "para a Petrobras. Três coisas dizem", False),
+        ("que isso é muito:", False),
+        ("  1. A subvenção é do diesel A RODOVIÁRIO, e o denominador aqui é a "
+         "produção total de diesel, que", False),
+        ("     inclui marítimo, não rodoviário e outros usos.", False),
+        ("  2. Os créditos extraordinários de 2026 para subvenção de "
+         "combustíveis somam cerca de R$ 17 bilhões", False),
+        ("     (MP 1.388 com R$ 3,15 bi, MP 1.389 com R$ 6,6 bi, MP 1.395 com "
+         "R$ 7,52 bi), e a fatia do diesel", False),
+        ("     rodoviário fica perto de R$ 9 bilhões — para todas as empresas "
+         "e um período maior.", False),
+        ("  3. Desde a MP 1.391 o valor por litro é definido por ato do "
+         "Ministro da Fazenda, em janelas de 30", False),
+        ("     dias renováveis. Não é R$ 2,12 correndo sem parar.", False),
+        ("", False),
+        ("O FUNDO DA QUESTÃO: são duas coisas diferentes. O DESCONTO que a "
+         "Petrobras dá no preço à distribuidora", False),
+        ("está na tabela dela e é o que esta planilha mede. O que o TESOURO "
+         "devolve a ela não está em lugar", False),
+        ("nenhum público. A T.3 supõe que os dois são iguais; se o Tesouro "
+         "ressarce menos que o desconto, a", False),
+        ("diferença não é ganho, é prejuízo.", False),
+        ("", False),
+        ("Leia a linha do ganho como TETO: quanto a medida valeria se "
          "alcançasse tudo. O que de fato foi pago", False),
         ("sai no resultado da empresa e na execução orçamentária, não aqui.", False),
         ("", False),
