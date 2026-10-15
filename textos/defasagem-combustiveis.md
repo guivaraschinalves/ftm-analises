@@ -9,19 +9,19 @@ fonte: politica-2023 | ⟨FALTA: a fonte da mudança de política de 2023⟩
 figura: abicom-tabela | assets/abicom-ppi-14-10-2026.png | Acompanhamento diário da Abicom em 14/10/2026: preço, PPI e defasagem por ponto de entrega. | Abicom, em parceria com a StoneX Brasil | https://abicom.com.br/ppi/ppi-14-10-2026/
 figura: abicom-serie | assets/abicom-diesel-paulinia.png | O preço do diesel A em Paulínia contra o PPI. A linha verde tem dois degraus e eles são coisas diferentes: o de março é a Petrobras subindo a tabela de R$ 3,30 para R$ 3,68, e o de junho é a subvenção entrando e derrubando para R$ 3,33 o que a distribuidora paga. | Abicom | https://abicom.com.br/ppi/ppi-14-10-2026/
 
-Há tempos mostro no canal a defasagem de preços da Petrobras reportada pela [Abicom](fonte:abicom). Muitos de vocês pediram uma análise do impacto no IPCA caso a empresa feche essa diferença.
+Há tempos mostro no canal a defasagem de preços da Petrobras na gasolina e no diesel reportada pela [Abicom](fonte:abicom). Muitos de vocês pediram uma análise do impacto no IPCA caso a empresa feche essa diferença.
 
-Os [dados de 14 de outubro](fonte:abicom) mostram o diesel em Paulínia a R$ 3,33 o litro contra um PPI de R$ 6,77, defasagem de **103% do preço cobrado**. Na gasolina, R$ 3,06 contra R$ 3,80, ou 24%. Paulínia é a maior refinaria do país: um quarto do diesel e um quinto da gasolina A que o Brasil produz.
+Segundo a Abicom, os [dados de 14 de outubro](fonte:abicom) mostram o diesel em Paulínia a R$ 3,33 o litro contra um PPI (Preço de Paridade de Importação) de R$ 6,77, defasagem de **103% do preço cobrado**, ou seja, a Petrobras teria que dobrar seu preço para igualar ao PPI. Na gasolina, R$ 3,06 contra R$ 3,80, ou 24%. A comparação é com Paulínia por ser a maior refinaria do país: um quarto do diesel e um quinto da gasolina A que o Brasil produz, além da posição geográfica favorável.
 
 [figura:abicom-tabela]
 
-**[PPI](fonte:anp-ppi)** é o custo estimado de importar o produto, com cotação internacional, câmbio, logística e, dependendo da metodologia, um prêmio de risco. Os preços são os cobrados das distribuidoras, antes de tributos, etanol anidro e margens.
+Esse [Preço de Paridade de Importação](fonte:anp-ppi) é o custo estimado de importar o produto, com cotação internacional, câmbio, logística e, dependendo da metodologia, um prêmio de risco. Importante ressaltar também que os preços da Petrobras e Acelen são os cobrados das distribuidoras, antes de tributos, etanol anidro e margens.
 
-Dois alertas de leitura. A Abicom divide a defasagem pelo preço da Petrobras, não pelo PPI: contra o PPI o diesel é −51%, não −103%. E os R$ 3,33 já são o preço **com** a [subvenção de R$ 2,12 por litro](fonte:mps-diesel) bancada pelo Tesouro. A [tabela cheia é R$ 5,45](fonte:tabela-petrobras); sem o subsídio a defasagem do diesel seria 24%, igual à da gasolina.
+Uma ressalva. Os R$ 3,33 já são o preço **com** a [subvenção de R$ 2,12 por litro](fonte:mps-diesel) bancada pelo Tesouro. A [tabela cheia é R$ 5,45](fonte:tabela-petrobras); sem o subsídio a defasagem do diesel seria 24%, igual à da gasolina. Em outras palavras, o preço efetivo para a Petrobras é R$ 5,45, mas para a distribuidora é R$ 3,33.
 
 [figura:abicom-serie]
 
-Ou seja, boa parte do buraco não é política de preço da Petrobras, é subsídio. O que sobra vem da [estratégia comercial que a empresa adotou em maio de 2023](fonte:politica-2023), quando abandonou a paridade estrita com o PPI.
+De qualquer forma, boa parte do buraco não é política de preço da Petrobras, é subsídio. O que sobra vem da [estratégia comercial que a empresa adotou em maio de 2023](fonte:politica-2023), quando abandonou a paridade estrita com o PPI.
 
 Antes de estimar o impacto, precisamos entender a probabilidade de ele acontecer. Com probabilidade irrelevante, o cálculo do impacto também é irrelevante.
 
