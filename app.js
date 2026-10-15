@@ -106,12 +106,46 @@
   function paragrafos(txt, classe) {
     if (!txt) return [];
     return String(txt).split(/\n\s*\n/).map(function (paragrafo) {
-      var p = html("p", { "class": classe });
-      paragrafo.split(/\*\*/).forEach(function (pedaco, i) {
-        if (!pedaco) return;
-        p.appendChild(i % 2 ? html("b", { texto: pedaco }) : document.createTextNode(pedaco));
-      });
-      return p;
+      return paragrafo1(paragrafo, classe);
+    });
+  }
+  function paragrafo1(paragrafo, classe) {
+    var p = html("p", { "class": classe });
+    paragrafo.split(/\*\*/).forEach(function (pedaco, i) {
+      if (!pedaco) return;
+      p.appendChild(i % 2 ? html("b", { texto: pedaco }) : document.createTextNode(pedaco));
+    });
+    return p;
+  }
+
+  // Imagem no meio do texto. Um parágrafo que seja só "[figura:nome]" vira a
+  // figura de mesmo id declarada na seção — é assim que uma tabela da Abicom
+  // entra entre dois parágrafos, e não num amontoado no fim.
+  var MARCA_FIGURA = /^\[figura:([\w-]+)\]$/;
+  function figura(f) {
+    var fig = html("figure", { "class": "figura" });
+    fig.appendChild(html("img", {
+      src: f.arquivo, alt: f.legenda || "", loading: "lazy"
+    }));
+    var legenda = html("figcaption", {});
+    if (f.legenda) legenda.appendChild(document.createTextNode(f.legenda + " "));
+    if (f.fonte) {
+      var credito = f.url
+        ? html("a", { href: f.url, target: "_blank", rel: "noopener noreferrer", texto: f.fonte })
+        : html("span", { texto: f.fonte });
+      legenda.appendChild(html("span", { "class": "figura-fonte" }, [credito]));
+    }
+    fig.appendChild(legenda);
+    return fig;
+  }
+
+  // Prosa e figuras na ordem em que o texto pede.
+  function blocos(txt, classe, figuras) {
+    var porId = {};
+    (figuras || []).forEach(function (f) { porId[f.id] = f; });
+    return String(txt || "").split(/\n\s*\n/).filter(Boolean).map(function (b) {
+      var m = b.trim().match(MARCA_FIGURA);
+      return m && porId[m[1]] ? figura(porId[m[1]]) : paragrafo1(b, classe);
     });
   }
 
@@ -1555,7 +1589,7 @@
         });
         secao.appendChild(fontes);
       }
-      paragrafos(sec.texto, "artigo-texto").forEach(function (p) {
+      blocos(sec.texto, "artigo-texto", sec.figuras).forEach(function (p) {
         secao.appendChild(p);
       });
       sec.graficos.forEach(function (g) {

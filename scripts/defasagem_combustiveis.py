@@ -170,6 +170,7 @@ def secao_introducao():
         "cobrado**. Na gasolina, R$ 3,06 contra R$ 3,80, ou 24%. Paulínia é a "
         "maior refinaria do país: um quarto do diesel e um quinto da gasolina "
         "A que o Brasil produz.\n\n"
+        "[figura:abicom-tabela]\n\n"
         "**PPI** é o custo estimado de importar o produto, com cotação "
         "internacional, câmbio, logística e, dependendo da metodologia, um "
         "prêmio de risco. Os preços são os cobrados das distribuidoras, antes "
@@ -179,6 +180,7 @@ def secao_introducao():
         "os R$ 3,33 já são o preço **com** a subvenção de R$ 2,12 por litro "
         "bancada pelo Tesouro. A tabela cheia é R$ 5,45; sem o subsídio a "
         "defasagem do diesel seria 24%, igual à da gasolina.\n\n"
+        "[figura:abicom-serie]\n\n"
         "Ou seja, boa parte do buraco não é política de preço da Petrobras, é "
         "subsídio. O que sobra vem da estratégia comercial que a empresa "
         "adotou em maio de 2023, quando abandonou a paridade estrita com o "
@@ -188,6 +190,24 @@ def secao_introducao():
         "próximas seções, a estrutura do mercado, as diferenças entre "
         "regiões, a situação da Petrobras e o custo fiscal."
     )
+
+    figuras = [
+        {"id": "abicom-tabela",
+         "arquivo": "assets/abicom-ppi-14-10-2026.png",
+         "legenda": "Acompanhamento diário da Abicom em 14/10/2026: preço, "
+                    "PPI e defasagem por ponto de entrega.",
+         "fonte": "Abicom, em parceria com a StoneX Brasil",
+         "url": "https://abicom.com.br/ppi/ppi-14-10-2026/"},
+        {"id": "abicom-serie",
+         "arquivo": "assets/abicom-diesel-paulinia.png",
+         "legenda": "O preço do diesel A em Paulínia contra o PPI. A linha "
+                    "verde tem dois degraus e eles são coisas diferentes: o "
+                    "de março é a Petrobras subindo a tabela de R$ 3,30 para "
+                    "R$ 3,68, e o de junho é a subvenção entrando e "
+                    "derrubando para R$ 3,33 o que a distribuidora paga.",
+         "fonte": "Abicom",
+         "url": "https://abicom.com.br/ppi/ppi-14-10-2026/"},
+    ]
 
     fontes = [
         {"rot": "Abicom, PPI de 14/10/2026",
@@ -234,7 +254,8 @@ def secao_introducao():
     if die:
         g["series"].append(serie("Diesel S-10", VERMELHO, die))
     return {"titulo": "O que é defasagem, e por que ela importa",
-            "texto": texto, "fontes": fontes, "graficos": [g]}
+            "texto": texto, "fontes": fontes, "figuras": figuras,
+            "graficos": [g]}
 
 
 # ─── seção 2: probabilidade de fechar, gasolina ──────────────────────────────

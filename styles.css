@@ -189,6 +189,23 @@ details[open] > summary > .seta, details[open] > .nav-rotulo > .seta, details[op
 }
 /* respiro entre a prosa e o gráfico que ela introduz, e depois dele */
 .artigo-secao > .card { margin: 28px 0 32px; }
+
+/* ---------- figura: imagem de terceiro no meio do texto ----------
+   Fundo claro sempre, porque as tabelas e gráficos que a gente cita vêm
+   desenhados em branco: num tema escuro, sem a moldura, eles pareceriam um
+   buraco de luz no meio da página. */
+.figura { margin: 26px 0 30px; }
+.figura img {
+  display: block; width: 100%; height: auto;
+  background: #fff; border: 1px solid var(--border); border-radius: 10px;
+}
+.figura figcaption {
+  margin-top: 9px; color: var(--ink-2);
+  font-size: 13.5px; line-height: 1.45;
+}
+.figura-fonte::before { content: "Fonte: "; }
+.figura-fonte a { color: var(--accent); text-decoration: none; }
+.figura-fonte a:hover { text-decoration: underline; }
 /* num relatório o gráfico não se recolhe: a seta some e o cabeçalho deixa de
    convidar o clique. O cartão segue sendo <details> aberto, o que mantém o
    resto do app (tela cheia, baixar, períodos) funcionando igual. */
