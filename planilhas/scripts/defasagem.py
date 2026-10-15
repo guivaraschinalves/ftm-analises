@@ -216,15 +216,20 @@ def baixar_ppi():
     return PPI_ARQUIVO
 
 
-def ler_ppi(caminho):
-    """[(início, fim, {ponto: R$/litro})], uma entrada por semana."""
+def ler_ppi(caminho, aba=None):
+    """[(início, fim, {ponto: R$/litro})], uma entrada por semana.
+
+    `aba` escolhe o produto: "Gasolina R$ semanal" (o padrão), "Diesel R$
+    semanal", "QAV R$ semanal" ou "GLP R$ kg semanal". O layout é o mesmo nas
+    quatro."""
     import openpyxl
-    ws = openpyxl.load_workbook(caminho, data_only=True)[ABA_PPI]
+    aba = aba or ABA_PPI
+    ws = openpyxl.load_workbook(caminho, data_only=True)[aba]
     grade = [list(r) for r in ws.iter_rows(values_only=True)]
     ih = next((i for i, r in enumerate(grade)
                if any(isinstance(c, str) and c.strip() == "Data" for c in r)), None)
     if ih is None:
-        raise SystemExit("a aba %r não tem linha de cabeçalho — o layout mudou?" % ABA_PPI)
+        raise SystemExit("a aba %r não tem linha de cabeçalho — o layout mudou?" % aba)
     jd = next(j for j, c in enumerate(grade[ih]) if isinstance(c, str) and c.strip() == "Data")
     # as colunas de preço são as contíguas depois de "Data"; o bloco seguinte,
     # separado por uma coluna vazia, repete os nomes com a variação semanal
@@ -536,14 +541,12 @@ def main():
     ppi = ler_ppi(baixar_ppi())
     print("  %d semanas, de %s a %s" % (len(ppi), ppi[0][0], ppi[-1][1]))
 
-    import glob
-    pdfs = sorted(glob.glob(os.path.join(DADOS, "*asolina*.pdf"))
-                  + glob.glob(os.path.join(DADOS, "*abela*re*.pdf")), key=os.path.getmtime)
-    if not pdfs:
-        raise SystemExit("nenhuma tabela da Petrobras em dados/ — veja "
+    caminho = pc.pdf_de("Gasolina")
+    if not caminho:
+        raise SystemExit("nenhuma tabela de gasolina da Petrobras — veja "
                          "precos_combustiveis.py, que sabe buscá-la")
-    print("Petrobras, de %s…" % os.path.basename(pdfs[-1]))
-    linhas = pc.ler_petrobras(pdfs[-1])
+    print("Petrobras, de %s…" % os.path.basename(caminho))
+    linhas = pc.ler_petrobras(caminho)
     escadas = {p: escadas_petrobras(linhas, p) for p in PONTOS}
     ultima = max(d for tab, sub in escadas.values() for d, _v in tab + sub)
     for p, (tab, sub) in sorted(escadas.items()):

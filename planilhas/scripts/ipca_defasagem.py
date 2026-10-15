@@ -119,14 +119,11 @@ def defasagem_mensal():
     três semanas, senão a média de um mês recém-começado entra como se fosse o
     mês inteiro."""
     ppi = df.ler_ppi(df.baixar_ppi())
-    import glob
-    pdfs = sorted(glob.glob(os.path.join(DADOS, "*asolina*.pdf"))
-                  + glob.glob(os.path.join(DADOS, "*abela*re*.pdf")),
-                  key=os.path.getmtime)
-    if not pdfs:
-        raise SystemExit("nenhuma tabela da Petrobras em dados/ — veja "
+    caminho = pc.pdf_de("Gasolina")
+    if not caminho:
+        raise SystemExit("nenhuma tabela de gasolina da Petrobras — veja "
                          "precos_combustiveis.py, que sabe buscá-la")
-    linhas = pc.ler_petrobras(pdfs[-1])
+    linhas = pc.ler_petrobras(caminho)
     escadas = {p: df.escadas_petrobras(linhas, p) for p in df.PONTOS}
     ultima = max(d for tab, sub in escadas.values() for d, _v in tab + sub)
 

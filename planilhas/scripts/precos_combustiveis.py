@@ -225,10 +225,22 @@ def colunas_de_data(cabecalho):
 
 # ------------------------------------------------------------- Petrobras (PDF)
 
+# O PDF do diesel traz S500 e S10 no mesmo arquivo, uma faixa de páginas para
+# cada, e o produto está no título da página. Os nomes aqui são os mesmos que
+# a Acelen usa, para as duas empresas casarem na mesma tabela.
+PRODUTO_NA_PAGINA = (("Diesel S500", "Diesel S-500"),
+                     ("Diesel S10", "Diesel S-10"),
+                     ("Gasolina A", "Gasolina A"))
+
+
 def ler_petrobras(caminho, produto="Gasolina A"):
     """O PDF de tabelas da Petrobras. Uma tabela por página: as duas primeiras
     colunas são ponto de entrega e modalidade, as demais são vigências. As
-    páginas de gasolina Premium e a da legenda ficam de fora."""
+    páginas de gasolina Premium e a da legenda ficam de fora.
+
+    `produto` é só o palpite de partida: quando o título da página diz qual é,
+    ele vence, que é o que permite ler o PDF de diesel, onde convivem S500 e
+    S10."""
     import pdfplumber
     fora = []
     with pdfplumber.open(caminho) as pdf:
@@ -236,6 +248,8 @@ def ler_petrobras(caminho, produto="Gasolina A"):
             topo = (pagina.extract_text() or "")[:200]
             if "Premium" in topo or "Modalidade de Venda" in topo:
                 continue
+            da_pagina = next((nome for marca, nome in PRODUTO_NA_PAGINA
+                              if marca in topo), produto)
             tabela = pagina.extract_table()
             if not tabela or len(tabela) < 3:
                 print("  página %d: sem tabela legível" % n, file=sys.stderr)
@@ -250,8 +264,9 @@ def ler_petrobras(caminho, produto="Gasolina A"):
                 for i, data, desc in colunas:
                     v = numero((linha[i] or "")) if i < len(linha) else None
                     if v:
-                        fora.append(("Petrobras", produto, data, uf.group(1),
-                                     mod, local, round(v / 1000.0, 5), desc))
+                        fora.append(("Petrobras", da_pagina, data,
+                                     uf.group(1), mod, local,
+                                     round(v / 1000.0, 5), desc))
     return fora
 
 
@@ -260,12 +275,19 @@ def ler_petrobras(caminho, produto="Gasolina A"):
 #
 #   .../api/jsonws/dlapp/get-file-entries/repository-id/1295200/folder-id/0
 #
-# ATENÇÃO: a biblioteca pública fica ATRÁS da tabela que a Petrobras manda por
-# outros canais. Em 8/10/2026 ela tinha a gasolina até 1/9/2026 e, de diesel,
-# só as tabelas de "Outros Diesel" de agosto de 2022. Para o diesel corrente, e
-# para a gasolina do mês, o arquivo precisa chegar à mão em dados/.
+# ATENÇÃO: as tabelas correntes ficam nas SUBPASTAS (Diesel, Gasolina, GLP,
+# Outros Produtos), não na raiz. Enquanto a busca não descia um nível, ela só
+# via o que estava solto na raiz — gasolina até 1/9/2026 e, de diesel, só
+# "Outros Diesel" de agosto de 2022 — e dava a impressão de que a biblioteca
+# estava atrasada. Estava a busca.
 PETRO_BIBLIOTECA = ("https://precos.petrobras.com.br/api/jsonws/dlapp/"
                     "get-file-entries/repository-id/1295200/folder-id/%d")
+PETRO_SUBPASTAS = ("https://precos.petrobras.com.br/api/jsonws/dlapp/"
+                   "get-folders/repository-id/1295200/parent-folder-id/%d")
+# A raiz e a pasta "tabelas de preços". As tabelas correntes NÃO ficam aqui:
+# ficam nas subpastas Diesel, Gasolina, GLP e Outros Produtos, e por isso a
+# busca desce um nível. Enquanto ela não descia, o script só enxergava o que
+# estava solto na raiz, que para o diesel era agosto de 2022.
 PETRO_PASTAS = (0, 1296634)
 PETRO_ARQUIVO = ("https://precos.petrobras.com.br/c/document_library/get_file"
                  "?uuid=%s&groupId=1295200")
@@ -273,16 +295,29 @@ NAVEGADOR = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"
                            " (KHTML, like Gecko) Chrome/131.0 Safari/537.36"}
 
 
+# Os dois PDF que interessam, por padrão de nome do arquivo na biblioteca.
+PETRO_PRODUTOS = ("Gasolina", "Diesel S500")
+
+
 def baixar_petrobras(padrao="Gasolina"):
     """Pega da biblioteca pública o PDF mais recente cujo nome case com
     `padrao`, grava em dados/ e devolve o caminho. None se não houver."""
     import urllib.request
-    melhor = None
-    for pasta in PETRO_PASTAS:
-        req = urllib.request.Request(PETRO_BIBLIOTECA % pasta, headers=NAVEGADOR)
+
+    def json_de(url):
+        req = urllib.request.Request(url, headers=NAVEGADOR)
         with urllib.request.urlopen(req, timeout=60) as r:
-            lista = json.loads(r.read())
-        for f in lista if isinstance(lista, list) else []:
+            saida = json.loads(r.read())
+        return saida if isinstance(saida, list) else []
+
+    pastas = list(PETRO_PASTAS)
+    for pasta in PETRO_PASTAS:
+        pastas += [int(f["folderId"]) for f in json_de(PETRO_SUBPASTAS % pasta)
+                   if f.get("folderId")]
+    melhor = None
+    for pasta in dict.fromkeys(pastas):
+        lista = json_de(PETRO_BIBLIOTECA % pasta)
+        for f in lista:
             nome = f.get("fileName", "")
             if (f.get("extension", "").lower() == "pdf"
                     and re.search(padrao, nome, re.I)
@@ -336,6 +371,20 @@ def tabela_do_html(bruto):
         if celulas:
             fora.append(celulas)
     return fora
+
+
+def pdf_de(padrao="Gasolina"):
+    """O PDF mais recente da Petrobras para esse produto, baixando se faltar.
+
+    Existe porque o nome do arquivo de diesel também casa com o padrão antigo
+    "*abela*re*" ("Tabelas de Precos"), e quem pegava só o mais recente da
+    pasta passou a pegar o diesel sem perceber."""
+    import glob
+    achados = [c for c in glob.glob(os.path.join(DADOS, "*.pdf"))
+               if re.search(padrao, os.path.basename(c), re.I)]
+    if achados:
+        return sorted(achados, key=os.path.getmtime)[-1]
+    return baixar_petrobras(padrao)
 
 
 def ler_acelen(ate=None):
@@ -655,27 +704,33 @@ def main():
     except Exception as e:                    # site fora do ar não derruba o resto
         print("  Acelen falhou: %s" % e, file=sys.stderr)
 
-    pdfs = sorted(glob.glob(os.path.join(DADOS, "*asolina*.pdf"))
-                  + glob.glob(os.path.join(DADOS, "*abela*re*.pdf")),
-                  key=os.path.getmtime)
-    if pdfs:
-        print("Petrobras, de %s…" % os.path.basename(pdfs[-1]))
-        lidas = ler_petrobras(pdfs[-1])
-        refinarias += lidas
-        print("  %d linhas" % len(lidas))
-    else:
-        print("Petrobras: nenhum PDF em dados/ — tentando a biblioteca pública…")
+    print("Petrobras, da biblioteca pública…")
+    caminhos = []
+    for padrao in PETRO_PRODUTOS:
         try:
-            baixado = baixar_petrobras("Gasolina")
-        except Exception as e:
-            baixado = None
-            print("  biblioteca falhou: %s" % e, file=sys.stderr)
-        if baixado:
-            lidas = ler_petrobras(baixado)
-            refinarias += lidas
-            print("  %s: %d linhas" % (os.path.basename(baixado), len(lidas)))
-        else:
-            print("  nada encontrado — só a Acelen entra.", file=sys.stderr)
+            achado = baixar_petrobras(padrao)
+        except Exception as e:                # biblioteca fora não derruba o resto
+            achado = None
+            print("  biblioteca falhou (%s): %s" % (padrao, e), file=sys.stderr)
+        if achado:
+            caminhos.append(achado)
+    # Mais um PDF que tenha chegado à mão em dados/. Os padrões se sobrepõem,
+    # então a lista passa por dict.fromkeys para não ler o mesmo arquivo duas
+    # vezes, e tudo é ordenado por data de modificação: as escadas são
+    # dicionários por vigência, o último lido vence, e assim o arquivo mais
+    # novo ganha, venha ele da biblioteca ou de fora.
+    caminhos += glob.glob(os.path.join(DADOS, "*asolina*.pdf"))
+    caminhos += glob.glob(os.path.join(DADOS, "*iesel*.pdf"))
+    caminhos += glob.glob(os.path.join(DADOS, "*abela*re*.pdf"))
+    caminhos = sorted(dict.fromkeys(os.path.realpath(c) for c in caminhos),
+                      key=os.path.getmtime)
+    for caminho in caminhos:
+        lidas = ler_petrobras(caminho)
+        refinarias += lidas
+        print("  %-50s %5d linhas"
+              % (os.path.basename(caminho)[:50], len(lidas)))
+    if not caminhos:
+        print("  nada encontrado — só a Acelen entra.", file=sys.stderr)
 
     if refinarias:
         por_empresa = {}
