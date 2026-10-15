@@ -1118,12 +1118,17 @@ def escrever(linhas, sensivel, pontos, medias, bah, par, sal, pesos, diag,
         "O RISCO, E ELE É REAL: escolher a data olhando a série é selecionar "
         "pelo resultado. Os meses que ficam",
         "de fora são justamente os de contribuição negativa, e o número sobe "
-        "sozinho. Por isso março de 2026 não",
-        "foi escolhido pelo gráfico: é o mês em que o PPI salta. Em Paulínia "
-        "ele sai de R$ 2,573 em fevereiro para",
-        "R$ 3,630 em março, enquanto a tabela da Petrobras fica em R$ 2,5808, "
-        "onde estava desde 27/1/2026 e onde",
-        "ficaria até maio. O choque está no PPI, e a data vem dele.",
+        "sozinho.",
+        "",
+        "Por isso o corte vem de fora dos dados: março de 2026 é quando começa "
+        "a guerra no Oriente Médio. A série",
+        "confirma a data em vez de escolhê-la. O PPI de Paulínia passa "
+        "fevereiro inteiro parado entre R$ 2,46 e",
+        "R$ 2,60, e aí faz +15,7% na semana encerrada em 6/3, +16,4% na "
+        "seguinte e +13,2% na outra, chegando a",
+        "R$ 4,04 em 27/3: 55% em quatro semanas. A tabela da Petrobras fica em "
+        "R$ 2,5808 o tempo todo, onde",
+        "estava desde 27/1/2026 e onde ficaria até maio.",
         "",
         "E a tabela de baixo varre o corte mês a mês, para você ver quanto a "
         "escolha decide. Ela anda MUITO:",
