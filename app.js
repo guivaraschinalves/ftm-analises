@@ -71,7 +71,9 @@
   // Um arquivo por assunto. Cada um traz assunto, fonte, data de referência,
   // uma apresentação e as suas seções; um que faltar é só ignorado. A ordem
   // aqui é a ordem da página.
-  var FONTES = ["dados/juros-eua.json", "dados/eleicoes.json", "dados/defasagem-combustiveis.json"];
+  // A análise vem primeiro: ela é o que se lê de ponta a ponta. Os painéis
+  // antigos ficam embaixo, fechados, como acervo.
+  var FONTES = ["dados/defasagem-combustiveis.json", "dados/juros-eua.json", "dados/eleicoes.json"];
   var docs = [];
   var logoSvg = null;   // {viewBox, nos}
 
