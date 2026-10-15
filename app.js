@@ -74,7 +74,7 @@
   // A análise vem primeiro: ela é o que se lê de ponta a ponta. Os painéis
   // antigos ficam embaixo, fechados, como acervo.
   var FONTES = ["dados/defasagem-combustiveis.json", "dados/juros-eua.json", "dados/eleicoes.json"];
-  var docs = [];
+  var docs = [], atual = 0;
   var logoSvg = null;   // {viewBox, nos}
 
   // ---------- utilidades ----------
@@ -1441,29 +1441,44 @@
     return t + " (" + g.subtitulo.split(";")[0].trim().split(" ").slice(-2).join(" ") + ")";
   }
 
-  function montarNav(dados, host) {
-    var total = dados.secoes.reduce(function (n, sec) { return n + sec.graficos.length; }, 0);
-    var grupo = html("details", { "class": "nav-grupo" });
-    var rotulo = html("summary", { "class": "nav-rotulo" });
-    rotulo.appendChild(seta());
-    rotulo.appendChild(html("span", { texto: dados.assunto }));
-    rotulo.appendChild(html("span", { "class": "nav-conta", texto: total + " gráficos" }));
-    grupo.appendChild(rotulo);
-
-    dados.secoes.forEach(function (sec, k) {
-      var sub = html("details", { "class": "nav-sub" });
-      var subRotulo = html("summary", { "class": "nav-sub-rotulo" });
-      subRotulo.appendChild(seta());
-      subRotulo.appendChild(html("span", { texto: sec.titulo }));
-      sub.appendChild(subRotulo);
-      sec.graficos.forEach(function (g) {
-        var a = html("a", { href: "#" + g.id, texto: rotuloNav(sec, g) });
-        a.addEventListener("click", function (ev) { ev.preventDefault(); irPara(g.id); });
-        sub.appendChild(a);
+  // O índice é uma lista, não um acordeão: assuntos, e sob o que está na tela
+  // as seções dele. Nada retrátil — num relatório, abrir aba para descobrir o
+  // que tem dentro é atrito. Clicar em outro assunto TROCA a página: um por
+  // vez, porque empilhar três análises numa rolagem só perde o leitor.
+  function montarNav(lista, host, atual) {
+    host.innerHTML = "";
+    lista.forEach(function (dados, i) {
+      var total = dados.secoes.reduce(function (n, sec) { return n + sec.graficos.length; }, 0);
+      var linha = html("a", {
+        "class": "nav-assunto" + (i === atual ? " atual" : ""),
+        href: "#" + idAssunto(dados)
       });
-      grupo.appendChild(sub);
+      linha.appendChild(html("span", { texto: dados.assunto }));
+      linha.appendChild(html("span", { "class": "nav-conta", texto: total + " gráficos" }));
+      linha.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        if (i === atual) { fecharIndice(); irPara(idAssunto(dados)); }
+        else mostrar(i);
+      });
+      host.appendChild(linha);
+
+      if (i !== atual) return;
+      dados.secoes.forEach(function (sec, k) {
+        var destino = "secao-" + slug(dados.assunto) + "-" + k;
+        var a = html("a", { "class": "nav-secao", href: "#" + destino, texto: sec.titulo });
+        a.addEventListener("click", function (ev) {
+          ev.preventDefault();
+          fecharIndice();
+          irPara(destino);
+        });
+        host.appendChild(a);
+      });
     });
-    host.appendChild(grupo);
+  }
+
+  function fecharIndice() {
+    var d = document.querySelector(".indice");
+    if (d) d.open = false;
   }
 
   // Link do menu para um gráfico dentro de categoria, seção ou cartão fechado:
@@ -1491,6 +1506,7 @@
   }
   function montarRodape(lista) {
     var rodape = document.getElementById("rodape");
+    rodape.innerHTML = "";
     lista.forEach(function (dados) {
       var at = dados.atualizado.split("-");
       rodape.appendChild(html("p", { style: "margin:0 0 6px",
@@ -1550,19 +1566,26 @@
 
   // Monta um assunto inteiro na página: assunto > seções > gráficos, tudo
   // fechado — a página inicial é o índice.
+  // Com um assunto por página, nada nasce fechado: a antiga tela de sumário
+  // existia porque os três dividiam a mesma rolagem, e agora quem faz esse
+  // papel é o índice da barra de cima. O <details> fica, porque o leitor pode
+  // querer recolher uma seção, mas o padrão é aberto.
   function montarAssunto(dados, host) {
     if (dados.formato === "artigo") return montarArtigo(dados, host);
-    var cat = html("details", { "class": "categoria", id: idAssunto(dados) });
+    var cat = html("details", { "class": "categoria", id: idAssunto(dados), open: "" });
     var rotulo = html("summary", { "class": "categoria-rotulo" });
     rotulo.appendChild(seta());
     rotulo.appendChild(html("span", { texto: dados.assunto }));
     cat.appendChild(rotulo);
+    var aDesenhar = [];
     paragrafos(dados.apresentacao, "apresentacao").forEach(function (p) {
       cat.appendChild(p);
     });
 
     dados.secoes.forEach(function (sec, k) {
-      var secao = html("details", { "class": "secao", id: "secao-" + slug(dados.assunto) + "-" + k });
+      var secao = html("details", {
+        "class": "secao", id: "secao-" + slug(dados.assunto) + "-" + k, open: ""
+      });
       var rotuloSecao = html("summary", { "class": "secao-rotulo" });
       rotuloSecao.appendChild(seta());
       rotuloSecao.appendChild(html("span", { texto: sec.titulo }));
@@ -1578,8 +1601,10 @@
       sec.graficos.forEach(function (g) {
         g.fonte = g.fonte || dados.fonte;
         var c = criarCartao(g);
+        c.raiz.open = true;
         cartoes.push(c);
         daSecao.push(c);
+        aDesenhar.push(c);
         listaGraficos.appendChild(c.raiz);
       });
       secao.appendChild(listaGraficos);
@@ -1589,25 +1614,53 @@
       cat.appendChild(secao);
     });
     host.appendChild(cat);
+    // Como no artigo: no quadro seguinte, quando o layout já aconteceu.
+    var pintar = function () { aDesenhar.forEach(function (c) { desenhar(c, true); }); };
+    if (window.requestAnimationFrame) window.requestAnimationFrame(pintar);
+    else setTimeout(pintar, 0);
+  }
+
+  // Um assunto por vez. Trocar desmonta o anterior inteiro, inclusive a lista
+  // de cartões — ela é quem o resize e o irPara percorrem, e deixar nela
+  // cartão que saiu do DOM faria os dois desenharem no vazio.
+  function mostrar(i, ancora) {
+    var host = document.getElementById("graficos");
+    atual = i;
+    cartoes.length = 0;
+    host.innerHTML = "";
+    montarAssunto(docs[i], host);
+    montarNav(docs, document.getElementById("nav"), i);
+    montarRodape([docs[i]]);
+    fecharIndice();
+    if (ancora) irPara(ancora);
+    else window.scrollTo({ top: 0, behavior: "auto" });
+    try { history.replaceState(null, "", "#" + (ancora || idAssunto(docs[i]))); } catch (e) {}
+  }
+
+  // De qual assunto é esta âncora? Serve para um link direto a um gráfico
+  // abrir a análise certa, e não a primeira da lista.
+  function assuntoDoHash(h) {
+    for (var i = 0; i < docs.length; i++) {
+      if (idAssunto(docs[i]) === h) return [i, null];
+      for (var k = 0; k < docs[i].secoes.length; k++) {
+        if ("secao-" + slug(docs[i].assunto) + "-" + k === h) return [i, h];
+        var achou = docs[i].secoes[k].graficos.some(function (g) { return g.id === h; });
+        if (achou) return [i, h];
+      }
+    }
+    return null;
   }
 
   function iniciar() {
     var host = document.getElementById("graficos");
-    var nav = document.getElementById("nav");
     var buscas = FONTES.map(function (url) {
       return fetch(url).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; });
     });
     Promise.all(buscas.concat([carregarLogo()])).then(function (r) {
       docs = r.slice(0, FONTES.length).filter(Boolean);
       if (!docs.length) throw new Error("nenhum arquivo de dados foi carregado");
-      host.innerHTML = "";
-      docs.forEach(function (dados) {
-        montarAssunto(dados, host);
-        montarNav(dados, nav);
-      });
-      montarRodape(docs);
-      cartoes.forEach(function (c) { desenhar(c, true); });
-      if (location.hash.length > 1) irPara(location.hash.slice(1));
+      var alvo = location.hash.length > 1 ? assuntoDoHash(location.hash.slice(1)) : null;
+      mostrar(alvo ? alvo[0] : 0, alvo ? alvo[1] : null);
     }).catch(function (e) {
       host.innerHTML = "";
       host.appendChild(html("p", { "class": "estado erro", texto: "Não foi possível carregar os dados. " + e.message }));
