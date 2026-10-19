@@ -216,7 +216,11 @@
           valor: function (v) { return nf(2).format(v) + " dp"; } },
     // razão entre duas medidas (volatilidade depois ÷ antes)
     x: { eixo: function (v, passo) { return nf(Math.max(1, casasDoPasso(passo))).format(v); },
-         valor: function (v) { return nf(2).format(v) + "\u00d7"; } }
+         valor: function (v) { return nf(2).format(v) + "\u00d7"; } },
+    // reais por litro: preço de combustível, onde o centavo é a unidade que
+    // o leitor reconhece
+    "R$/l": { eixo: function (v, passo) { return "R$ " + nf(casasDoPasso(passo)).format(v); },
+              valor: function (v) { return "R$ " + nf(2).format(v); } }
   };
   function unidade(g) { return UNIDADES[g.unidade] || UNIDADES["%"]; }
 

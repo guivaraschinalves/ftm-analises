@@ -1,11 +1,24 @@
 # A defasagem dos combustíveis
 
+## Do que é feito o preço na bomba
+chave: composicao
+fonte: anp-composicao | ANP, composição e estruturas de formação dos preços | https://www.gov.br/anp/pt-br/assuntos/precos-e-defesa-da-concorrencia/precos/composicao-e-estruturas-de-formacao-dos-precos
+
+Antes de falar da defasagem, vale saber o que você paga quando abastece. O preço do litro na bomba tem quatro partes, e a que a Petrobras controla é só uma delas.
+
+Em março de 2026, no Sudeste, o litro de gasolina custava R$ 6,64: R$ 1,85 de gasolina A, R$ 0,99 de etanol anidro, R$ 2,26 de tributos e R$ 1,53 de margem de distribuição e revenda. Ou seja, **a fatia do produtor é 28% do que você paga**.
+
+Isso já antecipa um limite da conta que faremos adiante: se a Petrobras subir o preço dela em um real, o litro na bomba não sobe um real.
+
+
+
 ## 
 fonte: abicom | Abicom, PPI de 14/10/2026 | https://abicom.com.br/ppi/ppi-14-10-2026/
 fonte: tabela-petrobras | Petrobras, tabela de preços do diesel S500 e S10, vigência de 01/10/2026 | https://precos.petrobras.com.br/
 fonte: mps-diesel | MP 1.363/2026 e MP 1.391/2026, com a Portaria MF 2.813
 fonte: anp-ppi | ANP, preços de paridade de importação | https://www.gov.br/anp/pt-br/assuntos/precos-e-defesa-da-concorrencia/precos/precos-de-paridade-de-importacao
 fonte: politica-2023 | ⟨FALTA: a fonte da mudança de política de 2023⟩
+fonte: fgv | Francisco Pessoa Faria, “Impacto da defasagem da gasolina no IPCA e reflexos de sua subvenção nos resultados da Petrobras”, Blog do IBRE (FGV) | https://blogdoibre.fgv.br/
 figura: abicom-tabela | assets/abicom-ppi-14-10-2026.png | Acompanhamento diário da Abicom em 14/10/2026: preço, PPI e defasagem por ponto de entrega. | Abicom, em parceria com a StoneX Brasil | https://abicom.com.br/ppi/ppi-14-10-2026/
 figura: abicom-serie | assets/abicom-diesel-paulinia.png | O preço do diesel A em Paulínia contra o PPI. A linha verde tem dois degraus e eles são coisas diferentes: o de março é a Petrobras subindo a tabela de R$ 3,30 para R$ 3,68, e o de junho é a subvenção entrando e derrubando para R$ 3,33 o que a distribuidora paga. | Abicom | https://abicom.com.br/ppi/ppi-14-10-2026/
 
@@ -27,11 +40,13 @@ Uma ressalva. Os R$ 3,33 já são o preço **com** a [subvenção de R$ 2,12 por
 
 [figura:abicom-serie]
 
-De qualquer forma, boa parte do buraco não é política de preço da Petrobras, é subsídio. O que sobra vem da [estratégia comercial que a empresa adotou em maio de 2023](fonte:politica-2023), quando abandonou a paridade estrita com o PPI.
+Portanto, boa parte do buraco não é política de preço da Petrobras, é subsídio. O que sobra vem da [estratégia comercial que a empresa adotou em maio de 2023](fonte:politica-2023), quando abandonou a paridade estrita com o PPI.
 
-Antes de estimar o impacto, precisamos entender a probabilidade de ele acontecer. Com probabilidade irrelevante, o cálculo do impacto também é irrelevante.
+Neste artigo fizemos dois exercícios. Um puramente contábil, que apenas passa a defasagem para o IPCA. E outro para os primeiros meses da guerra no Oriente Médio, com base no [IPCA de Salvador](fonte:fgv) — um caso interessante, porque na Bahia quem domina é a Acelen, que segue o PPI.
 
-Para saber o que precisaria ocorrer para a Petrobras fechar a defasagem da gasolina ou do diesel, vamos passar pela estrutura do mercado de petróleo e derivados no Brasil, pelas diferenças entre as regiões (de onde nasceu um exercício muito interessante da FGV), pela situação da Petrobras e pelo lado fiscal, com as subvenções e os gastos.
+Mas antes de estimar o impacto, precisamos entender a probabilidade de ele acontecer. Com probabilidade irrelevante, o cálculo do impacto também é irrelevante.
+
+Para isso, vamos passar pelo consumo e pela produção de derivados no Brasil, pelas diferenças entre as regiões, pela situação da Petrobras e pelo lado fiscal, com as subvenções e os gastos.
 
 ## Probabilidade de fechar: gasolina
 chave: gasolina-probabilidade
