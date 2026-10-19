@@ -6,7 +6,7 @@ fonte: anp-composicao | ANP, composição e estruturas de formação dos preços
 
 Antes de falar da defasagem, vale saber o que você paga quando abastece. O preço do litro na bomba tem quatro partes, e a que a Petrobras controla é só uma delas.
 
-Em março de 2026, no Sudeste, o litro de gasolina custava R$ 6,64: R$ 1,85 de gasolina A, R$ 0,99 de etanol anidro, R$ 2,26 de tributos e R$ 1,53 de margem de distribuição e revenda. Ou seja, **a fatia do produtor é 28% do que você paga**.
+Em outubro de 2026, o litro de gasolina custava R$ 6,55 em média no país: R$ 1,82 de gasolina A, R$ 0,98 de etanol anidro, R$ 2,24 de tributos e R$ 1,52 de margem de distribuição e revenda. Ou seja, **a fatia do produtor é 28% do que você paga**.
 
 Isso já antecipa um limite da conta que faremos adiante: se a Petrobras subir o preço dela em um real, o litro na bomba não sobe um real.
 

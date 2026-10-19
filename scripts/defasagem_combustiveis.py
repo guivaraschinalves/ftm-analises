@@ -187,33 +187,56 @@ MES_CURTO = ("jan fev mar abr mai jun jul ago set out nov dez").split()
 
 
 def composicao(produto, meses=12):
-    """{região: [(mês, {faixa: R$/l})]} nos últimos `meses` publicados."""
-    ws = planilha("precos-combustiveis.xlsx")["Composição regiões"]
+    """{região: [(mês, {faixa: R$/l})]} nos últimos `meses` publicados.
+
+    A ANP publica a mesma conta em dois lugares, e os dois são usados aqui:
+
+      - por REGIÃO, mensal, uma semana de referência por mês. É a única com
+        corte regional, e está parada em março de 2026.
+      - só BRASIL, semanal, e essa continua saindo. Vira média mensal abaixo.
+
+    Por isso o Brasil chega a outubro e as regiões param em março. Cada
+    variante do gráfico leva o próprio eixo, que é o que torna isso honesto
+    em vez de confuso."""
+    wb = planilha("precos-combustiveis.xlsx")
     acc = {}
-    for r in ws.iter_rows(min_row=2, values_only=True):
-        if r[0] != produto or r[2] not in REGIOES:
+    for r in wb["Composição regiões"].iter_rows(min_row=2, values_only=True):
+        if r[0] != produto or r[2] not in REGIOES or r[2] == "Brasil":
             continue
         acc.setdefault(r[2], {}).setdefault(r[1].strftime("%Y-%m"), {})[r[3]] = r[4]
-    todos = sorted({m for d in acc.values() for m in d})[-meses:]
-    return {reg: [(m, d[m]) for m in todos if m in d] for reg, d in acc.items()}, todos
+
+    # Brasil pela série semanal: média das semanas de cada mês
+    semanas = {}
+    for r in wb["Composição semanal"].iter_rows(min_row=2, values_only=True):
+        if r[0] != produto:
+            continue
+        semanas.setdefault(r[1].strftime("%Y-%m"), {}).setdefault(r[2], []).append(r[3])
+    acc["Brasil"] = {m: {k: sum(v) / len(v) for k, v in itens.items()}
+                     for m, itens in semanas.items()}
+
+    fora = {}
+    for reg, d in acc.items():
+        ms = sorted(d)[-meses:]
+        fora[reg] = [(m, d[m]) for m in ms]
+    return fora
 
 
 def grafico_composicao(produto, nome_produto, bio, rotulo):
-    dados, meses = composicao(produto)
+    dados = composicao(produto)
     rotulos = {"produto": nome_produto, "bio": bio}
-    # Eixo de categorias, e não de tempo: a ANP pula meses (não publicou
-    # outubro de 2024, nem janeiro de 2025…), e num eixo mensal cada mês que
-    # falta vira um buraco que parece defeito do gráfico.
-    categorias = [MES_CURTO[int(m[5:]) - 1] + "/" + m[2:4] for m in meses]
-    posicao = {m: str(i) for i, m in enumerate(meses)}
     variantes = []
     for reg in REGIOES:
-        if reg not in dados:
+        if not dados.get(reg):
             continue
+        meses = [m for m, _ in dados[reg]]
+        # Eixo de categorias, e não de tempo: a ANP pula meses, e num eixo
+        # mensal cada mês que falta vira um buraco com cara de defeito. Cada
+        # variante leva o seu, porque o Brasil vai mais longe que as regiões.
+        categorias = [MES_CURTO[int(m[5:]) - 1] + "/" + m[2:4] for m in meses]
         series = []
         for faixa, cor in COMPOSICAO:
             pares = []
-            for mes, itens in dados[reg]:
+            for i, (_mes, itens) in enumerate(dados[reg]):
                 if faixa == "Tributos":
                     v = sum(itens.get(k) or 0 for k in
                             ("Tributos federais", "Tributos estaduais"))
@@ -223,17 +246,19 @@ def grafico_composicao(produto, nome_produto, bio, rotulo):
                     v = itens.get(bio)
                 else:
                     v = itens.get(faixa)
-                pares.append((posicao[mes], v if v else None))
+                pares.append((str(i), v if v else None))
             series.append(serie(rotulos.get(faixa, faixa), cor, pares,
                                 tipo="barra"))
-        variantes.append({"rot": reg, "series": series})
+        variantes.append({
+            "rot": reg + " (até %s)" % categorias[-1],
+            "categorias": categorias,
+            "series": series,
+        })
     return {
         "id": "composicao-" + slug(produto),
         "titulo": "Do que é feito o preço %s na bomba" % rotulo,
-        "subtitulo": "Composição do litro nos últimos %d meses publicados "
-                     "pela ANP" % len(meses),
+        "subtitulo": "Composição do litro, mês a mês, como a ANP publica",
         "unidade": "R$/l",
-        "categorias": categorias,
         "fonte": "ANP. Elaboração: Follow the Money",
         # sem "barra": 1 — a fresta entre as colunas é o que faz a pilha ser
         # lida como doze meses, e não como uma área empilhada
@@ -242,10 +267,12 @@ def grafico_composicao(produto, nome_produto, bio, rotulo):
                 "estadual (ICMS). A ANP publica os dois separados; aqui eles "
                 "entram juntos porque cinco faixas encostadas não se "
                 "distinguem para quem tem daltonismo.\n\n"
-                "A ANP só publica esta conta por REGIÃO, nunca por estado, e "
-                "com uma semana de referência por mês. A série regional dela "
-                "está parada em março de 2026: as planilhas seguintes não "
-                "foram publicadas.\n\n"
+                "A ANP publica esta conta em dois lugares. Uma série "
+                "SEMANAL, só Brasil, que continua saindo — é dela que vem a "
+                "aba Brasil, em média mensal. E planilhas MENSAIS por região, "
+                "a única com corte regional, que estão paradas em março de "
+                "2026. Por isso o Brasil chega a outubro e as regiões não. "
+                "Estado a ANP não publica em lugar nenhum.\n\n"
                 "A margem é calculada por **resíduo**, ou seja, é o que sobra "
                 "do preço na bomba depois das outras faixas. Erro em qualquer "
                 "uma delas aparece ali.",
