@@ -60,7 +60,8 @@ por isso precisamos estimar um spread estrutural que na conta dele não existe.
 | Script | Papel |
 |---|---|
 | `anp_desembaracos.py` | Módulo comum: lê o Relatório de Desembaraços da ANP, guarda o calendário de quem era dono de cada refinaria em cada mês, e monta o perfil no formato da FGV. Não roda sozinho |
-| `composicao_anp.py` | O acervo de composição de preço, extraído dos PDF da Síntese Semanal |
+| `composicao_anp.py` | O acervo de composição de preço: o semanal (só Brasil) dos PDF da Síntese Semanal, e o mensal por região das planilhas da ANP |
+| `composicao_painel.py` | A composição **semanal por região**, do painel Power BI da ANP. Extração única, não roda em workflow: o resultado fica em `dados/anp-composicao-painel.csv` |
 | `precos_revenda.py` | O Levantamento de Preços da ANP, por posto, agregado em média semanal por UF. Não roda sozinho |
 | `precos_combustiveis.py`, `defasagem.py`, `oferta_diesel.py`, `oferta_gasolina.py`, `ipca_defasagem.py` | Um por planilha |
 

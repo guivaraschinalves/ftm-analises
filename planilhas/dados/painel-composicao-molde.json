@@ -1,0 +1,483 @@
+{
+ "url": "https://wabi-brazil-south-api.analysis.windows.net/public/reports/querydata?synchronous=true",
+ "headers": {
+  "X-PowerBI-ResourceKey": "e80c0e98-259a-48dc-a3b5-06690cb8fd79",
+  "Accept": "application/json, text/plain, */*",
+  "Content-Type": "application/json;charset=UTF-8"
+ },
+ "body": {
+  "version": "1.0.0",
+  "queries": [
+   {
+    "Query": {
+     "Commands": [
+      {
+       "SemanticQueryDataShapeCommand": {
+        "Query": {
+         "Version": 2,
+         "From": [
+          {
+           "Name": "p",
+           "Entity": "Plan1",
+           "Type": 0
+          },
+          {
+           "Name": "p1",
+           "Entity": "Planilha1",
+           "Type": 0
+          },
+          {
+           "Name": "l",
+           "Entity": "LocalDateTable_f596c735-3f62-4d87-891b-0dc5091b2b07",
+           "Type": 0
+          }
+         ],
+         "Select": [
+          {
+           "Aggregation": {
+            "Expression": {
+             "Column": {
+              "Expression": {
+               "SourceRef": {
+                "Source": "p1"
+               }
+              },
+              "Property": "Identificador"
+             }
+            },
+            "Function": 2
+           },
+           "Name": "Min(Planilha1.Identificador)",
+           "NativeReferenceName": "Identificador"
+          },
+          {
+           "Column": {
+            "Expression": {
+             "SourceRef": {
+              "Source": "p1"
+             }
+            },
+            "Property": "Parcela"
+           },
+           "Name": "Planilha1.Parcela",
+           "NativeReferenceName": "Parcela"
+          },
+          {
+           "Aggregation": {
+            "Expression": {
+             "Column": {
+              "Expression": {
+               "SourceRef": {
+                "Source": "p"
+               }
+              },
+              "Property": "VALOR"
+             }
+            },
+            "Function": 0
+           },
+           "Name": "Sum(Plan1.VALOR)",
+           "NativeReferenceName": "Soma de VALOR"
+          },
+          {
+           "HierarchyLevel": {
+            "Expression": {
+             "Hierarchy": {
+              "Expression": {
+               "PropertyVariationSource": {
+                "Expression": {
+                 "SourceRef": {
+                  "Source": "p"
+                 }
+                },
+                "Name": "Variation",
+                "Property": "DATA"
+               }
+              },
+              "Hierarchy": "Hierarquia de datas"
+             }
+            },
+            "Level": "Ano"
+           },
+           "Name": "Plan1.DATA.Variation.Hierarquia de datas.Ano",
+           "NativeReferenceName": "DATA Ano"
+          },
+          {
+           "HierarchyLevel": {
+            "Expression": {
+             "Hierarchy": {
+              "Expression": {
+               "PropertyVariationSource": {
+                "Expression": {
+                 "SourceRef": {
+                  "Source": "p"
+                 }
+                },
+                "Name": "Variation",
+                "Property": "DATA"
+               }
+              },
+              "Hierarchy": "Hierarquia de datas"
+             }
+            },
+            "Level": "Mês"
+           },
+           "Name": "Plan1.DATA.Variation.Hierarquia de datas.Mês",
+           "NativeReferenceName": "DATA Mês"
+          },
+          {
+           "HierarchyLevel": {
+            "Expression": {
+             "Hierarchy": {
+              "Expression": {
+               "PropertyVariationSource": {
+                "Expression": {
+                 "SourceRef": {
+                  "Source": "p"
+                 }
+                },
+                "Name": "Variation",
+                "Property": "DATA"
+               }
+              },
+              "Hierarchy": "Hierarquia de datas"
+             }
+            },
+            "Level": "Dia"
+           },
+           "Name": "Plan1.DATA.Variation.Hierarquia de datas.Dia",
+           "NativeReferenceName": "DATA Dia"
+          }
+         ],
+         "Where": [
+          {
+           "Condition": {
+            "Not": {
+             "Expression": {
+              "In": {
+               "Expressions": [
+                {
+                 "Column": {
+                  "Expression": {
+                   "SourceRef": {
+                    "Source": "p"
+                   }
+                  },
+                  "Property": "PARCELA"
+                 }
+                }
+               ],
+               "Values": [
+                [
+                 {
+                  "Literal": {
+                   "Value": "'Margem Distribuição'"
+                  }
+                 }
+                ],
+                [
+                 {
+                  "Literal": {
+                   "Value": "'Margem Revenda'"
+                  }
+                 }
+                ],
+                [
+                 {
+                  "Literal": {
+                   "Value": "'Preço Final'"
+                  }
+                 }
+                ],
+                [
+                 {
+                  "Literal": {
+                   "Value": "null"
+                  }
+                 }
+                ]
+               ]
+              }
+             }
+            }
+           }
+          },
+          {
+           "Condition": {
+            "In": {
+             "Expressions": [
+              {
+               "Column": {
+                "Expression": {
+                 "SourceRef": {
+                  "Source": "p"
+                 }
+                },
+                "Property": "PRODUTO"
+               }
+              }
+             ],
+             "Values": [
+              [
+               {
+                "Literal": {
+                 "Value": "'DIESEL S10'"
+                }
+               }
+              ]
+             ]
+            }
+           }
+          },
+          {
+           "Condition": {
+            "In": {
+             "Expressions": [
+              {
+               "Column": {
+                "Expression": {
+                 "SourceRef": {
+                  "Source": "p"
+                 }
+                },
+                "Property": "LOCAL"
+               }
+              }
+             ],
+             "Values": [
+              [
+               {
+                "Literal": {
+                 "Value": "'BRASIL'"
+                }
+               }
+              ]
+             ]
+            }
+           }
+          },
+          {
+           "Condition": {
+            "Not": {
+             "Expression": {
+              "In": {
+               "Expressions": [
+                {
+                 "Column": {
+                  "Expression": {
+                   "SourceRef": {
+                    "Source": "l"
+                   }
+                  },
+                  "Property": "Ano"
+                 }
+                }
+               ],
+               "Values": [
+                [
+                 {
+                  "Literal": {
+                   "Value": "2021L"
+                  }
+                 }
+                ],
+                [
+                 {
+                  "Literal": {
+                   "Value": "2022L"
+                  }
+                 }
+                ],
+                [
+                 {
+                  "Literal": {
+                   "Value": "2023L"
+                  }
+                 }
+                ],
+                [
+                 {
+                  "Literal": {
+                   "Value": "2024L"
+                  }
+                 }
+                ],
+                [
+                 {
+                  "Literal": {
+                   "Value": "2025L"
+                  }
+                 }
+                ]
+               ]
+              }
+             }
+            }
+           }
+          },
+          {
+           "Condition": {
+            "Comparison": {
+             "ComparisonKind": 1,
+             "Left": {
+              "Column": {
+               "Expression": {
+                "SourceRef": {
+                 "Source": "p"
+                }
+               },
+               "Property": "DATA"
+              }
+             },
+             "Right": {
+              "DateSpan": {
+               "Expression": {
+                "Literal": {
+                 "Value": "datetime'2021-01-01T00:00:00'"
+                }
+               },
+               "TimeUnit": 5
+              }
+             }
+            }
+           }
+          }
+         ],
+         "OrderBy": [
+          {
+           "Direction": 1,
+           "Expression": {
+            "HierarchyLevel": {
+             "Expression": {
+              "Hierarchy": {
+               "Expression": {
+                "PropertyVariationSource": {
+                 "Expression": {
+                  "SourceRef": {
+                   "Source": "p"
+                  }
+                 },
+                 "Name": "Variation",
+                 "Property": "DATA"
+                }
+               },
+               "Hierarchy": "Hierarquia de datas"
+              }
+             },
+             "Level": "Ano"
+            }
+           }
+          },
+          {
+           "Direction": 1,
+           "Expression": {
+            "HierarchyLevel": {
+             "Expression": {
+              "Hierarchy": {
+               "Expression": {
+                "PropertyVariationSource": {
+                 "Expression": {
+                  "SourceRef": {
+                   "Source": "p"
+                  }
+                 },
+                 "Name": "Variation",
+                 "Property": "DATA"
+                }
+               },
+               "Hierarchy": "Hierarquia de datas"
+              }
+             },
+             "Level": "Mês"
+            }
+           }
+          },
+          {
+           "Direction": 1,
+           "Expression": {
+            "HierarchyLevel": {
+             "Expression": {
+              "Hierarchy": {
+               "Expression": {
+                "PropertyVariationSource": {
+                 "Expression": {
+                  "SourceRef": {
+                   "Source": "p"
+                  }
+                 },
+                 "Name": "Variation",
+                 "Property": "DATA"
+                }
+               },
+               "Hierarchy": "Hierarquia de datas"
+              }
+             },
+             "Level": "Dia"
+            }
+           }
+          }
+         ]
+        },
+        "Binding": {
+         "Primary": {
+          "Groupings": [
+           {
+            "Projections": [
+             0,
+             2,
+             3,
+             4,
+             5
+            ]
+           }
+          ]
+         },
+         "Secondary": {
+          "Groupings": [
+           {
+            "Projections": [
+             1
+            ]
+           }
+          ]
+         },
+         "DataReduction": {
+          "DataVolume": 4,
+          "Primary": {
+           "Window": {
+            "Count": 200
+           }
+          },
+          "Secondary": {
+           "Top": {
+            "Count": 60
+           }
+          }
+         },
+         "SuppressedJoinPredicates": [
+          0
+         ],
+         "Version": 1
+        },
+        "ExecutionMetricsKind": 1
+       }
+      }
+     ]
+    },
+    "CacheKey": "{\"Commands\":[{\"SemanticQueryDataShapeCommand\":{\"Query\":{\"Version\":2,\"From\":[{\"Name\":\"p\",\"Entity\":\"Plan1\",\"Type\":0},{\"Name\":\"p1\",\"Entity\":\"Planilha1\",\"Type\":0},{\"Name\":\"l\",\"Entity\":\"LocalDateTable_f596c735-3f62-4d87-891b-0dc5091b2b07\",\"Type\":0}],\"Select\":[{\"Aggregation\":{\"Expression\":{\"Column\":{\"Expression\":{\"SourceRef\":{\"Source\":\"p1\"}},\"Property\":\"Identificador\"}},\"Function\":2},\"Name\":\"Min(Planilha1.Identificador)\",\"NativeReferenceName\":\"Identificador\"},{\"Column\":{\"Expression\":{\"SourceRef\":{\"Source\":\"p1\"}},\"Property\":\"Parcela\"},\"Name\":\"Planilha1.Parcela\",\"NativeReferenceName\":\"Parcela\"},{\"Aggregation\":{\"Expression\":{\"Column\":{\"Expression\":{\"SourceRef\":{\"Source\":\"p\"}},\"Property\":\"VALOR\"}},\"Function\":0},\"Name\":\"Sum(Plan1.VALOR)\",\"NativeReferenceName\":\"Soma de VALOR\"},{\"HierarchyLevel\":{\"Expression\":{\"Hierarchy\":{\"Expression\":{\"PropertyVariationSource\":{\"Expression\":{\"SourceRef\":{\"Source\":\"p\"}},\"Name\":\"Variation\",\"Property\":\"DATA\"}},\"Hierarchy\":\"Hierarquia de datas\"}},\"Level\":\"Ano\"},\"Name\":\"Plan1.DATA.Variation.Hierarquia de datas.Ano\",\"NativeReferenceName\":\"DATA Ano\"},{\"HierarchyLevel\":{\"Expression\":{\"Hierarchy\":{\"Expression\":{\"PropertyVariationSource\":{\"Expression\":{\"SourceRef\":{\"Source\":\"p\"}},\"Name\":\"Variation\",\"Property\":\"DATA\"}},\"Hierarchy\":\"Hierarquia de datas\"}},\"Level\":\"Mês\"},\"Name\":\"Plan1.DATA.Variation.Hierarquia de datas.Mês\",\"NativeReferenceName\":\"DATA Mês\"},{\"HierarchyLevel\":{\"Expression\":{\"Hierarchy\":{\"Expression\":{\"PropertyVariationSource\":{\"Expression\":{\"SourceRef\":{\"Source\":\"p\"}},\"Name\":\"Variation\",\"Property\":\"DATA\"}},\"Hierarchy\":\"Hierarquia de datas\"}},\"Level\":\"Dia\"},\"Name\":\"Plan1.DATA.Variation.Hierarquia de datas.Dia\",\"NativeReferenceName\":\"DATA Dia\"}],\"Where\":[{\"Condition\":{\"Not\":{\"Expression\":{\"In\":{\"Expressions\":[{\"Column\":{\"Expression\":{\"SourceRef\":{\"Source\":\"p\"}},\"Property\":\"PARCELA\"}}],\"Values\":[[{\"Literal\":{\"Value\":\"'Margem Distribuição'\"}}],[{\"Literal\":{\"Value\":\"'Margem Revenda'\"}}],[{\"Literal\":{\"Value\":\"'Preço Final'\"}}],[{\"Literal\":{\"Value\":\"null\"}}]]}}}}},{\"Condition\":{\"In\":{\"Expressions\":[{\"Column\":{\"Expression\":{\"SourceRef\":{\"Source\":\"p\"}},\"Property\":\"PRODUTO\"}}],\"Values\":[[{\"Literal\":{\"Value\":\"'DIESEL S10'\"}}]]}}},{\"Condition\":{\"In\":{\"Expressions\":[{\"Column\":{\"Expression\":{\"SourceRef\":{\"Source\":\"p\"}},\"Property\":\"LOCAL\"}}],\"Values\":[[{\"Literal\":{\"Value\":\"'BRASIL'\"}}]]}}},{\"Condition\":{\"Not\":{\"Expression\":{\"In\":{\"Expressions\":[{\"Column\":{\"Expression\":{\"SourceRef\":{\"Source\":\"l\"}},\"Property\":\"Ano\"}}],\"Values\":[[{\"Literal\":{\"Value\":\"2021L\"}}],[{\"Literal\":{\"Value\":\"2022L\"}}],[{\"Literal\":{\"Value\":\"2023L\"}}],[{\"Literal\":{\"Value\":\"2024L\"}}],[{\"Literal\":{\"Value\":\"2025L\"}}]]}}}}},{\"Condition\":{\"Comparison\":{\"ComparisonKind\":1,\"Left\":{\"Column\":{\"Expression\":{\"SourceRef\":{\"Source\":\"p\"}},\"Property\":\"DATA\"}},\"Right\":{\"DateSpan\":{\"Expression\":{\"Literal\":{\"Value\":\"datetime'2021-01-01T00:00:00'\"}},\"TimeUnit\":5}}}}}],\"OrderBy\":[{\"Direction\":1,\"Expression\":{\"HierarchyLevel\":{\"Expression\":{\"Hierarchy\":{\"Expression\":{\"PropertyVariationSource\":{\"Expression\":{\"SourceRef\":{\"Source\":\"p\"}},\"Name\":\"Variation\",\"Property\":\"DATA\"}},\"Hierarchy\":\"Hierarquia de datas\"}},\"Level\":\"Ano\"}}},{\"Direction\":1,\"Expression\":{\"HierarchyLevel\":{\"Expression\":{\"Hierarchy\":{\"Expression\":{\"PropertyVariationSource\":{\"Expression\":{\"SourceRef\":{\"Source\":\"p\"}},\"Name\":\"Variation\",\"Property\":\"DATA\"}},\"Hierarchy\":\"Hierarquia de datas\"}},\"Level\":\"Mês\"}}},{\"Direction\":1,\"Expression\":{\"HierarchyLevel\":{\"Expression\":{\"Hierarchy\":{\"Expression\":{\"PropertyVariationSource\":{\"Expression\":{\"SourceRef\":{\"Source\":\"p\"}},\"Name\":\"Variation\",\"Property\":\"DATA\"}},\"Hierarchy\":\"Hierarquia de datas\"}},\"Level\":\"Dia\"}}}]},\"Binding\":{\"Primary\":{\"Groupings\":[{\"Projections\":[0,2,3,4,5]}]},\"Secondary\":{\"Groupings\":[{\"Projections\":[1]}]},\"DataReduction\":{\"DataVolume\":4,\"Primary\":{\"Window\":{\"Count\":200}},\"Secondary\":{\"Top\":{\"Count\":60}}},\"SuppressedJoinPredicates\":[0],\"Version\":1},\"ExecutionMetricsKind\":1}}]}",
+    "QueryId": "",
+    "ApplicationContext": {
+     "DatasetId": "e8924982-de6c-4277-8aec-27294bb89faf",
+     "Sources": [
+      {
+       "ReportId": "217cf2a5-078e-440e-87e0-fd8a913d0e5c",
+       "VisualId": "c4a7b3953ee8d28e0800"
+      }
+     ]
+    }
+   }
+  ],
+  "cancelQueries": [],
+  "modelId": 9471381
+ }
+}
