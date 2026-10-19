@@ -57,30 +57,28 @@ fonte: anp-revenda | ANP, levantamento semanal de preços de revenda | https://w
 fonte: lei-estatais | Lei 13.303/2016, a Lei das Estatais | https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2016/lei/l13303.htm
 fonte: petroleo-exportacao | ⟨FALTA: exportação de petróleo da Petrobras⟩
 
-⟨ESQUELETO — o raciocínio em ordem, para escrever por cima⟩
+⟨ESQUELETO — o argumento em ordem, para escrever por cima⟩
 
-- **Quem define o preço é quem fornece o último litro.** Não o mais barato, não a média. O ofertante marginal.
-  - País fechado: o último litro é doméstico, a paridade internacional não diz nada.
-  - País exportador: a régua é a **paridade de exportação** (internacional − frete). É o que o produtor deixa de ganhar ao vender aqui em vez de embarcar.
-  - País que importa na margem: a régua é a **paridade de importação** (internacional + frete + internação).
-  - Entre as duas há uma **faixa**. Dentro dela um preço abrasileirado existe sem desequilibrar nada.
-- **O Brasil ocupa pontos diferentes dessa escada em cada produto.** É daí que vem a diferença de probabilidade entre gasolina e diesel — e é por isso que as duas seções seguintes dão respostas opostas.
-- **Na gasolina o país importa pouco: 14,4% da oferta em 2026, até agosto.** Era 8,5% em 2021 e 10,4% em 2025.
-  - Contra-argumento honesto, e ele é nosso: a fatia **quase dobrou em cinco anos**. O que sustenta a tese hoje está encolhendo.
-- **Vender abaixo da paridade é um preço-teto de fato.** E um teto cobra de duas formas que não se parecem:
-  - **Receita que não entra**: a defasagem sobre cada litro que a Petrobras produz e vende aqui. Não é dinheiro que sai. Uma estatal absorve por anos.
-  - **Caixa que sai**: a defasagem sobre o que ela **própria importa** — compra perto da paridade, vende pela tabela.
-- **Medido, de março a agosto de 2026:** gasolina R$ 11,1 bi de receita contra R$ 126 mi de caixa (88 para 1). Diesel: R$ 31,1 bi contra R$ 1,9 bi (16 para 1).
-  - Ressalva a manter no texto: a receita não realizada é **teto, não estimativa**. Supõe venda do mesmo volume ao PPI, e a demanda cairia.
-- **O teste do argumento está nos desembaraços por agente** — e o resultado é mais forte do que "ela aguenta": ela importa **quando compensa**.
-  - 297 mil m³ de gasolina em dezembro de 2025, com a tabela dela ainda acima da paridade.
-  - 48 m³ — quarenta e oito — em todo o trecho de março a junho de 2026, com a defasagem aberta. Quem trouxe foram distribuidores e tradings.
-  - No diesel: zero em abril, maio e junho; volta com força em julho e agosto, já com a subvenção dividindo a conta. É a deixa para a seção seguinte.
-- **Conclusão parcial: na gasolina o teto é pago em receita não realizada, que é item não-caixa.** Por isso dura. A probabilidade de a Petrobras ser **forçada** a fechar é baixa — o que não é o mesmo que dizer que ela não vai fechar.
-- **Limite por cima, do outro lado do balcão: o etanol.** Em 10/10 o hidratado estava a 66,5% da gasolina no país e a 60,8% em São Paulo, contra a regra dos 70%. Já compensa — a demanda está no ponto mais elástico, e cada centavo empurra consumidor para a outra bomba.
-- **Portanto: se fechar, fecha por escolha, não por escassez.** E a escolha tem dono.
-  - A favor de fechar: Lei das Estatais, acionistas minoritários, o dividendo que o Tesouro recebe.
-  - Contra: o calendário eleitoral e o IPCA.
+- Formação do preço doméstico: a referência é o custo do ofertante marginal, isto é, de quem supre a última unidade demandada, e não o custo médio nem o do produtor de menor custo.
+- A referência externa depende da posição comercial líquida do país no produto:
+  - economia fechada: custo marginal doméstico, sem vínculo com a cotação internacional;
+  - exportador líquido: paridade de exportação, igual à cotação internacional líquida de frete e custos portuários, que mede o custo de oportunidade de destinar o produto ao mercado interno;
+  - importador líquido na margem: paridade de importação, igual à cotação internacional acrescida de frete e custos de internação.
+  - O intervalo entre as duas paridades delimita a faixa em que o preço doméstico pode divergir da cotação internacional sem gerar arbitragem.
+- O Brasil ocupa posições distintas conforme o elo da cadeia: exportador líquido de petróleo bruto e importador na margem de derivados, com coeficientes de importação diferentes entre gasolina e diesel. Daí as conclusões opostas desta seção e da seguinte.
+- Coeficiente de importação da gasolina A: 14,4% da oferta em 2026 (janeiro a agosto), contra 10,4% em 2025 e 8,5% em 2021. O nível é baixo, mas a trajetória é de alta e reduz a margem do argumento ao longo do tempo.
+- Preço de venda abaixo da paridade de importação equivale a um teto de preço. O custo para o produtor dominante se reparte em duas rubricas de natureza distinta:
+  - custo de oportunidade: a diferença até a paridade aplicada ao volume de produção própria destinado ao mercado interno. É receita não realizada, sem efeito de caixa, e afeta apenas o resultado;
+  - resultado negativo de revenda: a mesma diferença aplicada ao volume que a própria empresa importa, adquirido a preço próximo da paridade e revendido pelo preço de tabela. Tem efeito de caixa.
+- Magnitudes estimadas para março a agosto de 2026: na gasolina, R$ 11,1 bilhões de custo de oportunidade contra R$ 126 milhões de resultado negativo de revenda, razão de 88 para 1; no diesel, R$ 31,1 bilhões contra R$ 1,9 bilhão, razão de 16 para 1.
+  - Qualificação necessária no texto final: a primeira rubrica é limite superior, porque mantém o volume constante. Com elasticidade-preço não nula, o volume vendido à paridade seria menor.
+- Evidência direta sobre o comportamento de importação da Petrobras, pelos desembaraços por agente declarante no Siscomex:
+  - gasolina, dezembro de 2025: 297 mil m³ importados com a defasagem negativa, isto é, com o preço de tabela acima da paridade;
+  - gasolina, março a junho de 2026: 48 m³ acumulados no período em que a defasagem esteve aberta, com o suprimento marginal a cargo de distribuidores e tradings;
+  - diesel: importação própria nula entre abril e junho, e 563 mil m³ e 785 mil m³ em julho e agosto, já sob vigência da subvenção.
+- Interpretação: no mercado de gasolina a empresa não assume a função de ofertante residual quando o preço interno é inferior à paridade. O custo do teto recai sobre rubrica sem efeito de caixa, o que é compatível com persistência prolongada, e a probabilidade de ajuste por restrição de abastecimento é baixa.
+- Restrição pelo lado da demanda: a substituição pelo etanol hidratado limita o repasse. Em 10 de outubro a razão entre os preços de revenda do hidratado e da gasolina C era de 66,5% no país e 60,8% em São Paulo, abaixo do limiar de indiferença de 70% usualmente adotado, o que eleva a elasticidade-preço da demanda por gasolina.
+- Implicação para a pergunta da seção: um eventual fechamento da defasagem na gasolina decorreria de decisão societária, não de restrição física de oferta. Vetores a favor: Lei 13.303/2016, interesse dos acionistas minoritários e política de dividendos. Vetores contrários: ciclo eleitoral e objetivo de inflação.
 
 ⟨FALTA: quanto do petróleo que extrai a Petrobras exporta. É a outra ponta da escada: em petróleo o Brasil é exportador líquido, e lá a régua é a paridade de exportação, que fica abaixo da de importação. São duas réguas dentro da mesma empresa. Não está nas nossas planilhas, que cobrem derivados — precisa vir da ANP ou do release trimestral da empresa.⟩
 
