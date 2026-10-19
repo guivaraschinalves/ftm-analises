@@ -2,11 +2,13 @@
 
 ## Do que é feito o preço na bomba
 chave: composicao
-fonte: anp-composicao | ANP, composição e estruturas de formação dos preços | https://www.gov.br/anp/pt-br/assuntos/precos-e-defesa-da-concorrencia/precos/composicao-e-estruturas-de-formacao-dos-precos
+fonte: anp-composicao | ANP, painel de composição de preços dos combustíveis | https://app.powerbi.com/view?r=eyJrIjoiZTgwYzBlOTgtMjU5YS00OGRjLWEzYjUtMDY2OTBjYjhmZDc5IiwidCI6IjVlMzk3OGI5LTQ5NTAtNDM3Yy04N2I2LTQ5MmYxMjY4ZGVjOCJ9
 
 Antes de falar da defasagem, vale saber o que você paga quando abastece. O preço do litro na bomba tem quatro partes, e a que a Petrobras controla é só uma delas.
 
-Em outubro de 2026, o litro de gasolina custava R$ 6,55 em média no país: R$ 1,82 de gasolina A, R$ 0,98 de etanol anidro, R$ 2,24 de tributos e R$ 1,52 de margem de distribuição e revenda. Ou seja, **a fatia do produtor é 28% do que você paga**.
+Em setembro de 2026, o litro de gasolina custava R$ 6,51 em média no país: R$ 1,97 de gasolina A, R$ 0,87 de etanol anidro, R$ 2,25 de tributos e R$ 1,42 de margem de distribuição e revenda. Ou seja, **a fatia do produtor é 30% do que você paga**.
+
+E varia por região: no Sudeste a gasolina A é 28% do preço, no Norte 32%. O gráfico abaixo troca de região.
 
 Isso já antecipa um limite da conta que faremos adiante: se a Petrobras subir o preço dela em um real, o litro na bomba não sobe um real.
 

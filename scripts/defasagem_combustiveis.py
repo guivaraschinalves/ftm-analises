@@ -24,6 +24,7 @@ O QUE AINDA FALTA
   Monetária do Banco Central. Procure por "FALTA" neste arquivo.
 """
 import datetime
+import io
 import json
 import os
 import re
@@ -175,49 +176,44 @@ COMPOSICAO = [
     ("Tributos", "#6250d6"),
     ("Margem de distribuição e revenda", "#C0504D"),
 ]
-# A ANP publica a composição por REGIÃO, nunca por estado, e a série regional
-# é mensal com uma semana de referência por mês.
-REGIOES = ["Brasil", "Norte", "Nordeste", "Sudeste", "Sul", "Centro-Oeste"]
-# (produto na planilha, faixa do produtor, faixa do biocombustível, rótulo)
+# A ANP publica a composição por REGIÃO, nunca por estado. São três fontes
+# diferentes para a mesma conta, e a que vale é a do painel: semanal, por
+# região, desde 2021 e atual. As outras duas ou não têm região (a semanal em
+# PDF) ou estão paradas em março de 2026 (as planilhas mensais). O acervo do
+# painel é extraído à mão pelo planilhas/scripts/composicao_painel.py.
+REGIOES = ["BRASIL", "NORTE", "NORDESTE", "SUDESTE", "SUL", "CENTRO-OESTE"]
+NOME_REGIAO = {"BRASIL": "Brasil", "NORTE": "Norte", "NORDESTE": "Nordeste",
+               "SUDESTE": "Sudeste", "SUL": "Sul", "CENTRO-OESTE": "Centro-Oeste"}
+# (produto no acervo, faixa do produtor, faixa do biocombustível, rótulo)
 PRODUTOS_COMPOSICAO = [
-    ("Gasolina C", "Gasolina A", "Etanol anidro", "da gasolina"),
-    ("Diesel B S10", "Diesel A", "Biodiesel", "do diesel"),
+    ("GASOLINA", "Gasolina A", "Etanol Anidro", "da gasolina"),
+    ("DIESEL S10", "Diesel A", "Biodiesel", "do diesel"),
 ]
+TRIBUTOS = ("Tributos Federais", "Tributo Estadual")
+MARGEM = "Margem Distribuição + Revenda"
 MES_CURTO = ("jan fev mar abr mai jun jul ago set out nov dez").split()
 
 
 def composicao(produto, meses=12):
-    """{região: [(mês, {faixa: R$/l})]} nos últimos `meses` publicados.
+    """{local: [(mês, {parcela: R$/l})]} nos últimos `meses` do acervo.
 
-    A ANP publica a mesma conta em dois lugares, e os dois são usados aqui:
-
-      - por REGIÃO, mensal, uma semana de referência por mês. É a única com
-        corte regional, e está parada em março de 2026.
-      - só BRASIL, semanal, e essa continua saindo. Vira média mensal abaixo.
-
-    Por isso o Brasil chega a outubro e as regiões param em março. Cada
-    variante do gráfico leva o próprio eixo, que é o que torna isso honesto
-    em vez de confuso."""
-    wb = planilha("precos-combustiveis.xlsx")
-    acc = {}
-    for r in wb["Composição regiões"].iter_rows(min_row=2, values_only=True):
-        if r[0] != produto or r[2] not in REGIOES or r[2] == "Brasil":
-            continue
-        acc.setdefault(r[2], {}).setdefault(r[1].strftime("%Y-%m"), {})[r[3]] = r[4]
-
-    # Brasil pela série semanal: média das semanas de cada mês
+    A fonte é semanal; aqui vira média mensal, que é o que cabe num gráfico
+    de doze barras sem virar serrote."""
+    import csv
+    caminho = os.path.join(PLANILHAS, "dados", "anp-composicao-painel.csv")
     semanas = {}
-    for r in wb["Composição semanal"].iter_rows(min_row=2, values_only=True):
-        if r[0] != produto:
-            continue
-        semanas.setdefault(r[1].strftime("%Y-%m"), {}).setdefault(r[2], []).append(r[3])
-    acc["Brasil"] = {m: {k: sum(v) / len(v) for k, v in itens.items()}
-                     for m, itens in semanas.items()}
-
+    with io.open(caminho, encoding="utf-8") as f:
+        for l in csv.DictReader(f):
+            if l["produto"] != produto:
+                continue
+            (semanas.setdefault(l["local"], {})
+                    .setdefault(l["data"][:7], {})
+                    .setdefault(l["parcela"], []).append(float(l["valor"])))
     fora = {}
-    for reg, d in acc.items():
-        ms = sorted(d)[-meses:]
-        fora[reg] = [(m, d[m]) for m in ms]
+    for local, porMes in semanas.items():
+        ms = sorted(porMes)[-meses:]
+        fora[local] = [(m, {k: sum(v) / len(v) for k, v in porMes[m].items()})
+                       for m in ms]
     return fora
 
 
@@ -238,19 +234,18 @@ def grafico_composicao(produto, nome_produto, bio, rotulo):
             pares = []
             for i, (_mes, itens) in enumerate(dados[reg]):
                 if faixa == "Tributos":
-                    v = sum(itens.get(k) or 0 for k in
-                            ("Tributos federais", "Tributos estaduais"))
+                    v = sum(itens.get(k) or 0 for k in TRIBUTOS)
                 elif faixa == "produto":
                     v = itens.get(nome_produto)
                 elif faixa == "bio":
                     v = itens.get(bio)
                 else:
-                    v = itens.get(faixa)
+                    v = itens.get(MARGEM)
                 pares.append((str(i), v if v else None))
             series.append(serie(rotulos.get(faixa, faixa), cor, pares,
                                 tipo="barra"))
         variantes.append({
-            "rot": reg + " (até %s)" % categorias[-1],
+            "rot": NOME_REGIAO.get(reg, reg),
             "categorias": categorias,
             "series": series,
         })
@@ -267,11 +262,10 @@ def grafico_composicao(produto, nome_produto, bio, rotulo):
                 "estadual (ICMS). A ANP publica os dois separados; aqui eles "
                 "entram juntos porque cinco faixas encostadas não se "
                 "distinguem para quem tem daltonismo.\n\n"
-                "A ANP publica esta conta em dois lugares. Uma série "
-                "SEMANAL, só Brasil, que continua saindo — é dela que vem a "
-                "aba Brasil, em média mensal. E planilhas MENSAIS por região, "
-                "a única com corte regional, que estão paradas em março de "
-                "2026. Por isso o Brasil chega a outubro e as regiões não. "
+                "Fonte: o painel de composição de preços da ANP, que "
+                "publica esta conta SEMANAL e por região. Aqui ela vira média "
+                "mensal. As planilhas da ANP, que são a outra fonte com corte "
+                "regional, estão paradas em março de 2026; o painel continua. "
                 "Estado a ANP não publica em lugar nenhum.\n\n"
                 "A margem é calculada por **resíduo**, ou seja, é o que sobra "
                 "do preço na bomba depois das outras faixas. Erro em qualquer "
