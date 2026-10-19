@@ -156,6 +156,12 @@ details[open] > summary > .seta, details[open] > .nav-rotulo > .seta, details[op
 .artigo-lede { margin: 0 0 18px; color: var(--ink-2); font-size: 19.5px; line-height: 1.62; }
 .artigo-texto { margin: 0 0 20px; color: var(--ink-2); font-size: 18.5px; line-height: 1.72; }
 .artigo-lede b, .artigo-texto b { color: var(--ink); font-weight: 600; }
+/* Lista dentro da prosa: o marcador fica na margem do texto, não recuado,
+   para a coluna continuar com a mesma borda à esquerda dos parágrafos. */
+ul.artigo-texto { padding-left: 1.1em; list-style: disc; }
+ul.artigo-texto li { margin: 0 0 6px; }
+ul.artigo-texto ul { margin: 6px 0 0; padding-left: 1.1em; list-style: circle; }
+ul.artigo-texto ul li { margin: 0 0 4px; }
 .artigo-secao { margin-top: 52px; position: relative; }
 /* sem cabeçalho, a seção não precisa do respiro que separa um título do
    texto anterior: ela continua o que veio antes */

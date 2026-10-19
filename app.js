@@ -106,8 +106,38 @@
   function paragrafos(txt, classe) {
     if (!txt) return [];
     return String(txt).split(/\n\s*\n/).map(function (paragrafo) {
-      return paragrafo1(paragrafo, classe);
+      return LISTA.test(paragrafo) ? lista(paragrafo, classe)
+                                   : paragrafo1(paragrafo, classe);
     });
+  }
+
+  // Um bloco cujas linhas todas comecam por "- " vira lista. Dois espacos
+  // antes do traco aninham um nivel. Serve ao esqueleto de uma secao ainda em
+  // rascunho, e ao texto final que precise de uma enumeracao — negrito e
+  // citacao continuam valendo dentro de cada item.
+  var LISTA = /^\s*-\s+\S/;
+  function lista(bloco, classe) {
+    var raiz = html("ul", { "class": classe ? classe + " lista" : "lista" });
+    var dentro = null;
+    bloco.split(/\n/).forEach(function (linha) {
+      var m = /^(\s*)-\s+(.*)$/.exec(linha);
+      if (!m) return;
+      var item = html("li");
+      m[2].split(/\*\*/).forEach(function (pedaco, i) {
+        if (pedaco) trecho(pedaco, i % 2 === 1, item);
+      });
+      if (m[1].length >= 2) {
+        if (!dentro) {
+          dentro = html("ul");
+          (raiz.lastChild || raiz).appendChild(dentro);
+        }
+        dentro.appendChild(item);
+      } else {
+        dentro = null;
+        raiz.appendChild(item);
+      }
+    });
+    return raiz;
   }
   // "[trecho](fonte:id)" marca de onde veio a informação. O trecho fica
   // sublinhado e a fonte vai para a margem na altura dele, ligada por uma
@@ -172,7 +202,8 @@
     (figuras || []).forEach(function (f) { porId[f.id] = f; });
     return String(txt || "").split(/\n\s*\n/).filter(Boolean).map(function (b) {
       var m = b.trim().match(MARCA_FIGURA);
-      return m && porId[m[1]] ? figura(porId[m[1]]) : paragrafo1(b, classe);
+      if (m && porId[m[1]]) return figura(porId[m[1]]);
+      return LISTA.test(b) ? lista(b, classe) : paragrafo1(b, classe);
     });
   }
 

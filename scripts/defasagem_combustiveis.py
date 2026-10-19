@@ -375,6 +375,15 @@ def perfil_mensal(arq, desde="2021-01"):
 
 
 def graficos_gasolina_probabilidade():
+    """Os quatro gráficos da seção da gasolina.
+
+    FORA DO AR enquanto a seção é um esqueleto. O texto dela saiu para ser
+    reescrito e os gráficos saíram junto, porque o que sobrou ali é o
+    raciocínio em tópicos e um gráfico embaixo de uma lista de pendências não
+    ajuda ninguém. Basta devolver a linha `chave: gasolina-probabilidade` ao
+    textos/defasagem-combustiveis.md para eles voltarem — nada aqui mudou, e
+    a conta que alimenta a tabela continua sendo refeita pelo
+    planilhas/scripts/custo_do_teto.py."""
     anos, imp = importado_por_ano()
     perfil = perfil_mensal("oferta-gasolina.xlsx")
     g, d = soma_do_teto("gasolina"), soma_do_teto("diesel")
