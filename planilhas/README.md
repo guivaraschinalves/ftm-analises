@@ -18,6 +18,7 @@ que as usam.
 | `defasagem-gasolina.xlsx` | Preço da Petrobras contra o PPI da ANP, semanal desde set/2019, nos nove pontos de entrega em que as duas pontas são o mesmo lugar. E a mesma conta para a Acelen na Bahia, contra o PPI de Aratu, que é o que mede (em vez de supor) se o preço baiano segue o mercado. A aba "Gráfico Acelen vs PPI" traz a reconstrução do G.3 do artigo da FGV, mensal, já com o gráfico montado |
 | `precos-combustiveis.xlsx` | Preço ao distribuidor, preço por refinaria e por UF, e a composição do preço na bomba decomposta em produto, anidro, tributos e margem |
 | `ipca-defasagem.xlsx` | Quanto da defasagem está represado no IPCA, por três caminhos independentes: o contábil (teto), a Bahia como grupo de controle (piso) e o método da FGV estendido para série mensal. Traz também o IPCA em 12 meses sob cada estimativa |
+| `custo-do-teto.xlsx` | O que custa à Petrobras vender abaixo da paridade, nos dois produtos, separando o que é **receita não realizada** sobre o volume que ela fornece do que é **prejuízo de caixa** sobre o que ela própria importa. São as duas áreas do diagrama de preço-teto, e qual delas aparece diz quem está bancando o teto |
 | `subvencao-petrobras.xlsx` | Quanto as subvenções de 2026 valem para a Petrobras, gasolina e diesel. É a tabela T.3 do artigo da FGV, com dado observado no lugar de projeção |
 | `ppi-anp.xlsx` | O arquivo bruto da ANP: PPI semanal de gasolina, diesel, QAV e GLP. Insumo, não produto, e por isso não é versionado |
 | `PPI_combustiveis_2016-2026.xlsx` | A planilha antiga, de setembro de 2026. Substituída em quase tudo pelas outras, **menos** na aba "Brent e Câmbio", que não existe em lugar nenhum. Não se atualiza sozinha |
@@ -32,6 +33,7 @@ python scripts/oferta_diesel.py
 python scripts/oferta_gasolina.py
 python scripts/ipca_defasagem.py        # depende dos de cima
 python scripts/subvencao.py             # depende dos de cima
+python scripts/custo_do_teto.py         # depende dos de cima
 ```
 
 Os scripts acham a própria pasta, então rodam de qualquer diretório. O que
@@ -41,6 +43,10 @@ eles baixam vai para `dados/`, e o que é grande demais para versionar está no
 A ordem importa só para o `ipca_defasagem.py`, que lê a defasagem, o preço de
 bomba e o teor de anidro dos outros. Ele é o único que baixa o IPCA por praça,
 e por isso demora mais que os demais.
+
+O `custo_do_teto.py` lê as duas planilhas de oferta e, por conta própria, as
+duas tabelas de preço da Petrobras — gasolina e diesel. Ler o PDF do diesel
+leva uns dois minutos: são dezenove mil linhas, e o pdfplumber é lento.
 
 ## O que é nosso e o que é emprestado
 
@@ -63,7 +69,7 @@ por isso precisamos estimar um spread estrutural que na conta dele não existe.
 | `composicao_anp.py` | O acervo de composição de preço: o semanal (só Brasil) dos PDF da Síntese Semanal, e o mensal por região das planilhas da ANP |
 | `composicao_painel.py` | A composição **semanal por região**, do painel Power BI da ANP. Extração única, não roda em workflow: o resultado fica em `dados/anp-composicao-painel.csv` |
 | `precos_revenda.py` | O Levantamento de Preços da ANP, por posto, agregado em média semanal por UF. Não roda sozinho |
-| `precos_combustiveis.py`, `defasagem.py`, `oferta_diesel.py`, `oferta_gasolina.py`, `ipca_defasagem.py` | Um por planilha |
+| `precos_combustiveis.py`, `defasagem.py`, `oferta_diesel.py`, `oferta_gasolina.py`, `ipca_defasagem.py`, `custo_do_teto.py` | Um por planilha |
 
 ## A armadilha que custa mais caro
 

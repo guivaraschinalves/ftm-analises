@@ -220,7 +220,11 @@
     // reais por litro: preço de combustível, onde o centavo é a unidade que
     // o leitor reconhece
     "R$/l": { eixo: function (v, passo) { return "R$ " + nf(casasDoPasso(passo)).format(v); },
-              valor: function (v) { return "R$ " + nf(2).format(v); } }
+              valor: function (v) { return "R$ " + nf(2).format(v); } },
+    // volume de combustível: o eixo fica só com o número, e a unidade vai no
+    // subtítulo; no valor cheio ela aparece, porque ali não há contexto
+    "mil m³": { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
+                    valor: function (v) { return nf(0).format(v) + " mil m³"; } }
   };
   function unidade(g) { return UNIDADES[g.unidade] || UNIDADES["%"]; }
 

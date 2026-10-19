@@ -120,6 +120,26 @@ def pct(v, casas=1, sinal=False):
     return (s % v).replace(".", ",") + "%"
 
 
+def br(v, casas=0):
+    """Número no formato brasileiro: ponto no milhar, vírgula no decimal."""
+    if v is None:
+        return "—"
+    s = format(v, ",." + str(casas) + "f")
+    return s.replace(",", "\x00").replace(".", ",").replace("\x00", ".")
+
+
+def volume(m3):
+    """Volume na unidade que lê melhor: mil m³ abaixo de um milhão, mi acima."""
+    return ("%s mi de m³" % br(m3 / 1e6, 2) if m3 >= 1e6
+            else "%s mil m³" % br(m3 / 1e3))
+
+
+def dinheiro(milhoes):
+    """R$ em milhões ou bilhões, conforme a ordem de grandeza."""
+    return ("R$ %s bi" % br(milhoes / 1e3, 1) if abs(milhoes) >= 1e3
+            else "R$ %s mi" % br(milhoes))
+
+
 def cor_de(v):
     return None if v is None else (VERDE if v > 0 else VERMELHO)
 
@@ -157,6 +177,41 @@ def defasagem_diesel():
     return [(l[1].strftime("%Y-%m-%d"), 100 * l[6])
             for l in df.montar(ppi, escadas, ultima, df.PONTOS)
             if l[0] == df.PRINCIPAL]
+
+
+# ─── o custo de sustentar o teto ────────────────────────────────────────────
+#
+# Vender abaixo da paridade é um preço-teto de fato, e um teto cobra de duas
+# formas que não se parecem: receita não realizada sobre o que a empresa
+# produz, e caixa sobre o que ela própria importa. A primeira uma estatal
+# absorve por anos; a segunda dói. Qual das duas aparece diz quem está
+# bancando o teto — e é isso que a planilha custo-do-teto.xlsx mede.
+CHOQUE = "2026-03"
+
+
+def custo_do_teto(rotulo, desde=CHOQUE):
+    """[dict da linha mensal] de um produto, desde o mês do choque."""
+    ws = planilha("custo-do-teto.xlsx")["Custo do teto — " + rotulo]
+    return [l for l in linhas_da_aba(ws) if str(l["mês"]) >= desde]
+
+
+def soma_do_teto(rotulo, desde=CHOQUE):
+    """(defasagem média R$/l, volume m³, importação própria m³, oportunidade
+    R$ mi, caixa bruto R$ mi)."""
+    linhas = custo_do_teto(rotulo, desde)
+    n = len(linhas)
+    return (sum(l["defasagem R$/l"] for l in linhas) / n,
+            sum(l["volume Petrobras (m³)"] for l in linhas),
+            sum(l["importação própria (m³)"] for l in linhas),
+            sum(l["custo de oportunidade (R$ mi)"] for l in linhas),
+            sum(l["caixa, bruto (R$ mi)"] for l in linhas))
+
+
+def importacao_propria(arq, desde="2025-01"):
+    """[(mês, mil m³)] que a Petrobras importou em nome próprio."""
+    ws = planilha(arq)["Importação por agente"]
+    return [(str(l["mês"]), (l["Petrobras"] or 0) / 1000)
+            for l in linhas_da_aba(ws) if str(l["mês"]) >= desde]
 
 
 # ─── seção 1: o que é defasagem ──────────────────────────────────────────────
@@ -322,6 +377,7 @@ def perfil_mensal(arq, desde="2021-01"):
 def graficos_gasolina_probabilidade():
     anos, imp = importado_por_ano()
     perfil = perfil_mensal("oferta-gasolina.xlsx")
+    g, d = soma_do_teto("gasolina"), soma_do_teto("diesel")
     return [
             {
                 "id": "importado-por-ano",
@@ -363,6 +419,72 @@ def graficos_gasolina_probabilidade():
                 "nota": "No formato da tabela T.1 do artigo de Francisco "
                         "Pessoa Faria no Blog do IBRE: a linha da Petrobras "
                         "inclui o que a própria empresa importa.",
+            },
+            {
+                "id": "quem-paga-o-teto",
+                "titulo": "O que custa vender abaixo da paridade",
+                "subtitulo": "De março a agosto de 2026, os dois produtos "
+                             "lado a lado",
+                "tipo": "tabela",
+                "fonte": FONTE_ANP,
+                "colunas": [{"rot": ""}, {"rot": "Gasolina", "num": True},
+                            {"rot": "Diesel", "num": True}],
+                "linhas": [
+                    [cel("Defasagem média"),
+                     cel("R$ %s/l" % br(g[0], 2)), cel("R$ %s/l" % br(d[0], 2))],
+                    [cel("Volume que a Petrobras forneceu"),
+                     cel(volume(g[1])), cel(volume(d[1]))],
+                    [cel("Do qual ela mesma importou"),
+                     cel(volume(g[2])), cel(volume(d[2]))],
+                    [cel("Receita que deixou na mesa", forte=True),
+                     cel(dinheiro(g[3]), VERMELHO, True),
+                     cel(dinheiro(d[3]), VERMELHO, True)],
+                    [cel("Prejuízo de caixa na importação", forte=True),
+                     cel(dinheiro(g[4]), VERMELHO, True),
+                     cel(dinheiro(d[4]), VERMELHO, True)],
+                    [cel("Uma coisa dividida pela outra"),
+                     cel("%s×" % br(g[3] / g[4] if g[4] else 0)),
+                     cel("%s×" % br(d[3] / d[4] if d[4] else 0))],
+                ],
+                "nota": "Um teto de preço cobra de duas formas. A **receita "
+                        "deixada na mesa** é a defasagem sobre cada litro que "
+                        "a Petrobras produz e vende aqui: não entra dinheiro, "
+                        "mas também não sai, e uma estatal absorve isso por "
+                        "anos. O **prejuízo de caixa** é a defasagem sobre o "
+                        "que ela própria importou, comprando perto da "
+                        "paridade e vendendo pela tabela — esse sai do "
+                        "bolso.\n\n"
+                        "Na gasolina a segunda conta é desprezível diante da "
+                        "primeira. No diesel, não.\n\n"
+                        "A receita deixada na mesa é **teto, não estimativa**: "
+                        "supõe que ela venderia o mesmo volume ao preço de "
+                        "paridade, e não venderia — a demanda cairia. Serve "
+                        "para comparar os dois produtos, não como lucro "
+                        "perdido.",
+            },
+            {
+                "id": "importacao-propria",
+                "titulo": "Quando a Petrobras importa por conta própria",
+                "subtitulo": "Desembaraços em nome dela, em mil m³ por mês",
+                "unidade": "mil m³",
+                "fonte": FONTE_ANP,
+                "series": [
+                    serie("Diesel A", LARANJA,
+                          importacao_propria("oferta-diesel.xlsx")),
+                    serie("Gasolina A", AZUL,
+                          importacao_propria("oferta-gasolina.xlsx")),
+                ],
+                "nota": "É o teste do argumento. Se o teto fosse "
+                        "insustentável, veríamos a Petrobras importando no "
+                        "vermelho para cobrir o mercado.\n\n"
+                        "Na gasolina ela importa quando compensa, e só: "
+                        "297 mil m³ em dezembro de 2025, com a tabela dela "
+                        "ainda acima da paridade, e **48 metros cúbicos** em "
+                        "todo o trecho de março a junho de 2026, quando a "
+                        "defasagem estava aberta. Nesses meses quem trouxe "
+                        "gasolina foram distribuidores e tradings. No diesel ela zerou em abril, maio e "
+                        "junho e voltou com força em julho e agosto, já com a "
+                        "subvenção em vigor para dividir a conta.",
             },
     ]
 

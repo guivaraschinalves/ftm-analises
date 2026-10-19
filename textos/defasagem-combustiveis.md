@@ -54,14 +54,29 @@ Para isso, vamos passar pelo consumo e pela produção de derivados no Brasil, p
 chave: gasolina-probabilidade
 fonte: anp-producao | ANP, produção e vendas de derivados | https://www.gov.br/anp/pt-br/centrais-de-conteudo/dados-estatisticos
 fonte: anp-desembaracos | ANP, Relatório de Desembaraços (Siscomex) | https://www.gov.br/anp/pt-br/centrais-de-conteudo/dados-estatisticos
-fonte: fgv | Francisco Pessoa Faria, “Impacto da defasagem da gasolina no IPCA e reflexos de sua subvenção nos resultados da Petrobras”, Blog do IBRE (FGV) | https://blogdoibre.fgv.br/
+fonte: anp-revenda | ANP, levantamento semanal de preços de revenda | https://www.gov.br/anp/pt-br/assuntos/precos-e-defesa-da-concorrencia/precos/levantamento-de-precos-de-combustiveis
+fonte: lei-estatais | Lei 13.303/2016, a Lei das Estatais | https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2016/lei/l13303.htm
 fonte: petroleo-exportacao | ⟨FALTA: exportação de petróleo da Petrobras⟩
 
-Na gasolina a probabilidade de a defasagem fechar é baixa, e o motivo é estrutural: o Brasil depende pouco de importação. Em 2026, até agosto, **14,4% da gasolina A** veio de fora. No diesel foram 22,7%, e em 2025, 26,8%.
+Quem define o preço de um combustível é quem fornece o último litro necessário para atender à demanda — não o litro mais barato, nem a média.
 
-Isso muda quem manda no preço. Com pouca importação, o importador que desiste de trazer gasolina não cria buraco de abastecimento: a Petrobras absorve, e ela tem de onde. A participação dela oscila entre 70% e 80% do fornecimento e sobe justamente quando o importador sai.
+Num país fechado, esse último litro é doméstico e a paridade internacional não diz nada. Num país que exporta, a referência é a **paridade de exportação**, o preço internacional menos o frete: é o que o produtor deixa de ganhar ao vender aqui em vez de embarcar. Num país que importa na margem, a referência é a **paridade de importação**, o internacional mais frete e internação. Entre as duas há uma faixa, e é dentro dela que um preço abrasileirado pode existir sem desequilibrar nada.
 
-⟨FALTA: quanto do petróleo que extrai a Petrobras exporta. É a outra perna do argumento: com o petróleo caro, o lucro da exportação de cru financia o prejuízo do refino vendido abaixo da paridade. Esse dado não está nas nossas planilhas, que cobrem derivados e não petróleo bruto — precisa vir da ANP ou do release trimestral da empresa.⟩
+O Brasil está em pontos diferentes dessa escada em cada produto, e é daí que vem a diferença de probabilidade entre a gasolina e o diesel.
+
+Na gasolina, [14,4% da oferta](fonte:anp-producao) veio de fora em 2026, até agosto. Em 2025 foram 10,4% e em 2021, 8,5%: a fatia quase dobrou em cinco anos, e isso conta contra o que vem a seguir.
+
+Ainda assim é pouco, e pouco muda quem manda no preço. **Vender abaixo da paridade é um preço-teto**, e um teto cobra de duas formas. Sobre cada litro que a Petrobras produz e vende aqui, ela deixa de arrecadar a diferença até a paridade — receita que não entra, mas dinheiro que também não sai. Sobre o que ela própria importa para cobrir o mercado, compra perto da paridade e vende pela tabela — e aí sai do bolso.
+
+De março a agosto de 2026, na gasolina, a primeira conta deu R$ 11,1 bilhões e a segunda, R$ 126 milhões: **oitenta e oito para um**. No diesel a razão é de dezesseis para um.
+
+O teste está nos [desembaraços por agente](fonte:anp-desembaracos): nos quatro meses de defasagem aberta a Petrobras importou 48 metros cúbicos de gasolina, enquanto distribuidores e tradings importavam. Ela só voltou a importar em julho, quando a defasagem já havia caído de R$ 1,50 para R$ 0,52 o litro.
+
+Do outro lado do balcão, o etanol limita o que ela consegue cobrar. Em 10 de outubro o hidratado estava a [66,5% do preço da gasolina no país](fonte:anp-revenda) e a 60,8% em São Paulo, contra a regra dos 70% que o motorista usa na bomba. O etanol já compensa — a demanda por gasolina está no ponto mais elástico, e cada centavo de aumento empurra consumidor para a outra bomba.
+
+Portanto, se a defasagem da gasolina fechar, fechará **por escolha, não por escassez** — e a escolha tem dono. A [Lei das Estatais](fonte:lei-estatais), os acionistas minoritários e o dividendo que o Tesouro recebe empurram para fechar; o calendário eleitoral e o IPCA, para não.
+
+⟨FALTA: quanto do petróleo que extrai a Petrobras exporta. É a outra ponta da escada: em petróleo o Brasil é exportador líquido, e lá a referência é a paridade de exportação, que fica abaixo da de importação. São duas réguas dentro da mesma empresa. Não está nas nossas planilhas, que cobrem derivados — precisa vir da ANP ou do release trimestral da empresa.⟩
 
 ## Probabilidade de fechar: diesel
 chave: diesel-probabilidade
