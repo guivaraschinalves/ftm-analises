@@ -15,7 +15,13 @@ Segundo a Abicom, os [dados de 14 de outubro](fonte:abicom) mostram o diesel em 
 
 [figura:abicom-tabela]
 
-Esse [Preço de Paridade de Importação](fonte:anp-ppi) é o custo estimado de importar o produto, com cotação internacional, câmbio, logística e, dependendo da metodologia, um prêmio de risco. Importante ressaltar também que os preços da Petrobras e Acelen são os cobrados das distribuidoras, antes de tributos, etanol anidro e margens.
+Esse [Preço de Paridade de Importação](fonte:anp-ppi) é o custo estimado de importar o produto, com cotação internacional, câmbio, logística e, dependendo da metodologia, um prêmio de risco.
+
+As colunas da tabela são **polos de suprimento**: os lugares onde o produtor entrega o combustível à distribuidora. Dois deles são refinarias, Paulínia e Araucária. Os outros quatro são terminais abastecidos por mar ou por rio: Itaqui, no porto de São Luís; Suape, em Ipojuca; Itacoatiara, no Amazonas; e Aratu, na Bahia, que é da Acelen e não da Petrobras.
+
+Daí as duas médias no rodapé da tabela. A **média nos polos Petrobras** usa só os cinco dela. A **média nos principais polos** inclui Aratu, e por isso sai menor: a Acelen vende perto da paridade e puxa a conta para cima. No diesel, −102% vira −92%; na gasolina, −21% vira −16%.
+
+Os preços são os cobrados das distribuidoras no polo, antes dos tributos, do etanol anidro e das margens. É a primeira fatia do preço que você vê na bomba.
 
 Uma ressalva. Os R$ 3,33 já são o preço **com** a [subvenção de R$ 2,12 por litro](fonte:mps-diesel) bancada pelo Tesouro. A [tabela cheia é R$ 5,45](fonte:tabela-petrobras); sem o subsídio a defasagem do diesel seria 24%, igual à da gasolina. Em outras palavras, o preço efetivo para a Petrobras é R$ 5,45, mas para a distribuidora é R$ 3,33.
 
