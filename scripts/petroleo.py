@@ -607,11 +607,6 @@ def graficos_cif(imp, classes, nomes):
                             serie(k, cores[k], media12(pct_log[k]), 1, rotulo=True) for k in cores]),
                         dict(rot="Mensal", unidade="%", series=[
                             serie(k, cores[k], pct_log[k], 1, rotulo=True) for k in cores])]),
-        dict(id="diesel-frete-origem", titulo="Frete e seguro do diesel importado, por origem",
-             subtitulo="US$ por barril, mensal; só meses com mais de 100 mil barris da origem",
-             unidade="usd-bbl", buracoMax=1,
-             series=[serie(o, c, frete_origem[o], rotulo=True) for o, c in pe.ORIGENS
-                     if o in frete_origem and o != "Outros"]),
     ]
     g = grafico_cif_ppi(soma["Diesel"])
     if g:
@@ -654,6 +649,81 @@ def grafico_cif_ppi(diesel):
                           "Banco Central e FtM",
                 series=[serie("CIF do diesel importado", VERMELHO, cif, rotulo=True),
                         serie("PPI da ANP", BRANCO, ppi, rotulo=True)])
+
+
+# Nomes curtos dos produtos que costumam aparecer no topo da pauta. Fora daqui
+# vale o nome oficial do SH4, cortado.
+NOMES_SH4 = {
+    "1201": "Soja", "2709": "Petróleo bruto", "2601": "Minério de ferro", "0901": "Café",
+    "1701": "Açúcar", "0202": "Carne bovina congelada", "2710": "Derivados de petróleo",
+    "4703": "Celulose", "0207": "Carne de frango", "2304": "Farelo de soja", "1005": "Milho",
+    "8703": "Automóveis", "7108": "Ouro", "2603": "Minério de cobre", "5201": "Algodão",
+    "0201": "Carne bovina fresca", "1507": "Óleo de soja", "7207": "Semimanufaturados de ferro e aço",
+    "8802": "Aviões", "2401": "Fumo", "0203": "Carne suína", "2207": "Etanol", "8429": "Máquinas de terraplenagem",
+}
+
+
+def sh4_exportado(ano):
+    """{mês: {SH4: US$}} de todos os produtos exportados num ano, com cache
+    próprio (dados/.cache-comex/SH4_EXP_AAAA.json) — o agregado principal só
+    guarda petróleo, derivados e soja, e o ranking precisa de todos."""
+    url = BASE_COMEX + "EXP_%d.csv" % ano
+    arq = os.path.join(CACHE, "SH4_EXP_%d.json" % ano)
+    tamanho, data = cabecalho(url)
+    if os.path.exists(arq):
+        g = json.load(open(arq, encoding="utf-8"))
+        if g.get("last_modified") == data and g.get("tamanho") == tamanho:
+            return g["meses"]
+    print("  baixando EXP_%d para o ranking (%.0f MB)…" % (ano, tamanho / 1e6))
+    os.makedirs(BRUTO, exist_ok=True)
+    bruto = os.path.join(BRUTO, "EXP_%d.csv" % ano)
+    baixar_inteiro(url, bruto, tamanho)
+    meses = {}
+    with open(bruto, encoding="latin-1", newline="") as f:
+        for l in csv.DictReader(f, delimiter=";"):
+            m = meses.setdefault("%s-%s" % (l["CO_ANO"], l["CO_MES"].zfill(2)), {})
+            k = l["CO_NCM"][:4]
+            m[k] = m.get(k, 0.0) + float(l["VL_FOB"])
+    os.remove(bruto)
+    json.dump(dict(last_modified=data, tamanho=tamanho, meses=meses), open(arq, "w", encoding="utf-8"))
+    return meses
+
+
+def nomes_sh4():
+    req = urllib.request.Request(BASE_COMEX.replace("comexstat-bd/ncm/", "tabelas/NCM_SH.csv"), headers=UA)
+    with urllib.request.urlopen(req, timeout=60, context=SSL_COMEX) as r:
+        txt = r.read().decode("latin-1")
+    return {l["CO_SH4"]: l["NO_SH4_POR"] for l in csv.DictReader(io.StringIO(txt), delimiter=";")}
+
+
+def graficos_ranking(ref):
+    """Os 10 produtos mais exportados, em valor (US$ FOB), de janeiro até o
+    mês de referência, no ano corrente e no anterior — um gráfico para cada."""
+    ano, mes = int(ref[:4]), int(ref[5:])
+    oficiais = nomes_sh4()
+    MESES_CURTOS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
+    graficos = []
+    for a in (ano - 1, ano):
+        meses = sh4_exportado(a)
+        soma = {}
+        for m, d in meses.items():
+            if int(m[5:]) <= mes:
+                for k, v in d.items():
+                    soma[k] = soma.get(k, 0.0) + v
+        total = sum(soma.values())
+        top = sorted(soma.items(), key=lambda kv: -kv[1])[:10]
+        nome = lambda k: NOMES_SH4.get(k) or (oficiais.get(k, k)[:38] + "…")      # noqa: E731
+        print("  ranking jan–%s/%d: total US$ %.1f bi; 1º %s %.1f" % (MESES_CURTOS[mes - 1], a, total / 1e9,
+                                                                      nome(top[0][0]), top[0][1] / 1e9))
+        periodo = "jan a %s de %d" % (MESES_CURTOS[mes - 1], a) if mes > 1 else "jan de %d" % a
+        graficos.append(dict(
+            id="exportacao-top10-%d" % a, tipo="ranking", unidade="usd-bi",
+            titulo="Os 10 produtos mais exportados pelo Brasil: %s" % periodo,
+            subtitulo="US$ bilhões FOB, acumulado de janeiro a %s; %.0f%% do total exportado no período" % (
+                ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro",
+                 "outubro", "novembro", "dezembro"][mes - 1], 100 * sum(v for _, v in top) / total),
+            itens=[[nome(k), round(v / 1e9, 2)] for k, v in top]))
+    return dict(titulo="Ranking da exportação", graficos=graficos)
 
 
 def graficos_fornecimento():
@@ -704,6 +774,7 @@ def main():
     secoes, pexp, pimp = graficos_pauta(exp, imp)
     confere_soma("pauta de exportação", list(pexp.values()), {m: x["total"] for m, x in exp.items()})
     confere_soma("pauta de importação", list(pimp.values()), {m: x["total"] for m, x in imp.items()})
+    secoes.append(graficos_ranking(ref))
     secoes.append(grafico_saldo(exp, imp, pexp, pimp))
     secoes.append(graficos_petroleo_derivados(pexp, pimp))
     classes = classes_ncm()
@@ -733,6 +804,9 @@ def main():
           % (SAIDA, os.path.getsize(SAIDA) / 1024, ref, ref_icbr))
     for sec in doc["secoes"]:
         for g in sec["graficos"]:
+            if g.get("tipo") == "ranking":
+                print("  %-26s %s" % (g["id"], "; ".join("%s=%s" % (n, v) for n, v in g["itens"][:3])))
+                continue
             ss = g.get("series") or g["variantes"][-1]["series"]
             print("  %-26s %s" % (g["id"], "; ".join("%s=%s" % (s["nome"][:18], s["dados"][-1][1])
                                                        for s in ss if s["dados"])))

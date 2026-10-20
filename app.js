@@ -403,8 +403,61 @@
   }
 
   // ---------- desenho ----------
+  // Ranking: barras deitadas, um item abaixo do outro, do maior para o menor.
+  // "itens": [[rótulo, valor, cor?]]. Mesmo título, subtítulo, fonte e logo
+  // dos outros gráficos, sem eixo de tempo e sem caixa do mouse (o valor já
+  // vai escrito na ponta de cada barra).
+  function construirRanking(cartao, L0, nomeTema) {
+    var g = graficoDe(cartao), pal = PALETAS[nomeTema], F = unidade(g);
+    var L = Object.assign({}, L0);
+    var svg = el("svg", {
+      xmlns: NS, viewBox: "0 0 " + L.W + " " + L.H, width: L.W, height: L.H,
+      role: "img", "aria-label": g.titulo + (g.subtitulo ? " — " + g.subtitulo : "")
+    });
+    var itens = g.itens || [];
+    var fs = Math.round(L.tick * 1.15);
+    var y0 = L.sub.y + L.sub.fs * 2.4, y1 = L.y1;
+    var passo = (y1 - y0) / Math.max(itens.length, 1), alt = passo * 0.66;
+    var lw = Math.max.apply(null, [0].concat(itens.map(function (it) { return largura(it[0], fs); })));
+    var vw = Math.max.apply(null, [0].concat(itens.map(function (it) { return largura(F.valor(it[1]), fs, "bold"); })));
+    var x0 = L.titulo.x + lw + 18, x1 = L.W - L.titulo.x - vw - 16;
+    var mx = Math.max.apply(null, [0].concat(itens.map(function (it) { return it[1]; }))) || 1;
+    itens.forEach(function (it, k) {
+      var yc = y0 + passo * (k + 0.5), w = Math.max(1, (x1 - x0) * it[1] / mx);
+      svg.appendChild(texto(it[0], { x: x0 - 14, y: yc, "font-size": fs, fill: pal.texto, "text-anchor": "end",
+                                     "dominant-baseline": "central" }));
+      svg.appendChild(el("rect", { x: x0, y: yc - alt / 2, width: w, height: alt, rx: 3,
+                                   fill: corNoTema(it[2] || "#4F81BD", pal) }));
+      svg.appendChild(texto(F.valor(it[1]), { x: x0 + w + 10, y: yc, "font-size": fs, "font-weight": "bold",
+                                              fill: pal.texto, "dominant-baseline": "central" }));
+    });
+    svg.appendChild(texto(g.titulo, {
+      x: L.titulo.x, y: L.titulo.y, "font-weight": "bold", fill: pal.texto,
+      "font-size": corpoQueCabe(g.titulo, L.titulo.fs, L.titulo.max, "bold")
+    }));
+    if (g.subtitulo) {
+      svg.appendChild(texto(g.subtitulo, {
+        x: L.sub.x, y: L.sub.y, "font-style": "italic", fill: pal.texto,
+        "font-size": corpoQueCabe(g.subtitulo, L.sub.fs, L.sub.max, "italic")
+      }));
+    }
+    svg.appendChild(texto("Fonte: " + g.fonte + ".", {
+      x: L.fonte.x, y: L.fonte.y, "font-size": L.fonte.fs, fill: pal.texto, "text-anchor": "end"
+    }));
+    if (logoSvg) {
+      var lh = L.logo.w * logoSvg.razao;
+      var gl = el("svg", { x: L.logo.x, y: L.logo.y, width: L.logo.w, height: lh, viewBox: logoSvg.viewBox });
+      var gg = el("g", { fill: pal.logo });
+      logoSvg.nos.forEach(function (n) { gg.appendChild(n.cloneNode(true)); });
+      gl.appendChild(gg);
+      svg.appendChild(gl);
+    }
+    return { svg: svg, L: L, pal: pal, ranking: true };
+  }
+
   function construir(cartao, L0, nomeTema) {
     var g = graficoDe(cartao), pal = PALETAS[nomeTema], F = unidade(g);
+    if (g.tipo === "ranking") return construirRanking(cartao, L0, nomeTema);
     var L = Object.assign({}, L0);
 
     // subtítulo que não cabe numa linha quebra em duas (versão estreita)
@@ -762,6 +815,7 @@
 
   // ---------- passar o mouse ----------
   function ligarHover(cartao, desenho) {
+    if (desenho.ranking) return;            // o valor já está escrito na barra
     var svg = desenho.svg, L = desenho.L, pal = desenho.pal, g = graficoDe(cartao), F = unidade(g);
     var camada = el("g", { "pointer-events": "none" });
     var alvo = el("rect", { x: L.x0, y: L.y0, width: L.x1 - L.x0, height: L.y1 - L.y0, fill: "transparent" });
@@ -1512,6 +1566,11 @@
     // legenda é decisão de leitura do gráfico, não de exportação do dado
     // (linha única num cartão de uma série só). Nome repetido vira "nome (2)".
     var g = graficoDe(cartao);
+    if (g.tipo === "ranking") {
+      return salvar(new Blob(["\ufeff" + ["item;valor"].concat((g.itens || []).map(function (it) {
+        return it[0].replace(/;/g, ",") + ";" + String(it[1]).replace(".", ",");
+      })).join("\r\n")], { type: "text/csv;charset=utf-8" }), nomeArquivo(cartao, "csv"));
+    }
     if (g.tipo === "tabela") {
       var cab = (g.colunas || []).map(function (c) { return c.rot.replace(/;/g, ","); });
       var corpo = (g.linhas || []).map(function (l) {
