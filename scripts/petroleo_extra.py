@@ -32,9 +32,15 @@ AS FONTES E AS CONTAS
     pela mesma soma de 4 trimestres é conferido contra a taxa que o IBGE
     publica (SIDRA 5932).
   - **Brent**, FRED, MCOILBRENTEU (média mensal, EIA), CSV sem chave.
+  - **Conta corrente**, Banco Central, tabela especial BalPagM.xlsx (BPM6,
+    US$ milhões), com as linhas achadas pelo código SGS que o BC põe ao lado
+    de cada uma — o mesmo leitor do ftm-dados/scripts/bp.py. Em dez/2026 entra
+    a projeção do BC do RPM de setembro de 2026 (PROJ_BC, trocar a cada RPM).
 """
 import calendar
 import csv
+import re
+from xml.etree import ElementTree as ET
 import io
 import json
 import os
@@ -366,7 +372,105 @@ def brent():
     return fora
 
 
+# --------------------------------------------------------------------------
+# conta corrente (BC)
+# --------------------------------------------------------------------------
+
+URL_BP = "https://www.bcb.gov.br/content/estatisticas/Documents/Tabelas_especiais/BalPagM.xlsx"
+COD_CC = dict(cc=22701, comercial=22707, servicos=22719, renda1=22800, renda2=22838)
+
+# RPM de setembro de 2026, boxe "Projeções para a evolução das contas
+# externas", Tabela 1, coluna "Proj. 2026 Atual", US$ bilhões. A renda
+# secundária não está na tabela: é o que fecha a conta (−60 − 75 + 56 + 85).
+PROJ_BC = dict(mes="2026-12", rpm="RPM de setembro de 2026", cc=-60.0, comercial=75.0,
+               servicos=-56.0, renda1=-85.0)
+PROJ_BC["renda2"] = PROJ_BC["cc"] - PROJ_BC["comercial"] - PROJ_BC["servicos"] - PROJ_BC["renda1"]
+NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+RNS = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
+MESES_BP = {m: i + 1 for i, m in enumerate(MESES)}
+
+
+def tabela_bp():
+    """{código SGS: {mês: US$ milhões}} da primeira aba do BalPagM.xlsx."""
+    corpo = baixar(URL_BP)
+    if not corpo.startswith(b"PK"):
+        raise RuntimeError("a tabela do BC não veio como .xlsx")
+    z = zipfile.ZipFile(io.BytesIO(corpo))
+    textos = ["".join(x.text or "" for x in si.iter(NS + "t"))
+              for si in ET.fromstring(z.read("xl/sharedStrings.xml"))]
+    rels = {r.get("Id"): r.get("Target") for r in ET.fromstring(z.read("xl/_rels/workbook.xml.rels"))}
+    aba = next(ET.fromstring(z.read("xl/workbook.xml")).iter(NS + "sheet"))
+    alvo = rels[aba.get(RNS + "id")].lstrip("/")
+    alvo = alvo if alvo.startswith("xl/") else "xl/" + alvo
+
+    def col(ref):
+        n = 0
+        for ch in re.match(r"[A-Z]+", ref).group(0):
+            n = n * 26 + ord(ch) - 64
+        return n
+    linhas = {}
+    for c in ET.fromstring(z.read(alvo)).iter(NS + "c"):
+        v = c.find(NS + "v")
+        if v is None or v.text is None:
+            continue
+        val = textos[int(v.text)] if c.get("t") == "s" else v.text
+        linhas.setdefault(int(re.search(r"\d+", c.get("r")).group(0)), {})[col(c.get("r"))] = val
+    lm = next(r for r in sorted(linhas) if "Jan" in linhas[r].values())
+    ano, meses = None, {}
+    for c in sorted(linhas[lm]):
+        if str(linhas.get(lm - 1, {}).get(c, "")).strip().isdigit():
+            ano = int(str(linhas[lm - 1][c]).strip())
+        m = MESES_BP.get(str(linhas[lm][c]).strip().lower()[:3])
+        if m and ano:
+            meses[c] = "%04d-%02d" % (ano, m)
+    col_cod = next(c for r in (lm - 1, lm) for c, x in linhas.get(r, {}).items() if "digo no SGS" in str(x))
+    fora = {}
+    for cel in linhas.values():
+        cod = str(cel.get(col_cod, "")).strip()
+        if cod.isdigit() and int(cod) not in fora:
+            d = {}
+            for c, mes in meses.items():
+                try:
+                    d[mes] = float(cel[c])
+                except (KeyError, ValueError):
+                    pass
+            fora[int(cod)] = d
+    return fora
+
+
+def graficos_conta_corrente():
+    s = tabela_bp()
+    def a12(d):
+        ms = sorted(d)
+        return {ms[i]: sum(d[m] for m in ms[i - 11:i + 1]) / 1000 for i in range(11, len(ms))}
+    acc = {k: a12(s[c]) for k, c in COD_CC.items()}
+    soma = max(abs(sum(acc[k][m] for k in ("comercial", "servicos", "renda1", "renda2")) - acc["cc"][m])
+               for m in acc["cc"])
+    print("  conta corrente até %s: os componentes somam o saldo, diferença máxima US$ %.4f bi"
+          % (max(acc["cc"]), soma))
+    if soma > 0.001:
+        raise RuntimeError("os componentes da conta corrente não somam o saldo")
+    ult = max(acc["cc"])
+    nomes = [("comercial", "Balança Comercial", AZUL), ("servicos", "Serviços", VERMELHO),
+             ("renda1", "Renda Primária", VERDE), ("renda2", "Renda Secundária", AZUL_ESCURO)]
+    series = [serie(n, c, acc[k], 2, tipo="barra") for k, n, c in nomes]
+    series.append(serie("Saldo Conta Corrente", BRANCO, acc["cc"], 2, rotulo=True))
+    m = PROJ_BC["mes"]
+    if m > ult:                               # o ano fechou: a projeção sai sozinha
+        series += [serie(n + " (proj. BC)", c, {m: PROJ_BC[k]}, 2, tipo="barra", opacidade=0.4, legenda=False)
+                   for k, n, c in nomes]
+        series.append(serie("Projeção do BC para 2026 (%s)" % PROJ_BC["rpm"], CINZA,
+                            {ult: acc["cc"][ult], m: PROJ_BC["cc"]}, 2, traco="pontilhado", rotulo=True))
+    return dict(titulo="Conta corrente", graficos=[
+        dict(id="conta-corrente-projecao", titulo="Conta Corrente do Brasil",
+             subtitulo="US$ bilhões, acumulado em 12 meses; em dez/2026, a projeção do BC",
+             unidade="usd-bi", fonte="Banco Central e FtM", barra=1, buracoMax=5, series=series),
+    ])
+
+
 def secoes_extra():
+    print("Conta corrente (BC)…")
+    cc = graficos_conta_corrente()
     print("ANP…")
     prod = graficos_producao()
     refino = graficos_refino_brasil()
@@ -374,7 +478,7 @@ def secoes_extra():
     mundo = graficos_refino_mundo()
     print("IBGE…")
     pib = graficos_pib()
-    return [prod, dict(titulo="Refino", graficos=refino + mundo), pib]
+    return [cc, prod, dict(titulo="Refino", graficos=refino + mundo), pib]
 
 
 if __name__ == "__main__":
