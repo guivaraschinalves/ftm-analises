@@ -341,10 +341,49 @@ def pct_do_total(partes):
     return [(n, {m: v / tot[m] * 100 for m, v in d.items() if tot.get(m)}) for n, d in partes]
 
 
+def acumulado_n(mensal, n):
+    ms = sorted(mensal)
+    fora = {}
+    for i in range(n - 1, len(ms)):
+        janela = ms[i - n + 1:i + 1]
+        if num(janela[-1]) - num(janela[0]) == n - 1:
+            fora[ms[i]] = sum(mensal[m] for m in janela)
+    return fora
+
+
+def no_ano(mensal):
+    """Acumulado de janeiro até o mês."""
+    fora, soma, ano = {}, 0.0, None
+    for m in sorted(mensal):
+        if m[:4] != ano:
+            soma, ano = 0.0, m[:4]
+        soma += mensal[m]
+        fora[m] = soma
+    return fora
+
+
+# Os três recortes do botão: o de 12 meses tira a sazonalidade (a soja embarca
+# entre março e julho); o do ano é o que a imprensa usa ("o petróleo passou a
+# soja em setembro" é jan–set); o de 3 meses mostra a virada mais cedo.
+RECORTES = [("Acumulado em 12 meses", lambda d: acumulado_n(d, 12)),
+            ("Acumulado em 3 meses", lambda d: acumulado_n(d, 3)),
+            ("Acumulado no ano", no_ano)]
+
+
+def barras(partes, cores, acc, como_pct=False):
+    a = [(n, acc(d)) for n, d in partes]
+    a = pct_do_total(a) if como_pct else [(n, bi(d)) for n, d in a]
+    return [serie(n, c, d, 2, tipo="barra") for (n, d), c in zip(a, cores)]
+
+
 def barras_12m(partes, cores, como_pct=False):
-    acc = [(n, acumulado_12(d)) for n, d in partes]
-    acc = pct_do_total(acc) if como_pct else [(n, bi(d)) for n, d in acc]
-    return [serie(n, c, d, 2, tipo="barra") for (n, d), c in zip(acc, cores)]
+    return barras(partes, cores, acumulado_12, como_pct)
+
+
+def variantes_recorte(partes, cores, como_pct=False):
+    u = "%" if como_pct else "usd-bi"
+    return [dict(rot=rot, unidade=u, series=barras(partes, cores, acc, como_pct),
+                 **({"eixo": dict(max=100)} if como_pct else {})) for rot, acc in RECORTES]
 
 
 def graficos_pauta(exp, imp):
@@ -353,40 +392,41 @@ def graficos_pauta(exp, imp):
     e = [(n, pexp[n]) for n in ("Petróleo bruto", "Soja em grão", "Outros")]
     i = [(n, pimp[n]) for n in ("Derivados de petróleo", "Petróleo bruto", "Outros")]
     cor_e, cor_i = [AZUL_ESCURO, VERDE, CINZA], [LARANJA, AZUL_ESCURO, CINZA]
-    sub_bi = "US$ bilhões FOB, acumulado em 12 meses"
-    sub_pct = "% do total exportado, acumulado em 12 meses"
     return [
         dict(titulo="Pauta de exportação", graficos=[
             dict(id="exportacao-pauta", titulo="Exportações do Brasil por produto",
-                 subtitulo=sub_bi, unidade="usd-bi", barra=1, series=barras_12m(e, cor_e)),
+                 subtitulo="US$ bilhões FOB", unidade="usd-bi", barra=1, variantes=variantes_recorte(e, cor_e)),
             dict(id="exportacao-pauta-pct", titulo="Exportações do Brasil por produto",
-                 subtitulo=sub_pct, unidade="%", barra=1, eixo=dict(max=100),
-                 series=barras_12m(e, cor_e, True)),
+                 subtitulo="% do total exportado", unidade="%", barra=1,
+                 variantes=variantes_recorte(e, cor_e, True)),
         ]),
         dict(titulo="Pauta de importação", graficos=[
             dict(id="importacao-pauta", titulo="Importações do Brasil por produto",
-                 subtitulo=sub_bi, unidade="usd-bi", barra=1, series=barras_12m(i, cor_i)),
+                 subtitulo="US$ bilhões FOB", unidade="usd-bi", barra=1, variantes=variantes_recorte(i, cor_i)),
             dict(id="importacao-pauta-pct", titulo="Importações do Brasil por produto",
-                 subtitulo="% do total importado, acumulado em 12 meses", unidade="%", barra=1,
-                 eixo=dict(max=100), series=barras_12m(i, cor_i, True)),
+                 subtitulo="% do total importado", unidade="%", barra=1,
+                 variantes=variantes_recorte(i, cor_i, True)),
         ]),
     ], pexp, pimp
 
 
 def grafico_saldo(exp, imp, pexp, pimp):
-    """Saldo da balança comercial em 12 meses: o do petróleo bruto (exportado
-    − importado, SH4 2709) e o de todo o resto, que somados dão o total."""
+    """Saldo da balança comercial: o do petróleo bruto (exportado − importado,
+    SH4 2709) e o de todo o resto, que somados dão o total."""
     total = {m: exp[m]["total"] - imp[m]["total"] for m in exp if m in imp}
     bruto = {m: pexp["Petróleo bruto"][m] - pimp["Petróleo bruto"][m] for m in total}
     resto = {m: total[m] - bruto[m] for m in total}
-    t12, b12, r12 = (bi(acumulado_12(d)) for d in (total, bruto, resto))
+    variantes = []
+    for rot, acc in RECORTES:
+        t_, b_, r_ = (bi(acc(d)) for d in (total, bruto, resto))
+        variantes.append(dict(rot=rot, unidade="usd-bi", series=[
+            serie("Petróleo bruto", AZUL_ESCURO, b_, tipo="barra", rotulo=True),
+            serie("Outros produtos", CINZA, r_, tipo="barra", rotulo=True),
+            serie("Saldo total", BRANCO, t_, rotulo=True)]))
     return dict(titulo="Saldo comercial", graficos=[
         dict(id="saldo-comercial-petroleo", titulo="Saldo da balança comercial: petróleo bruto e o resto",
-             subtitulo="US$ bilhões FOB, acumulado em 12 meses; petróleo bruto = exportado − importado",
-             unidade="usd-bi", barra=1,
-             series=[serie("Petróleo bruto", AZUL_ESCURO, b12, tipo="barra", rotulo=True),
-                     serie("Outros produtos", CINZA, r12, tipo="barra", rotulo=True),
-                     serie("Saldo total", BRANCO, t12, rotulo=True)]),
+             subtitulo="US$ bilhões FOB; petróleo bruto = exportado − importado", unidade="usd-bi", barra=1,
+             variantes=variantes),
     ])
 
 
