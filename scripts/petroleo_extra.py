@@ -25,12 +25,14 @@ AS FONTES E AS CONTAS
     — só os países com o dado de todos os meses desde jan/2015 até o último mês
     em que todos eles informaram. Não é o mundo inteiro, mas a variação é real.
     O CSV tem 650 MB descompactado e é lido de dentro do zip, sem extrair.
-  - **Contribuição para o PIB**, IBGE, SIDRA 1846 (valores correntes) e 6612
-    (valores encadeados a preços de 1995). Em 4 trimestres contra os 4
-    anteriores: peso nominal do componente nos 4 trimestres-base × variação
-    real dele, em p.p. A importação entra com sinal trocado. O PIB refeito
-    pela mesma soma de 4 trimestres é conferido contra a taxa que o IBGE
-    publica (SIDRA 5932).
+  - **Setor externo no PIB**, IBGE: exportação e importação em % do PIB
+    nominal, somas de 4 trimestres a preços correntes (SIDRA 1846), e a
+    variação real em 4 trimestres que o próprio IBGE publica (SIDRA 5932).
+    Antes era a contribuição para o crescimento (peso × variação real), que
+    deixava um resíduo de estoques e discrepância de até 1 p.p.; ele pediu
+    para trocar.
+  - **Refino no mundo**: além do nível, a variação contra o mesmo mês do ano
+    anterior, que é o que se compara num painel que não é o mundo inteiro.
   - **Brent**, FRED, MCOILBRENTEU (média mensal, EIA), CSV sem chave.
   - **Conta corrente**, Banco Central, tabela especial BalPagM.xlsx (BPM6,
     US$ milhões), com as linhas achadas pelo código SGS que o BC põe ao lado
@@ -106,6 +108,12 @@ def media_n(d, n):
     """Média móvel dos n meses até cada mês."""
     ms = sorted(d)
     return {ms[i]: sum(d[m] for m in ms[i - n + 1:i + 1]) / n for i in range(n - 1, len(ms))}
+
+
+def var_anual(d):
+    """% contra o mesmo mês do ano anterior."""
+    return {m: (v / d["%04d-%s" % (int(m[:4]) - 1, m[5:])] - 1) * 100 for m, v in d.items()
+            if "%04d-%s" % (int(m[:4]) - 1, m[5:]) in d}
 
 
 def media_12(d):
@@ -286,18 +294,22 @@ def graficos_refino_mundo():
     if sairam:
         lista = sairam[0] if len(sairam) == 1 else ", ".join(sairam[:-1]) + " e " + sairam[-1]
         nota_fora = "; fora do painel por buraco na série: " + lista
-    sub = ("Mil barris por dia, produção bruta das refinarias; soma de %d países com dado completo "
-           "desde 2015" + nota_fora)
+    sub = ("Produção bruta das refinarias; soma de %d países com dado completo desde 2015"
+           + nota_fora)
     return [
         dict(id="refino-mundo", titulo="Produção de diesel e gasolina nas refinarias do mundo",
              subtitulo=sub % min(n_g, n_d), unidade="kbd", fonte=fonte,
              variantes=[
-                 dict(rot="Mensal", unidade="kbd", series=[
+                 dict(rot="Mil b/d", unidade="kbd", series=[
                      serie("Gasóleo/diesel (%d países)" % n_d, VERMELHO, die, 0, rotulo=True),
                      serie("Gasolina (%d países)" % n_g, AZUL, gas, 0, rotulo=True)]),
-                 dict(rot="Média de 12 meses", unidade="kbd", series=[
+                 dict(rot="Média de 12 meses (mil b/d)", unidade="kbd", series=[
                      serie("Gasóleo/diesel (%d países)" % n_d, VERMELHO, media_12(die), 0, rotulo=True),
                      serie("Gasolina (%d países)" % n_g, AZUL, media_12(gas), 0, rotulo=True)]),
+                 # o nível é de um painel, não do mundo; a variação é o que se compara
+                 dict(rot="Variação anual (%)", unidade="%", series=[
+                     serie("Gasóleo/diesel (%d países)" % n_d, VERMELHO, var_anual(die), 1, rotulo=True),
+                     serie("Gasolina (%d países)" % n_g, AZUL, var_anual(gas), 1, rotulo=True)]),
              ]),
     ]
 
@@ -331,50 +343,50 @@ def soma4(d):
     return {ms[i]: sum(d[m] for m in ms[i - 3:i + 1]) for i in range(3, len(ms))}
 
 
-def graficos_pib():
-    nominal, real = sidra(1846), sidra(6612)
-    n4 = {k: soma4(v) for k, v in nominal.items()}
-    r4 = {k: soma4(v) for k, v in real.items()}
-
-    def ant(m):
-        return "%04d-%s" % (int(m[:4]) - 1, m[5:])
-
-    contrib = {k: {} for k in COMP.values() if k != "PIB"}
-    pib = {}
-    for m in r4["PIB"]:
-        a = ant(m)
-        if a not in r4["PIB"] or a not in n4["PIB"]:
-            continue
-        pib[m] = (r4["PIB"][m] / r4["PIB"][a] - 1) * 100
-        for k in contrib:
-            if a in r4.get(k, {}) and a in n4.get(k, {}):
-                g = r4[k][m] / r4[k][a] - 1
-                w = n4[k][a] / n4["PIB"][a]
-                contrib[k][m] = (-1 if k == "Importação" else 1) * w * g * 100
-    # o PIB pela soma de 4 trimestres contra a taxa publicada pelo IBGE
-    pub = json.loads(baixar("https://apisidra.ibge.gov.br/values/t/5932/n1/all/v/6562/p/all/c11255/90707",
-                            headers={"User-Agent": "Mozilla/5.0 (ftm-analises)"}).decode("utf-8"))
-    oficial = {}
-    for l in pub[1:]:
+def taxa_4tri(codigos):
+    """Taxa acumulada em 4 trimestres publicada pelo IBGE (SIDRA 5932, v6562),
+    {nome: {mês: %}}."""
+    url = ("https://apisidra.ibge.gov.br/values/t/5932/n1/all/v/6562/p/all/c11255/%s" % ",".join(codigos))
+    d = json.loads(baixar(url, headers={"User-Agent": "Mozilla/5.0 (ftm-analises)"}).decode("utf-8"))
+    fora = {}
+    for l in d[1:]:
         try:
-            oficial["%s-%s" % (l["D3C"][:4], TRI[l["D3C"][-1]])] = float(l["V"])
+            fora.setdefault(COMP[l["D4C"]], {})["%s-%s" % (l["D3C"][:4], TRI[l["D3C"][-1]])] = float(l["V"])
         except (ValueError, KeyError):
             pass
-    difs = [abs(pib[m] - oficial[m]) for m in pib if m in oficial]
-    print("  PIB em 4 trimestres confere com o IBGE em %d trimestres, diferença máxima %.2f p.p."
-          % (len(difs), max(difs)))
-    if max(difs) > 0.06:
-        raise RuntimeError("o PIB refeito não bate com a taxa do IBGE (%.2f p.p.)" % max(difs))
-    liquido = {m: contrib["Exportação"][m] + contrib["Importação"][m]
-               for m in contrib["Exportação"] if m in contrib["Importação"]}
+    return fora
+
+
+def graficos_pib():
+    """Dois gráficos, sem conta que deixe resíduo:
+
+      - exportação e importação em % do PIB nominal, somas de 4 trimestres a
+        preços correntes (SIDRA 1846) — a participação de cada um, e o saldo;
+      - variação real em 4 trimestres contra os 4 anteriores, a taxa que o
+        próprio IBGE publica (SIDRA 5932), com o PIB de referência."""
+    nominal = sidra(1846)
+    n4 = {k: soma4(v) for k, v in nominal.items()}
+    exp = {m: n4["Exportação"][m] / n4["PIB"][m] * 100 for m in n4["Exportação"] if m in n4["PIB"]}
+    imp = {m: -n4["Importação"][m] / n4["PIB"][m] * 100 for m in n4["Importação"] if m in n4["PIB"]}
+    saldo = {m: exp[m] + imp[m] for m in exp if m in imp}
+    taxa = taxa_4tri(["90707", "93407", "93408"])
+    print("  PIB: exportação %.1f%% e importação %.1f%% do PIB nominal em %s; variação real %s"
+          % (exp[max(exp)], -imp[max(imp)], max(exp),
+             ", ".join("%s %.1f%%" % (k, v[max(v)]) for k, v in taxa.items())))
+    fonte = "IBGE e FtM"
     return dict(titulo="PIB", graficos=[
-        dict(id="pib-setor-externo", titulo="Contribuição do setor externo para o crescimento do PIB",
-             subtitulo="p.p., acumulado em 4 trimestres contra os 4 anteriores; importação com sinal trocado",
-             unidade="pp", fonte="IBGE e FtM", barra=2.6, buracoMax=3,
-             series=[serie("Exportação", AZUL, contrib["Exportação"], 2, tipo="barra"),
-                     serie("Importação", LARANJA, contrib["Importação"], 2, tipo="barra"),
-                     serie("Setor externo líquido", BRANCO, liquido, 2, rotulo=True),
-                     serie("PIB (variação %)", CINZA, pib, 2, rotulo=True, traco="pontilhado", largura=4)]),
+        dict(id="pib-setor-externo-nominal", titulo="Exportação e importação no PIB",
+             subtitulo="% do PIB nominal, acumulado em 4 trimestres; importação com sinal negativo",
+             unidade="%", fonte=fonte, barra=2.6, buracoMax=3,
+             series=[serie("Exportação", AZUL, exp, 2, tipo="barra", rotulo=True),
+                     serie("Importação", LARANJA, imp, 2, tipo="barra", rotulo=True),
+                     serie("Saldo (exportação − importação)", BRANCO, saldo, 2, rotulo=True)]),
+        dict(id="pib-setor-externo-real", titulo="Variação real da exportação e da importação",
+             subtitulo="% acumulada em 4 trimestres contra os 4 anteriores", unidade="%", fonte=fonte,
+             buracoMax=3,
+             series=[serie("Exportação", AZUL, taxa["Exportação"], 1, rotulo=True),
+                     serie("Importação", LARANJA, taxa["Importação"], 1, rotulo=True),
+                     serie("PIB", CINZA, taxa["PIB"], 1, rotulo=True, traco="pontilhado", largura=4)]),
     ])
 
 

@@ -373,6 +373,23 @@ def graficos_pauta(exp, imp):
     ], pexp, pimp
 
 
+def grafico_saldo(exp, imp, pexp, pimp):
+    """Saldo da balança comercial em 12 meses: o do petróleo bruto (exportado
+    − importado, SH4 2709) e o de todo o resto, que somados dão o total."""
+    total = {m: exp[m]["total"] - imp[m]["total"] for m in exp if m in imp}
+    bruto = {m: pexp["Petróleo bruto"][m] - pimp["Petróleo bruto"][m] for m in total}
+    resto = {m: total[m] - bruto[m] for m in total}
+    t12, b12, r12 = (bi(acumulado_12(d)) for d in (total, bruto, resto))
+    return dict(titulo="Saldo comercial", graficos=[
+        dict(id="saldo-comercial-petroleo", titulo="Saldo da balança comercial: petróleo bruto e o resto",
+             subtitulo="US$ bilhões FOB, acumulado em 12 meses; petróleo bruto = exportado − importado",
+             unidade="usd-bi", barra=1,
+             series=[serie("Petróleo bruto", AZUL_ESCURO, b12, tipo="barra", rotulo=True),
+                     serie("Outros produtos", CINZA, r12, tipo="barra", rotulo=True),
+                     serie("Saldo total", BRANCO, t12, rotulo=True)]),
+    ])
+
+
 def graficos_petroleo_derivados(pexp, pimp):
     exp12 = acumulado_12(pexp["Petróleo bruto"])
     imp12 = acumulado_12(pimp["Derivados de petróleo"])
@@ -505,6 +522,7 @@ def main():
     secoes, pexp, pimp = graficos_pauta(exp, imp)
     confere_soma("pauta de exportação", list(pexp.values()), {m: x["total"] for m, x in exp.items()})
     confere_soma("pauta de importação", list(pimp.values()), {m: x["total"] for m, x in imp.items()})
+    secoes.append(grafico_saldo(exp, imp, pexp, pimp))
     secoes.append(graficos_petroleo_derivados(pexp, pimp))
     secoes.append(graficos_preco_volume(imp, classes_ncm(), pe.brent()))
     secoes.append(graficos_paises(exp, imp, nomes, ref))
