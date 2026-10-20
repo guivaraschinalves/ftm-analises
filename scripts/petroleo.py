@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Monta dados/petroleo.json — petróleo, derivados e a pauta do comércio exterior
-do Brasil, a página petroleo.html.
+do Brasil, um assunto do índice.
 
 Uso:
     ~/.venvs/dados-economicos/bin/python scripts/petroleo.py
@@ -512,14 +512,19 @@ def main():
     icbr, ref_icbr = graficos_icbr()
     secoes.append(icbr)
 
-    doc = dict(atualizado=datetime.date.today().isoformat(), referencia=ref,
-               fonte=FONTE_COMEX, assunto="Petróleo, derivados e comércio exterior", secoes=secoes)
+    # Por enquanto, só o título do assunto e os gráficos em sequência: uma
+    # seção sem título, no formato de artigo (que não põe seção sem título no
+    # índice). A ordem das seções acima continua sendo a ordem dos gráficos.
+    todos = [g for s in secoes for g in s["graficos"]]
+    doc = dict(atualizado=datetime.date.today().isoformat(), referencia=ref, formato="artigo",
+               fonte=FONTE_COMEX, assunto="Petróleo, derivados e comércio exterior",
+               secoes=[dict(titulo="", graficos=todos)])
     with open(SAIDA, "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False, separators=(",", ":"))
         f.write("\n")
     print("gravado %s (%.0f KB); Comex até %s, IC-Br até %s"
           % (SAIDA, os.path.getsize(SAIDA) / 1024, ref, ref_icbr))
-    for sec in secoes:
+    for sec in doc["secoes"]:
         for g in sec["graficos"]:
             ss = g.get("series") or g["variantes"][-1]["series"]
             print("  %-26s %s" % (g["id"], "; ".join("%s=%s" % (s["nome"][:18], s["dados"][-1][1])

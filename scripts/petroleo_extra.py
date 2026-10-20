@@ -102,9 +102,14 @@ def kbd(m3, mes):
     return m3 * M3_BBL / calendar.monthrange(a, mm)[1] / 1000
 
 
-def media_12(d):
+def media_n(d, n):
+    """Média móvel dos n meses até cada mês."""
     ms = sorted(d)
-    return {ms[i]: sum(d[m] for m in ms[i - 11:i + 1]) / 12 for i in range(11, len(ms))}
+    return {ms[i]: sum(d[m] for m in ms[i - n + 1:i + 1]) / n for i in range(n - 1, len(ms))}
+
+
+def media_12(d):
+    return media_n(d, 12)
 
 
 def sazonal(mensal, nome, cor, unidade, titulo, subtitulo, id_, fonte):
@@ -191,23 +196,27 @@ def graficos_refino_brasil():
     ultimo = max(m for m, v in total.items() if v > 0)
     nomes = {p for p, _, _ in PRODUTOS_REFINO}
     outros = {m: sum(d.get(m, 0) for p, d in por.items() if p not in nomes) for m in total if m <= ultimo}
-    series = [serie(n, c, {m: kbd(v, m) for m, v in por[p].items() if m <= ultimo}, 0, tipo="barra")
-              for p, n, c in PRODUTOS_REFINO]
-    series.append(serie("Outros", CINZA, {m: kbd(v, m) for m, v in outros.items()}, 0, tipo="barra"))
-    tot = {m: kbd(v, m) for m, v in total.items() if m <= ultimo}
-    series.append(serie("Total", BRANCO, tot, 0, rotulo=True))
+    kb = lambda d: {m: kbd(v, m) for m, v in d.items() if m <= ultimo}          # noqa: E731
+    produtos = [(n, c, kb(por[p])) for p, n, c in PRODUTOS_REFINO] + [("Outros", CINZA, kb(outros))]
+    tot = kb(total)
+    diesel, gasolina = kb(por["ÓLEO DIESEL"]), kb(por["GASOLINA A"])
     print("  refino no Brasil até %s: %.0f mil barris/dia" % (ultimo, tot[ultimo]))
-    diesel = {m: kbd(v, m) for m, v in por["ÓLEO DIESEL"].items() if m <= ultimo}
-    gasolina = {m: kbd(v, m) for m, v in por["GASOLINA A"].items() if m <= ultimo}
+
+    def variantes(series_de):
+        """Mensal, média móvel de 3 meses e de 12 meses, num botão."""
+        return [dict(rot=rot, unidade="kbd", series=series_de(f))
+                for rot, f in (("Mensal", lambda d: d), ("Média de 3 meses", lambda d: media_n(d, 3)),
+                               ("Média de 12 meses", lambda d: media_n(d, 12)))]
     fonte = "ANP e FtM"
     return [
         dict(id="refino-brasil", titulo="Produção das refinarias no Brasil",
-             subtitulo="Mil barris por dia, mensal, por derivado", unidade="kbd", fonte=fonte, barra=1,
-             series=series),
+             subtitulo="Mil barris por dia, por derivado", unidade="kbd", fonte=fonte, barra=1,
+             variantes=variantes(lambda f: [serie(n, c, f(d), 0, tipo="barra") for n, c, d in produtos]
+                                 + [serie("Total", BRANCO, f(tot), 0, rotulo=True)])),
         dict(id="refino-brasil-diesel-gasolina", titulo="Produção de diesel e gasolina A nas refinarias do Brasil",
-             subtitulo="Mil barris por dia, mensal", unidade="kbd", fonte=fonte,
-             series=[serie("Diesel", VERMELHO, diesel, 0, rotulo=True),
-                     serie("Gasolina A", AZUL, gasolina, 0, rotulo=True)]),
+             subtitulo="Mil barris por dia", unidade="kbd", fonte=fonte,
+             variantes=variantes(lambda f: [serie("Diesel", VERMELHO, f(diesel), 0, rotulo=True),
+                                            serie("Gasolina A", AZUL, f(gasolina), 0, rotulo=True)])),
     ]
 
 

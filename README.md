@@ -13,9 +13,8 @@ No ar: <https://guivaraschinalves.github.io/ftm-analises/>
 | **A bolsa nas eleições presidenciais** | `dados/eleicoes.json` | Baixados da API aberta do Ipeadata (Ibovespa diário desde 1993); `scripts/eleicoes.py`, rodado à mão |
 | **A defasagem dos combustíveis** | `dados/defasagem-combustiveis.json` | Montados a partir das planilhas de [`planilhas/`](planilhas/); `scripts/defasagem_combustiveis.py`, rodado à mão |
 
-Fora do índice, numa página própria, **[`petroleo.html`](petroleo.html)** junta
-os gráficos de petróleo, derivados e pauta do comércio exterior, um abaixo do
-outro e ainda sem texto: `dados/petroleo.json`, montado por
+O assunto **Petróleo, derivados e comércio exterior** junta, ainda sem texto,
+os gráficos de petróleo, derivados, contas externas e pauta do comércio exterior: `dados/petroleo.json`, montado por
 `scripts/petroleo.py` (rodado à mão) a partir dos arquivos anuais do **Comex
 Stat**, da produção de petróleo e das refinarias da **ANP**, do refino mundial
 da **JODI**, das contas nacionais do **IBGE** (SIDRA), do IC-Br em dólar do
@@ -23,8 +22,7 @@ da **JODI**, das contas nacionais do **IBGE** (SIDRA), do IC-Br em dólar do
 [`planilhas/`](planilhas/). As contas e as armadilhas de cada fonte estão no
 cabeçalho de `scripts/petroleo.py` e de `scripts/petroleo_extra.py`. O agregado
 mensal do Comex fica em `dados/.cache-comex/` (versionado, 2 MB): sem ele a
-primeira rodada baixa 5 GB e leva uma hora. Uma página escolhe o que carrega com
-`<body data-fontes="dados/x.json">`.
+primeira rodada baixa 5 GB e leva uma hora.
 
 O acervo intradiário fica à parte, em `dados/intradiario-10a.json`: é o arquivo
 que **acumula** as cotações de 15 em 15 minutos (veja abaixo).
