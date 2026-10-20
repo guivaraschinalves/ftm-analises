@@ -74,6 +74,11 @@
   // A análise vem primeiro: ela é o que se lê de ponta a ponta. Os painéis
   // antigos ficam embaixo, fechados, como acervo.
   var FONTES = ["dados/defasagem-combustiveis.json", "dados/juros-eua.json", "dados/eleicoes.json"];
+  // Uma página pode pedir outros arquivos: <body data-fontes="dados/x.json">.
+  // É o que faz o petroleo.html, que mostra um assunto só, fora do índice.
+  if (document.body && document.body.getAttribute("data-fontes")) {
+    FONTES = document.body.getAttribute("data-fontes").split(/\s*,\s*/);
+  }
   var docs = [], atual = 0;
   var logoSvg = null;   // {viewBox, nos}
 
@@ -232,8 +237,12 @@
   // casas do eixo conforme o passo da grade: numa janela curta (7,0% a 9,5%) o
   // eixo sem decimal repetiria "7%, 8%, 8%, 9%"
   function casasDoPasso(p) {
+    // as casas que o passo pede: 20 → 0, 1,6 → 1, 0,25 → 2
     p = Math.abs(p || 1);
-    return p >= 1 ? 0 : p >= 0.1 ? 1 : 2;
+    for (var c = 0; c < 2; c++) {
+      if (Math.abs(p * Math.pow(10, c) - Math.round(p * Math.pow(10, c))) < 1e-6) return c;
+    }
+    return 2;
   }
   var UNIDADES = {
     "%": { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v) + "%"; },
@@ -255,7 +264,12 @@
     // volume de combustível: o eixo fica só com o número, e a unidade vai no
     // subtítulo; no valor cheio ela aparece, porque ali não há contexto
     "mil m³": { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
-                    valor: function (v) { return nf(0).format(v) + " mil m³"; } }
+                    valor: function (v) { return nf(0).format(v) + " mil m³"; } },
+    // comércio exterior em bilhões de dólares, e índice (IC-Br, dez/2005 = 100)
+    "usd-bi": { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
+                valor: function (v) { return "US$ " + nf(1).format(v) + " bi"; } },
+    pts: { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
+           valor: function (v) { return nf(1).format(v); } }
   };
   function unidade(g) { return UNIDADES[g.unidade] || UNIDADES["%"]; }
 
@@ -417,7 +431,8 @@
       });
     });
     Object.keys(pilhaPos).forEach(function (i) { mx = Math.max(mx, pilhaPos[i]); mn = Math.min(mn, 0); });
-    Object.keys(pilhaNeg).forEach(function (i) { mn = Math.min(mn, pilhaNeg[i]); });
+    // barra sai do zero: o zero entra na escala mesmo com todas negativas
+    Object.keys(pilhaNeg).forEach(function (i) { mn = Math.min(mn, pilhaNeg[i]); mx = Math.max(mx, 0); });
     // Acontecimentos: cada um ganha uma linha vertical e um rótulo curto no
     // alto do gráfico. Os rótulos entram em fileiras — a próxima fileira só é
     // usada quando o texto encostaria no anterior — e quem cai perto da borda

@@ -366,12 +366,26 @@ def importado_por_ano():
     return anos, fora
 
 
-def perfil_mensal(arq, desde="2021-01"):
-    """{coluna: [(mês, %)]} do perfil do fornecimento."""
-    ws = planilha(arq)["Perfil mensal"]
+def perfil_mensal(arq, desde="2021-01", aba="Perfil mensal"):
+    """{coluna: [(mês, %)]} do perfil do fornecimento. A aba "Perfil mensal" é
+    o mês puro; "Perfil do fornecimento" é a janela de 12 meses."""
+    ws = planilha(arq)[aba]
     linhas = [l for l in linhas_da_aba(ws) if str(l["mês"]) >= desde]
     return {c: [(str(l["mês"]), l[c]) for l in linhas if l.get(c) is not None]
             for c in ("Petrobras", "Importações", "Tradings")}
+
+
+def variantes_perfil(arq):
+    """O perfil no mês e na janela de 12 meses, num botão."""
+    fora = []
+    for aba, rot in (("Perfil mensal", "No mês"), ("Perfil do fornecimento", "Janela de 12 meses")):
+        p = perfil_mensal(arq, aba=aba)
+        fora.append({"rot": rot, "unidade": "%", "series": [
+            serie("Petrobras", AZUL, p["Petrobras"]),
+            serie("Importações", VERMELHO, p["Importações"]),
+            serie("Tradings", VERDE, p["Tradings"]),
+        ]})
+    return fora
 
 
 def graficos_gasolina_probabilidade():
@@ -385,7 +399,6 @@ def graficos_gasolina_probabilidade():
     a conta que alimenta a tabela continua sendo refeita pelo
     planilhas/scripts/custo_do_teto.py."""
     anos, imp = importado_por_ano()
-    perfil = perfil_mensal("oferta-gasolina.xlsx")
     g, d = soma_do_teto("gasolina"), soma_do_teto("diesel")
     return [
             {
@@ -416,15 +429,11 @@ def graficos_gasolina_probabilidade():
             },
             {
                 "id": "perfil-gasolina",
-                "titulo": "Quem fornece a gasolina do Brasil",
-                "subtitulo": "% do volume, em janela de 12 meses",
+                "titulo": "Fornecimento de gasolina A no Brasil",
+                "subtitulo": "% do volume; importações incluem tradings",
                 "unidade": "%",
                 "fonte": FONTE_ANP,
-                "series": [
-                    serie("Petrobras", AZUL, perfil["Petrobras"]),
-                    serie("Importações", VERMELHO, perfil["Importações"]),
-                    serie("Tradings", VERDE, perfil["Tradings"]),
-                ],
+                "variantes": variantes_perfil("oferta-gasolina.xlsx"),
                 "nota": "No formato da tabela T.1 do artigo de Francisco "
                         "Pessoa Faria no Blog do IBRE: a linha da Petrobras "
                         "inclui o que a própria empresa importa.",
@@ -501,7 +510,6 @@ def graficos_gasolina_probabilidade():
 # ─── seção 3: probabilidade de fechar, diesel ────────────────────────────────
 
 def graficos_diesel_probabilidade():
-    perfil = perfil_mensal("oferta-diesel.xlsx")
     mensal = planilha("oferta-diesel.xlsx")["Perfil mensal"]
     pm = {str(l["mês"]): l for l in linhas_da_aba(mensal)}
 
@@ -521,16 +529,11 @@ def graficos_diesel_probabilidade():
     return [
             {
                 "id": "perfil-diesel",
-                "titulo": "O importador sai e a Petrobras cobre",
-                "subtitulo": "Fornecimento de diesel, % do volume, em janela "
-                             "de 12 meses",
+                "titulo": "Fornecimento de diesel A no Brasil",
+                "subtitulo": "% do volume; importações incluem tradings",
                 "unidade": "%",
                 "fonte": FONTE_ANP,
-                "series": [
-                    serie("Petrobras", AZUL, perfil["Petrobras"]),
-                    serie("Importações", VERMELHO, perfil["Importações"]),
-                    serie("Tradings", VERDE, perfil["Tradings"]),
-                ],
+                "variantes": variantes_perfil("oferta-diesel.xlsx"),
                 "nota": "A janela de 12 meses suaviza sazonalidade e por isso "
                         "atrasa a virada. No mês puro o movimento é mais "
                         "brusco: as tradings vão de 14,7% em abril de 2026 a "
