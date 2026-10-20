@@ -88,6 +88,9 @@ def linhas(ano, cache):
                     "kg": next(i for i, n in enumerate(nomes)
                                if n.startswith("Quantidade")),
                     "uf": nomes.index("UF DO CNPJ*") if "UF DO CNPJ*" in nomes else None,
+                    # "Pais de origem", sem acento na ANP; procurado pelo começo
+                    "pais": next((i for i, n in enumerate(nomes) if n.lower().startswith(("pais", "país"))),
+                                 None),
                 }
             continue
         if not isinstance(linha[0], int):
@@ -103,6 +106,8 @@ def linhas(ano, cache):
             "uf": (str(linha[col["uf"]]).strip() if col["uf"] is not None
                    and linha[col["uf"]] else None),
             "kg": kg,
+            "pais": (str(linha[col["pais"]]).strip().upper() if col["pais"] is not None
+                     and linha[col["pais"]] else None),
         }
     wb.close()
 

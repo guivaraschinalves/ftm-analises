@@ -486,17 +486,120 @@ def graficos_conta_corrente():
     ])
 
 
+# --------------------------------------------------------------------------
+# diesel importado: origem e importador (ANP, Relatório de Desembaraços)
+# --------------------------------------------------------------------------
+
+# O line up da Abicom (navios de diesel S10 programados para o mês, mil m³),
+# revisão de 29/09/2026. A Abicom não publica série: é um retrato, digitado
+# do quadro dela, que entra apagado nos meses que a ANP ainda não fechou.
+# Trocar a cada revisão. Só S10 — o realizado da ANP inclui o S500.
+LINE_UP = dict(revisao="29/09/2026", meses={
+    "2026-09": {"EUA": 754.0, "Rússia": 27.0, "Índia": 126.2, "Golfo Árabe": 0.0, "Outros": 28.5,
+                "Petrobras": 365.2, "Outras empresas": 570.5},
+    "2026-10": {"EUA": 562.2, "Rússia": 16.7, "Índia": 207.8, "Golfo Árabe": 43.9, "Outros": 0.0,
+                "Petrobras": 407.1, "Outras empresas": 423.5},
+})
+GOLFO = ("EMIRADOS ARABES", "ARABIA SAUDITA", "OMA", "KUWAIT", "BAREIN", "BAHREIN", "CATAR", "QATAR",
+         "IRAQUE")
+ORIGENS = [("EUA", AZUL), ("Rússia", VERMELHO), ("Índia", LARANJA), ("Golfo Árabe", AREIA), ("Outros", CINZA)]
+
+
+def origem(pais):
+    import unicodedata
+    p = "".join(c for c in unicodedata.normalize("NFD", pais or "") if unicodedata.category(c) != "Mn")
+    p = p.upper().strip()
+    if p == "ESTADOS UNIDOS":
+        return "EUA"
+    if p == "RUSSIA":
+        return "Rússia"
+    if p == "INDIA":
+        return "Índia"
+    if any(p == g or p.startswith(g) for g in GOLFO):
+        return "Golfo Árabe"
+    return "Outros"
+
+
+def diesel_importado():
+    """({mês: {origem: mil m³}}, {mês: {"Petrobras"|"Outras empresas": mil m³}}).
+
+    Mesmo arquivo e mesma conta do planilhas/scripts/oferta_diesel.py (kg ÷
+    0,84 t/m³), lido aqui com o país de origem. O ano corrente é baixado de
+    novo se o arquivo tiver mais de 5 dias: a ANP republica o mesmo .xlsx
+    a cada mês."""
+    import datetime as dt
+    sys_path = os.path.join(RAIZ, "planilhas", "scripts")
+    import sys
+    if sys_path not in sys.path:
+        sys.path.insert(0, sys_path)
+    import anp_desembaracos as ad
+    cache = os.path.join(RAIZ, "planilhas", "dados", ".cache-anp-oferta")
+    atual = os.path.join(cache, "desembaraco-%d.xlsx" % dt.date.today().year)
+    if os.path.exists(atual) and time.time() - os.path.getmtime(atual) > 5 * 86400:
+        os.remove(atual)
+    por_origem, por_quem = {}, {}
+    for ano in ad.anos(cache):
+        for r in ad.linhas(ano, cache):
+            if r["ncm"] != ad.NCM_DIESEL:
+                continue
+            m3 = r["kg"] / 1000 / ad.DENSIDADE[ad.NCM_DIESEL] / 1000
+            o = por_origem.setdefault(r["mes"], {})
+            o[origem(r["pais"])] = o.get(origem(r["pais"]), 0.0) + m3
+            k = "Petrobras" if ad.classe(r["importador"]) == "Petrobras" else "Outras empresas"
+            q = por_quem.setdefault(r["mes"], {})
+            q[k] = q.get(k, 0.0) + m3
+    return por_origem, por_quem
+
+
+def graficos_diesel_importado():
+    por_origem, por_quem = diesel_importado()
+    ult = max(por_origem)
+    pior = max(abs(sum(por_origem[m].values()) - sum(por_quem.get(m, {}).values())) for m in por_origem)
+    print("  diesel importado (ANP) até %s: %.0f mil m³ no mês; origem e importador somam igual (máx %.4f)"
+          % (ult, sum(por_origem[ult].values()), pior))
+
+    def pct(d):
+        return {m: {k: v / sum(x.values()) * 100 for k, v in x.items()} for m, x in d.items() if sum(x.values())}
+
+    def series(d, grupos, unidade_pct):
+        out = [serie(n, c, {m: x.get(n, 0.0) for m, x in d.items()}, 1, tipo="barra") for n, c in grupos]
+        lu = {m: x for m, x in LINE_UP["meses"].items() if m > ult}
+        if lu:
+            if unidade_pct:
+                lu = pct({m: {n: x[n] for n, _ in grupos} for m, x in lu.items()})
+            out += [serie(n + " (line up Abicom)", c, {m: x[n] for m, x in lu.items()}, 1, tipo="barra",
+                          opacidade=0.35, legenda=False) for n, c in grupos]
+        return out
+
+    quem = [("Petrobras", VERDE), ("Outras empresas", AZUL_ESCURO)]
+    nota = "; meses apagados: line up da Abicom de %s, só S10" % LINE_UP["revisao"]
+    fonte = "ANP, Abicom e FtM"
+    return dict(titulo="Diesel importado", graficos=[
+        dict(id="diesel-importado-origem", titulo="Importação de diesel por origem",
+             subtitulo="Mil m³, mensal, desembaraçado" + nota, unidade="mil m³", fonte=fonte, barra=0.8,
+             variantes=[dict(rot="Mil m³", unidade="mil m³", series=series(por_origem, ORIGENS, False)),
+                        dict(rot="% do total", unidade="%", eixo=dict(max=100),
+                             series=series(pct(por_origem), ORIGENS, True))]),
+        dict(id="diesel-importado-petrobras", titulo="Importação de diesel: Petrobras e outras empresas",
+             subtitulo="Mil m³, mensal, desembaraçado" + nota, unidade="mil m³", fonte=fonte, barra=0.8,
+             variantes=[dict(rot="Mil m³", unidade="mil m³", series=series(por_quem, quem, False)),
+                        dict(rot="% do total", unidade="%", eixo=dict(max=100),
+                             series=series(pct(por_quem), quem, True))]),
+    ])
+
+
 def secoes_extra():
     print("Conta corrente (BC)…")
     cc = graficos_conta_corrente()
     print("ANP…")
+    diesel = graficos_diesel_importado()
     prod = graficos_producao()
     refino = graficos_refino_brasil()
     print("JODI…")
     mundo = graficos_refino_mundo()
     print("IBGE…")
     pib = graficos_pib()
-    return [cc, prod, dict(titulo="Refino", graficos=refino + mundo), pib]
+    return [cc, diesel, prod, dict(titulo="Refino", graficos=refino + mundo), pib]
 
 
 if __name__ == "__main__":
