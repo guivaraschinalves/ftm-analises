@@ -242,43 +242,52 @@ def refino_mundo():
                 except ValueError:
                     continue
                 dados.setdefault(l["ENERGY_PRODUCT"], {}).setdefault(l["REF_AREA"], {})[l["TIME_PERIOD"]] = v
-    # O mês final: o último em que o painel completo até ele ainda tem pelo
-    # menos 90% do volume do painel de 12 meses antes. Sem isso, um país
-    # grande que para de informar (a Índia depois de mar/2026) sai da série
-    # inteira e o nível cai sem nada ter caído.
+    # O mês final: o último em que o painel (países com todos os meses desde
+    # 2015 até ele) ainda tem pelo menos 95% dos países que tinha três meses
+    # antes. É o que corta o mês mais recente quando só parte dos países já
+    # informou (ago/2026 tinha 40 contra 47). O mesmo mês vale para os dois
+    # produtos. País que parou de informar sai da série inteira — a Índia,
+    # depois de mar/2026 —, porque somá-lo só até onde ele vai faria o nível
+    # cair sem nada ter caído; os ausentes vão para o subtítulo.
+    def painel(paises, meses, fim):
+        janela = [m for m in meses if m <= fim]
+        return [p for p, d in paises.items() if all(m in d for m in janela)], janela
+
+    fins = []
+    for prod, paises in dados.items():
+        meses = sorted({m for d in paises.values() for m in d})
+        for k in range(len(meses) - 1, 2, -1):
+            if len(painel(paises, meses, meses[k])[0]) >= 0.95 * len(painel(paises, meses, meses[k - 3])[0]):
+                fins.append(meses[k])
+                break
+    fim = min(fins)
     fora = {}
     for prod, paises in dados.items():
         meses = sorted({m for d in paises.values() for m in d})
-
-        def painel(fim):
-            janela = [m for m in meses if m <= fim]
-            return [p for p, d in paises.items() if all(m in d for m in janela)], janela
-
-        base = meses[-13]
-        p_base, _ = painel(base)
-        vol_base = sum(paises[p][base] for p in p_base)
-        for fim in reversed(meses):
-            p_fim, janela = painel(fim)
-            if sum(paises[p][base] for p in p_fim if base in paises[p]) >= 0.9 * vol_base:
-                break
-        fora[prod] = fim
-    # o mesmo mês final para os dois produtos, para a comparação ser justa
-    fim = min(fora.values())
-    for prod, paises in dados.items():
-        meses = sorted({m for d in paises.values() for m in d})
-        janela = [m for m in meses if m <= fim]
-        p_fim = [p for p, d in paises.items() if all(m in d for m in janela)]
-        fora[prod] = ({m: sum(paises[p][m] for p in p_fim) for m in janela}, len(p_fim), fim)
+        p_fim, janela = painel(paises, meses, fim)
+        # quem informava em 2025 e ficou fora do painel por ter parado
+        sairam = sorted(p for p, d in paises.items() if p not in p_fim and "2025-12" in d
+                        and d["2025-12"] > 300)
+        fora[prod] = ({m: sum(paises[p][m] for p in p_fim) for m in janela}, len(p_fim), fim, sairam)
     return fora
 
 
 def graficos_refino_mundo():
     r = refino_mundo()
-    gas, n_g, fim_g = r["GASOLINE"]
-    die, n_d, fim_d = r["GASDIES"]
-    print("  JODI: gasolina %d países até %s, diesel %d países até %s" % (n_g, fim_g, n_d, fim_d))
+    gas, n_g, fim_g, sai_g = r["GASOLINE"]
+    die, n_d, fim_d, sai_d = r["GASDIES"]
+    print("  JODI: gasolina %d países até %s, diesel %d países até %s; grandes fora: %s"
+          % (n_g, fim_g, n_d, fim_d, sorted(set(sai_g) | set(sai_d))))
     fonte = "JODI e FtM"
-    sub = "Mil barris por dia, produção bruta das refinarias; soma de %d países com dado completo desde 2015"
+    NOMES = {"IN": "Índia", "ID": "Indonésia", "KW": "Kuwait", "MY": "Malásia", "CN": "China",
+             "US": "EUA", "RU": "Rússia", "SA": "Arábia Saudita", "KR": "Coreia do Sul", "JP": "Japão"}
+    sairam = [NOMES.get(p, p) for p in sorted(set(sai_g) | set(sai_d))]
+    nota_fora = ""
+    if sairam:
+        lista = sairam[0] if len(sairam) == 1 else ", ".join(sairam[:-1]) + " e " + sairam[-1]
+        nota_fora = "; fora do painel por buraco na série: " + lista
+    sub = ("Mil barris por dia, produção bruta das refinarias; soma de %d países com dado completo "
+           "desde 2015" + nota_fora)
     return [
         dict(id="refino-mundo", titulo="Produção de diesel e gasolina nas refinarias do mundo",
              subtitulo=sub % min(n_g, n_d), unidade="kbd", fonte=fonte,
