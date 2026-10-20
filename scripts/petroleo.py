@@ -137,12 +137,20 @@ def baixar_inteiro(url, destino, tamanho, tentativas=8):
         raise RuntimeError("%s veio com %d de %d bytes" % (destino, os.path.getsize(destino), tamanho))
 
 
-VERSAO_CACHE = 2       # sobe quando muda o que o agregado guarda
+# sobe quando muda o que o agregado guarda; por fluxo, para mexer só na
+# importação não obrigar a baixar de novo a exportação
+VERSAO_CACHE = {"EXP": 2, "IMP": 3}
+# NCM cujo país de origem fica guardado com frete e seguro (só importação):
+# diesel, gasolina A e petróleo bruto
+NCM_COM_PAIS = ("27101921", "27101259", "27090010", "27090090")
 
 
 def agregar(caminho, fluxo):
-    """O CSV anual em {mês: {"total": US$, "ncm": {ncm: [US$, kg]},
-    "paises": {sh4: {país: [US$, kg]}}}}.
+    """O CSV anual em {mês: {"total": US$, "ncm": {ncm: [US$, kg, frete, seguro]},
+    "paises": {sh4: {país: [US$, kg]}}, "ncm_pais": {ncm: {país: [US$, kg, frete, seguro]}}}}.
+
+    Frete e seguro (US$) só existem no arquivo de importação: na exportação
+    ficam zero. CIF = FOB + frete + seguro.
 
     Guarda o NCM inteiro (e o peso) de todo o capítulo 27 e da soja, para dar
     preço implícito e volume por produto, e o país do petróleo bruto e dos
@@ -151,22 +159,32 @@ def agregar(caminho, fluxo):
     with open(caminho, encoding="latin-1", newline="") as f:
         for l in csv.DictReader(f, delimiter=";"):
             mes = "%s-%s" % (l["CO_ANO"], l["CO_MES"].zfill(2))
-            m = fora.setdefault(mes, {"total": 0.0, "ncm": {}, "paises": {}})
+            m = fora.setdefault(mes, {"total": 0.0, "ncm": {}, "paises": {}, "ncm_pais": {}})
             fob = float(l["VL_FOB"])
+            frete = float(l.get("VL_FRETE") or 0)
+            seguro = float(l.get("VL_SEGURO") or 0)
             m["total"] += fob
             ncm = l["CO_NCM"]
             if ncm[:2] == "27" or ncm[:4] == SOJA_SH4:
                 kg = float(l["KG_LIQUIDO"] or 0)
-                x = m["ncm"].setdefault(ncm, [0.0, 0.0])
+                x = m["ncm"].setdefault(ncm, [0.0, 0.0, 0.0, 0.0])
                 x[0] += fob
                 x[1] += kg
+                x[2] += frete
+                x[3] += seguro
+                if fluxo == "IMP" and (ncm in NCM_COM_PAIS or ncm[:4] == BRUTO_SH4):
+                    y = m["ncm_pais"].setdefault(ncm, {}).setdefault(l["CO_PAIS"], [0.0, 0.0, 0.0, 0.0])
+                    y[0] += fob
+                    y[1] += kg
+                    y[2] += frete
+                    y[3] += seguro
                 if ncm[:4] in (BRUTO_SH4, DERIV_SH4):
                     p = m["paises"].setdefault(ncm[:4], {}).setdefault(l["CO_PAIS"], [0.0, 0.0])
                     p[0] += fob
                     p[1] += kg
     for m in fora.values():                    # a soma por SH4 que o resto usa
         m["sh4"] = {}
-        for ncm, (fob, _) in m["ncm"].items():
+        for ncm, (fob, *_) in m["ncm"].items():
             if ncm[:4] in SH4:
                 m["sh4"][ncm[:4]] = m["sh4"].get(ncm[:4], 0.0) + fob
     return fora
@@ -180,7 +198,7 @@ def ano_agregado(fluxo, ano):
         with open(arq, encoding="utf-8") as f:
             guardado = json.load(f)
         if (guardado.get("last_modified") == data and guardado.get("tamanho") == tamanho
-                and guardado.get("versao") == VERSAO_CACHE):
+                and guardado.get("versao") == VERSAO_CACHE[fluxo]):
             return guardado["meses"]
     print("  baixando %s_%d (%.0f MB)…" % (fluxo, ano, tamanho / 1e6))
     os.makedirs(BRUTO, exist_ok=True)
@@ -188,7 +206,7 @@ def ano_agregado(fluxo, ano):
     baixar_inteiro(url, bruto, tamanho)
     meses = agregar(bruto, fluxo)
     with open(arq, "w", encoding="utf-8") as f:
-        json.dump(dict(versao=VERSAO_CACHE, last_modified=data, tamanho=tamanho, meses=meses), f)
+        json.dump(dict(versao=VERSAO_CACHE[fluxo], last_modified=data, tamanho=tamanho, meses=meses), f)
     os.remove(bruto)
     return meses
 
@@ -479,7 +497,7 @@ def graficos_preco_volume(imp, classes, brent):
     import calendar
     prod = {"Petróleo bruto": {}, "Diesel": {}, "Gasolina": {}}
     for mes, m in imp.items():
-        for ncm, (fob, kg) in m["ncm"].items():
+        for ncm, (fob, kg, *_) in m["ncm"].items():
             k = "Petróleo bruto" if ncm[:4] == BRUTO_SH4 else classes.get(ncm)
             if k:
                 a = prod[k].setdefault(mes, [0.0, 0.0])
@@ -512,6 +530,130 @@ def graficos_preco_volume(imp, classes, brent):
              variantes=[dict(rot="Média de 12 meses", unidade="kbd", series=sv(media12)),
                         dict(rot="Mensal", unidade="kbd", series=sv(lambda d: d))]),
     ])
+
+
+def graficos_cif(imp, classes, nomes):
+    """FOB contra CIF do que o Brasil importa, e o que é logística.
+
+    CIF = FOB + frete + seguro, os três declarados no despacho (Comex Stat,
+    arquivo de importação). Frete e seguro aparecem por barril e em % do CIF;
+    o frete do diesel por origem sai do NCM 27101921 com o país (Comex, não
+    ANP). E o CIF do diesel em R$/litro, com a PTAX média do mês (SGS 3698),
+    contra o PPI da ANP (média dos portos com dado desde 2018): a distância
+    entre os dois é o custo de internação que o PPI soma ao CIF, mais o
+    descasamento de datas (o Comex data pelo desembaraço, o PPI pela semana
+    da cotação)."""
+    import calendar
+    nomes_k = {"Petróleo bruto": "Petróleo bruto", "Diesel": "Diesel", "Gasolina": "Gasolina"}
+    soma = {k: {} for k in nomes_k}
+    for mes, m in imp.items():
+        if mes < "2002-01":
+            continue
+        for ncm, v in m["ncm"].items():
+            k = "Petróleo bruto" if ncm[:4] == BRUTO_SH4 else classes.get(ncm)
+            if k:
+                a = soma[k].setdefault(mes, [0.0] * 4)
+                for i in range(4):
+                    a[i] += v[i] if i < len(v) else 0.0
+    # cobertura: frete declarado ÷ FOB, por ano, no log — ano com frete
+    # perto de zero é declaração faltando, não frete barato
+    for k, d in soma.items():
+        por_ano = {}
+        for mes, (fob, kg, fr, sg) in d.items():
+            a = por_ano.setdefault(mes[:4], [0.0, 0.0])
+            a[0] += fob
+            a[1] += fr + sg
+        print("  frete+seguro em %% do FOB, %s: %s" % (k, ", ".join(
+            "%s %.1f%%" % (a, 100 * x[1] / x[0]) for a, x in sorted(por_ano.items())[-6:] if x[0])))
+    fob_bbl, cif_bbl, pct_log = {}, {}, {}
+    for k, d in soma.items():
+        fob_bbl[k], cif_bbl[k], pct_log[k] = {}, {}, {}
+        for mes, (fob, kg, fr, sg) in d.items():
+            bbl = kg / 1000 * BBL_POR_T[k]
+            if bbl < 20000:                        # mês sem volume que dê preço
+                continue
+            fob_bbl[k][mes] = fob / bbl
+            cif_bbl[k][mes] = (fob + fr + sg) / bbl
+            pct_log[k][mes] = (fr + sg) / (fob + fr + sg) * 100
+    cores = {"Petróleo bruto": VERDE, "Diesel": VERMELHO, "Gasolina": AZUL}
+
+    def media12(d):
+        ms = sorted(d)
+        return {ms[i]: sum(d[x] for x in ms[i - 11:i + 1]) / 12 for i in range(11, len(ms))
+                if num(ms[i]) - num(ms[i - 11]) == 11}
+
+    # frete do diesel por origem, US$ por barril
+    por_origem = {}
+    for mes, m in imp.items():
+        if mes < "2015-01":
+            continue
+        for pais, (fob, kg, fr, sg) in m.get("ncm_pais", {}).get("27101921", {}).items():
+            o = pe.origem(nomes.get(pais, ""))
+            a = por_origem.setdefault(o, {}).setdefault(mes, [0.0, 0.0])
+            a[0] += fr + sg
+            a[1] += kg / 1000 * BBL_POR_T["Diesel"]
+    frete_origem = {o: {mes: v[0] / v[1] for mes, v in d.items() if v[1] >= 100000}
+                    for o, d in por_origem.items()}
+
+    graficos = [
+        dict(id="importados-fob-cif", titulo="Preço do importado: FOB e CIF",
+             subtitulo="US$ por barril, mensal; CIF = FOB + frete + seguro", unidade="usd-bbl",
+             variantes=[dict(rot=k, unidade="usd-bbl", series=[
+                 serie("FOB", cores[k], fob_bbl[k], rotulo=True),
+                 serie("CIF", BRANCO, cif_bbl[k], rotulo=True)]) for k in ("Diesel", "Gasolina", "Petróleo bruto")]),
+        dict(id="importados-frete-pct", titulo="Frete e seguro no preço do importado",
+             subtitulo="% do valor CIF", unidade="%",
+             variantes=[dict(rot="Média de 12 meses", unidade="%", series=[
+                            serie(k, cores[k], media12(pct_log[k]), 1, rotulo=True) for k in cores]),
+                        dict(rot="Mensal", unidade="%", series=[
+                            serie(k, cores[k], pct_log[k], 1, rotulo=True) for k in cores])]),
+        dict(id="diesel-frete-origem", titulo="Frete e seguro do diesel importado, por origem",
+             subtitulo="US$ por barril, mensal; só meses com mais de 100 mil barris da origem",
+             unidade="usd-bbl", buracoMax=1,
+             series=[serie(o, c, frete_origem[o], rotulo=True) for o, c in pe.ORIGENS
+                     if o in frete_origem and o != "Outros"]),
+    ]
+    g = grafico_cif_ppi(soma["Diesel"])
+    if g:
+        graficos.append(g)
+    return dict(titulo="FOB, CIF e logística", graficos=graficos)
+
+
+def grafico_cif_ppi(diesel):
+    """CIF do diesel em R$/litro contra o PPI da ANP (média mensal das
+    semanas, média dos portos com dado desde 2018)."""
+    sys.path.insert(0, os.path.join(RAIZ, "planilhas", "scripts"))
+    try:
+        import defasagem as df
+    except Exception as e:                       # noqa: BLE001
+        print("  sem o PPI (%s)" % e)
+        return None
+    if not os.path.exists(df.PPI_ARQUIVO) or time.time() - os.path.getmtime(df.PPI_ARQUIVO) > 5 * 86400:
+        if os.path.exists(df.PPI_ARQUIVO):
+            os.remove(df.PPI_ARQUIVO)
+    semanas = df.ler_ppi(df.baixar_ppi(), "Diesel R$ semanal")
+    portos = ["Itaqui", "Suape", "Aratu", "Santos", "Paranagua"]
+    por_mes = {}
+    for ini, fim, v in semanas:
+        vs = [v[p] for p in portos if p in v]
+        if vs:
+            por_mes.setdefault("%04d-%02d" % (fim.year, fim.month), []).append(sum(vs) / len(vs))
+    ppi = {m: sum(x) / len(x) for m, x in por_mes.items()}
+    ptax = sgs(3698)
+    cif = {}
+    for mes, (fob, kg, fr, sg) in diesel.items():
+        m3 = kg / 1000 / 0.84
+        if m3 > 3000 and mes in ptax:
+            cif[mes] = (fob + fr + sg) / m3 / 1000 * ptax[mes]
+    inicio = min(ppi)
+    cif = {m: v for m, v in cif.items() if m >= inicio}
+    print("  PPI diesel até %s: R$ %.2f/l; CIF do mês R$ %.2f/l" % (max(ppi), ppi[max(ppi)], cif.get(max(ppi), 0)))
+    return dict(id="diesel-cif-ppi", titulo="Diesel importado: custo CIF e paridade de importação da ANP",
+                subtitulo="R$ por litro, mensal; CIF do Comex com a PTAX média do mês; PPI = média de Itaqui, "
+                          "Suape, Aratu, Santos e Paranaguá", unidade="R$/l", fonte="Comex Stat (MDIC), ANP, "
+                          "Banco Central e FtM",
+                series=[serie("CIF do diesel importado", VERMELHO, cif, rotulo=True),
+                        serie("PPI da ANP", BRANCO, ppi, rotulo=True)])
 
 
 def graficos_fornecimento():
@@ -564,7 +706,9 @@ def main():
     confere_soma("pauta de importação", list(pimp.values()), {m: x["total"] for m, x in imp.items()})
     secoes.append(grafico_saldo(exp, imp, pexp, pimp))
     secoes.append(graficos_petroleo_derivados(pexp, pimp))
-    secoes.append(graficos_preco_volume(imp, classes_ncm(), pe.brent()))
+    classes = classes_ncm()
+    secoes.append(graficos_preco_volume(imp, classes, pe.brent()))
+    secoes.append(graficos_cif(imp, classes, nomes))
     secoes.append(graficos_paises(exp, imp, nomes, ref))
     secoes.extend(pe.secoes_extra())
     print("Planilhas de oferta…")

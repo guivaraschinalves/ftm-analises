@@ -25,12 +25,11 @@ AS FONTES E AS CONTAS
     — só os países com o dado de todos os meses desde jan/2015 até o último mês
     em que todos eles informaram. Não é o mundo inteiro, mas a variação é real.
     O CSV tem 650 MB descompactado e é lido de dentro do zip, sem extrair.
-  - **Setor externo no PIB**, IBGE: exportação e importação em % do PIB
-    nominal, somas de 4 trimestres a preços correntes (SIDRA 1846), e a
-    variação real em 4 trimestres que o próprio IBGE publica (SIDRA 5932).
-    Antes era a contribuição para o crescimento (peso × variação real), que
-    deixava um resíduo de estoques e discrepância de até 1 p.p.; ele pediu
-    para trocar.
+  - **PIB**, IBGE: contribuição de famílias, governo, FBC (FBCF + estoques)
+    e exportações líquidas para o crescimento do PIB NOMINAL em 4 trimestres
+    (SIDRA 1846). A preços correntes a ótica da demanda é aditiva, então as
+    contribuições somam o crescimento sem resíduo — o script confere. E a
+    variação real da exportação e da importação que o IBGE publica (SIDRA 5932).
   - **Refino no mundo**: além do nível, a variação contra o mesmo mês do ano
     anterior, que é o que se compara num painel que não é o mundo inteiro.
   - **Brent**, FRED, MCOILBRENTEU (média mensal, EIA), CSV sem chave.
@@ -319,7 +318,7 @@ def graficos_refino_mundo():
 # --------------------------------------------------------------------------
 
 COMP = {"90707": "PIB", "93404": "Consumo das famílias", "93405": "Consumo do governo",
-        "93406": "FBCF", "93407": "Exportação", "93408": "Importação"}
+        "93406": "FBCF", "102880": "Variação de estoque", "93407": "Exportação", "93408": "Importação"}
 TRI = {"1": "03", "2": "06", "3": "09", "4": "12"}
 
 
@@ -360,27 +359,46 @@ def taxa_4tri(codigos):
 def graficos_pib():
     """Dois gráficos, sem conta que deixe resíduo:
 
-      - exportação e importação em % do PIB nominal, somas de 4 trimestres a
-        preços correntes (SIDRA 1846) — a participação de cada um, e o saldo;
-      - variação real em 4 trimestres contra os 4 anteriores, a taxa que o
-        próprio IBGE publica (SIDRA 5932), com o PIB de referência."""
+      - contribuição para o crescimento do PIB NOMINAL em 4 trimestres:
+        (componente_t − componente_t−4) ÷ PIB_t−4, somas de 4 trimestres a
+        preços correntes (SIDRA 1846). Em valores correntes a ótica da demanda
+        é aditiva — famílias + governo + FBCF + estoques + exportação −
+        importação = PIB, conferido a cada rodada —, então as contribuições
+        somam exatamente o crescimento nominal. Em volume (encadeado) isso
+        não vale, e era daí que vinha o resíduo de estoques da versão anterior;
+      - variação real em 4 trimestres que o próprio IBGE publica (SIDRA 5932)."""
     nominal = sidra(1846)
     n4 = {k: soma4(v) for k, v in nominal.items()}
-    exp = {m: n4["Exportação"][m] / n4["PIB"][m] * 100 for m in n4["Exportação"] if m in n4["PIB"]}
-    imp = {m: -n4["Importação"][m] / n4["PIB"][m] * 100 for m in n4["Importação"] if m in n4["PIB"]}
-    saldo = {m: exp[m] + imp[m] for m in exp if m in imp}
+    pior = max(abs(n4["Consumo das famílias"][m] + n4["Consumo do governo"][m] + n4["FBCF"][m]
+                   + n4["Variação de estoque"].get(m, 0) + n4["Exportação"][m] - n4["Importação"][m]
+                   - n4["PIB"][m]) / n4["PIB"][m] * 100 for m in n4["PIB"])
+    if pior > 0.01:
+        raise RuntimeError("a ótica da demanda não fecha o PIB nominal (%.3f%% do PIB)" % pior)
+    comp = {
+        "Consumo das famílias": n4["Consumo das famílias"],
+        "Consumo do governo": n4["Consumo do governo"],
+        "FBC (FBCF + estoques)": {m: n4["FBCF"][m] + n4["Variação de estoque"].get(m, 0) for m in n4["FBCF"]},
+        "Exportações líquidas": {m: n4["Exportação"][m] - n4["Importação"][m] for m in n4["Exportação"]},
+    }
+
+    def ant(m):
+        return "%04d-%s" % (int(m[:4]) - 1, m[5:])
+    contrib = {k: {m: (d[m] - d[ant(m)]) / n4["PIB"][ant(m)] * 100 for m in d if ant(m) in d and ant(m) in n4["PIB"]}
+               for k, d in comp.items()}
+    pib = {m: (n4["PIB"][m] / n4["PIB"][ant(m)] - 1) * 100 for m in n4["PIB"] if ant(m) in n4["PIB"]}
+    fecha = max(abs(sum(c[m] for c in contrib.values()) - pib[m]) for m in pib)
+    print("  PIB nominal: contribuições somam o crescimento, diferença máxima %.4f p.p.; último %s %.1f%%"
+          % (fecha, max(pib), pib[max(pib)]))
     taxa = taxa_4tri(["90707", "93407", "93408"])
-    print("  PIB: exportação %.1f%% e importação %.1f%% do PIB nominal em %s; variação real %s"
-          % (exp[max(exp)], -imp[max(imp)], max(exp),
-             ", ".join("%s %.1f%%" % (k, v[max(v)]) for k, v in taxa.items())))
     fonte = "IBGE e FtM"
+    cores = {"Consumo das famílias": VERDE, "Consumo do governo": VERMELHO,
+             "FBC (FBCF + estoques)": AZUL, "Exportações líquidas": LARANJA}
     return dict(titulo="PIB", graficos=[
-        dict(id="pib-setor-externo-nominal", titulo="Exportação e importação no PIB",
-             subtitulo="% do PIB nominal, acumulado em 4 trimestres; importação com sinal negativo",
-             unidade="%", fonte=fonte, barra=2.6, buracoMax=3,
-             series=[serie("Exportação", AZUL, exp, 2, tipo="barra", rotulo=True),
-                     serie("Importação", LARANJA, imp, 2, tipo="barra", rotulo=True),
-                     serie("Saldo (exportação − importação)", BRANCO, saldo, 2, rotulo=True)]),
+        dict(id="pib-nominal-contribuicao", titulo="Contribuição para o crescimento do PIB nominal",
+             subtitulo="p.p., acumulado em 4 trimestres contra os 4 anteriores, a preços correntes",
+             unidade="pp", fonte=fonte, barra=2.6, buracoMax=3,
+             series=[serie(k, cores[k], contrib[k], 2, tipo="barra") for k in comp]
+             + [serie("PIB nominal (variação %)", BRANCO, pib, 2, rotulo=True)]),
         dict(id="pib-setor-externo-real", titulo="Variação real da exportação e da importação",
              subtitulo="% acumulada em 4 trimestres contra os 4 anteriores", unidade="%", fonte=fonte,
              buracoMax=3,
