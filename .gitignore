@@ -24,3 +24,10 @@ planilhas/dados/.cache-anp-revenda/
 # Já os dois acervos de composição (planilhas/dados/anp-composicao-*.csv) e o
 # .cache-acelen/ FICAM versionados: refazê-los do zero custa 260 MB de PDF da
 # Síntese Semanal. Veja o cabeçalho de planilhas/scripts/composicao_anp.py.
+
+# Comex Stat: os CSV anuais (20 a 140 MB cada) são lidos e apagados; o
+# agregado mensal de cada ano, em dados/.cache-comex/*.json, fica versionado.
+dados/.cache-comex/bruto/
+# ANP (produção e refino) e JODI (zip de 58 MB): baixados a cada rodada.
+dados/.cache-anp/
+dados/.cache-jodi/

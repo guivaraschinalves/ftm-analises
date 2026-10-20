@@ -269,7 +269,14 @@
     "usd-bi": { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
                 valor: function (v) { return "US$ " + nf(1).format(v) + " bi"; } },
     pts: { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
-           valor: function (v) { return nf(1).format(v); } }
+           valor: function (v) { return nf(1).format(v); } },
+    // petróleo e derivados em mil barris por dia; contribuição em pontos percentuais
+    kbd: { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
+           valor: function (v) { return nf(0).format(v) + " mil b/d"; } },
+    pp: { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
+          valor: function (v) { return nf(2).format(v) + " p.p."; } },
+    "usd-bbl": { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
+                 valor: function (v) { return "US$ " + nf(2).format(v) + "/barril"; } }
   };
   function unidade(g) { return UNIDADES[g.unidade] || UNIDADES["%"]; }
 
@@ -411,7 +418,11 @@
     var y0 = topoLegenda + (legenda.linhas - 1) * L.legenda.passo + 42;
 
     // período visível
-    var todas = g.series.map(function (s) { return s.dados.map(function (d) { return { i: idxDe(g, d[0]), v: d[1] }; }); });
+    // tipo "faixa": cada ponto é [chave, mínimo, máximo] e o desenho é a
+    // área entre os dois (a sazonalidade contra os anos anteriores)
+    var todas = g.series.map(function (s) {
+      return s.dados.map(function (d) { return { i: idxDe(g, d[0]), v: d[1], v2: d[2] }; });
+    });
     var ini = Infinity, fim = -Infinity;
     todas.forEach(function (pts) { pts.forEach(function (p) { if (p.i < ini) ini = p.i; if (p.i > fim) fim = p.i; }); });
     var d0 = cartao.inicioIdx === null ? ini : Math.max(ini, cartao.inicioIdx), d1 = fim + 1;
@@ -427,6 +438,7 @@
         } else {
           if (p.v < mn) mn = p.v;
           if (p.v > mx) mx = p.v;
+          if (p.v2 !== undefined) { mn = Math.min(mn, p.v2); mx = Math.max(mx, p.v2); }
         }
       });
     });
@@ -653,9 +665,20 @@
         b[p.i] = depois;
         var ya = Y(antes), yb = Y(depois);
         area.appendChild(el("rect", {
-          x: X(p.i + 0.5) - bw / 2, y: Math.min(ya, yb), width: bw, height: Math.max(0.6, Math.abs(yb - ya)), fill: cor
+          x: X(p.i + 0.5) - bw / 2, y: Math.min(ya, yb), width: bw, height: Math.max(0.6, Math.abs(yb - ya)), fill: cor,
+          opacity: s.opacidade || null
         }));
       });
+    });
+    // faixas: o máximo de ida, o mínimo de volta, fechado e translúcido
+    g.series.forEach(function (s, k) {
+      if (s.tipo !== "faixa" || vis[k].length < 2) return;
+      var ida = vis[k].map(function (p) { return X(p.i + 0.5).toFixed(1) + " " + Y(p.v2).toFixed(1); });
+      var volta = vis[k].slice().reverse().map(function (p) { return X(p.i + 0.5).toFixed(1) + " " + Y(p.v).toFixed(1); });
+      area.appendChild(el("path", {
+        d: "M" + ida.join("L") + "L" + volta.join("L") + "Z", fill: corNoTema(s.cor, pal),
+        opacity: s.opacidade || 0.3, stroke: "none"
+      }));
     });
     // linhas, na ordem da lista (a última fica por cima)
     // no eixo diário, todo fim de semana é um salto de 3 dias: a linha só corta
@@ -664,7 +687,7 @@
     // sem cotação) corta a linha
     var buracoMax = g.buracoMax || (g.intradiario ? 8 : g.diario ? 6 : 1);
     g.series.forEach(function (s, k) {
-      if (s.tipo === "barra" || !vis[k].length) return;
+      if (s.tipo === "barra" || s.tipo === "faixa" || !vis[k].length) return;
       var d = "", ant = null;
       vis[k].forEach(function (p) {
         d += (ant === null || p.i - ant > buracoMax ? "M" : "L") + X(p.i + 0.5).toFixed(1) + " " + Y(p.v).toFixed(1);
@@ -692,8 +715,9 @@
     // legenda
     legenda.pos.forEach(function (it) {
       var y = topoLegenda + it.linha * L.legenda.passo, s = it.s, cor = corNoTema(s.cor, pal);
-      if (s.tipo === "barra") {
-        svg.appendChild(el("rect", { x: it.x + 6, y: y - 10, width: 22, height: 20, fill: cor }));
+      if (s.tipo === "barra" || s.tipo === "faixa") {
+        svg.appendChild(el("rect", { x: it.x + 6, y: y - 10, width: 22, height: 20, fill: cor,
+                                     opacity: s.tipo === "faixa" ? (s.opacidade || 0.3) * 1.6 : (s.opacidade || null) }));
       } else {
         var w = Math.min(s.largura || L.linha, 8);
         svg.appendChild(el("line", {
@@ -744,10 +768,12 @@
     svg.appendChild(alvo);
     svg.appendChild(camada);
     var porSerie = desenho.vis.map(function (pts) {
-      return pts.reduce(function (o, p) { o[p.i] = p.v; return o; }, {});
+      return pts.reduce(function (o, p) { o[p.i] = p.v2 === undefined ? p.v : [p.v, p.v2]; return o; }, {});
     });
 
     function limpar() { while (camada.firstChild) camada.removeChild(camada.firstChild); }
+    // a faixa mostra os dois extremos
+    function valorTip(v) { return Array.isArray(v) ? F.valor(v[0]) + " a " + F.valor(v[1]) : F.valor(v); }
     function mover(ev) {
       var pt = svg.createSVGPoint();
       pt.x = ev.clientX; pt.y = ev.clientY;
@@ -777,7 +803,7 @@
       }));
       var titulo = rotuloX(g, i, true);
       var w = Math.max(largura(titulo, fs, "bold"), Math.max.apply(null, linhas.map(function (l) {
-        return largura(l.s.nome + "  " + F.valor(l.v), fs) + fs * 1.1;
+        return largura(l.s.nome + "  " + valorTip(l.v), fs) + fs * 1.1;
       }))) + pad * 2;
       var h = (linhas.length + 1) * fs * 1.3 + pad;
       var bx = x + 22; if (bx + w > L.x1) bx = x - 22 - w;
@@ -788,7 +814,7 @@
         var ty = by + pad + fs * 0.8 + (k + 1) * fs * 1.3;
         camada.appendChild(el("rect", { x: bx + pad, y: ty - fs * 0.62, width: fs * 0.7, height: fs * 0.7, rx: 2, fill: corNoTema(l.s.cor, pal) }));
         camada.appendChild(texto(l.s.nome, { x: bx + pad + fs * 1.1, y: ty, "font-size": fs, fill: pal.suave }));
-        camada.appendChild(texto(F.valor(l.v), { x: bx + w - pad, y: ty, "font-size": fs, "font-weight": "bold", fill: pal.texto, "text-anchor": "end" }));
+        camada.appendChild(texto(valorTip(l.v), { x: bx + w - pad, y: ty, "font-size": fs, "font-weight": "bold", fill: pal.texto, "text-anchor": "end" }));
         if (desenho.vis[g.series.indexOf(l.s)] && l.s.tipo !== "barra") {
           camada.appendChild(el("circle", { cx: x, cy: desenho.Y(l.v), r: 6, fill: corNoTema(l.s.cor, pal), stroke: pal.bg, "stroke-width": 2 }));
         }
@@ -1497,7 +1523,13 @@
       return salvar(new Blob(["\ufeff" + [cab.join(";")].concat(corpo).join("\r\n")],
                              { type: "text/csv;charset=utf-8" }), nomeArquivo(cartao, "csv"));
     }
-    var cols = g.series;
+    // a faixa vira duas colunas, mínimo e máximo
+    var cols = [];
+    g.series.forEach(function (s) {
+      if (s.tipo !== "faixa") return cols.push(s);
+      cols.push({ nome: s.nome + " (mínimo)", dados: s.dados.map(function (d) { return [d[0], d[1]]; }) });
+      cols.push({ nome: s.nome + " (máximo)", dados: s.dados.map(function (d) { return [d[0], d[2]]; }) });
+    });
     var meses = {};
     cols.forEach(function (s) { s.dados.forEach(function (d) { meses[d[0]] = true; }); });
     var mapas = cols.map(function (s) { return s.dados.reduce(function (o, d) { o[d[0]] = d[1]; return o; }, {}); });
