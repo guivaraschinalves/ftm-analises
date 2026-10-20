@@ -75,9 +75,12 @@ BASE_COMEX = "https://balanca.economia.gov.br/balanca/bd/comexstat-bd/ncm/"
 URL_PAISES = "https://balanca.economia.gov.br/balanca/bd/tabelas/PAIS.csv"
 URL_NCM = "https://balanca.economia.gov.br/balanca/bd/tabelas/NCM.csv"
 
-# Barris por tonelada (fatores de conversão do BP Statistical Review): o
-# Comex Stat dá o peso, e o preço do petróleo se lê por barril.
-BBL_POR_T = {"Petróleo bruto": 7.33, "Diesel": 7.46, "Gasolina": 8.53}
+# Barris por tonelada: o Comex Stat dá o peso, e o preço se lê por barril.
+# As densidades são as da ANP: 0,84 t/m³ no diesel e 0,74 na gasolina (as do
+# Relatório de Desembaraços) e 0,85 no petróleo importado, que é a densidade
+# implícita entre o peso do Comex e o volume da ANP em 2025 (no exportado,
+# mais pesado, ela dá 0,88). 1 m³ = 6,28981 barris.
+BBL_POR_T = {"Petróleo bruto": 6.28981 / 0.85, "Diesel": 6.28981 / 0.84, "Gasolina": 6.28981 / 0.74}
 SSL_COMEX = ssl._create_unverified_context()          # só para o host do MDIC
 UA = {"User-Agent": "Mozilla/5.0 (ftm-analises)"}
 
