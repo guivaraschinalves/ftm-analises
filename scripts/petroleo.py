@@ -511,6 +511,8 @@ def main():
     print("IC-Br…")
     icbr, ref_icbr = graficos_icbr()
     secoes.append(icbr)
+    print("Termos de troca…")
+    secoes.append(pe.termos_de_troca())
 
     # Por enquanto, só o título do assunto e os gráficos em sequência: uma
     # seção sem título, no formato de artigo (que não põe seção sem título no

@@ -588,6 +588,30 @@ def graficos_diesel_importado():
     ])
 
 
+# --------------------------------------------------------------------------
+# termos de troca (Funcex, via Ipeadata)
+# --------------------------------------------------------------------------
+
+URL_IPEA = "http://www.ipeadata.gov.br/api/odata4/ValoresSerie(SERCODIGO='%s')"
+
+
+def termos_de_troca():
+    """Funcex, "Termos de troca - índice (média 2018 = 100)", FUNCEX12_TTR12:
+    preço das exportações ÷ preço das importações, mensal desde 1978."""
+    d = json.loads(baixar(URL_IPEA % "FUNCEX12_TTR12", headers={}).decode("utf-8"))["value"]
+    serie_ = {x["VALDATA"][:7]: float(x["VALVALOR"]) for x in d if x["VALVALOR"] is not None}
+    print("  termos de troca até %s: %.1f" % (max(serie_), serie_[max(serie_)]))
+    return dict(titulo="Termos de troca", graficos=[
+        dict(id="termos-de-troca", titulo="Termos de troca do Brasil",
+             subtitulo="Preço das exportações ÷ preço das importações, índice (média de 2018 = 100)",
+             unidade="pts", fonte="Funcex (Ipeadata) e FtM", eixo=dict(zero=False),
+             variantes=[dict(rot="Mensal", unidade="pts", series=[serie("Termos de troca", BRANCO, serie_, 1,
+                                                                          rotulo=True)]),
+                        dict(rot="Média de 12 meses", unidade="pts",
+                             series=[serie("Termos de troca", BRANCO, media_12(serie_), 1, rotulo=True)])]),
+    ])
+
+
 def secoes_extra():
     print("Conta corrente (BC)…")
     cc = graficos_conta_corrente()
