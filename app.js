@@ -478,8 +478,10 @@
     });
     var ini = Infinity, fim = -Infinity;
     todas.forEach(function (pts) { pts.forEach(function (p) { if (p.i < ini) ini = p.i; if (p.i > fim) fim = p.i; }); });
-    var d0 = cartao.inicioIdx === null ? ini : Math.max(ini, cartao.inicioIdx), d1 = fim + 1;
-    var vis = todas.map(function (pts) { return pts.filter(function (p) { return p.i >= d0; }); });
+    var d0 = cartao.inicioIdx === null ? ini : Math.max(ini, cartao.inicioIdx);
+    var d1 = cartao.fimIdx === null ? fim + 1 : Math.min(fim + 1, cartao.fimIdx + 1);
+    if (d1 - d0 < 2) { d0 = ini; d1 = fim + 1; }     // faixa degenerada volta a ser tudo
+    var vis = todas.map(function (pts) { return pts.filter(function (p) { return p.i >= d0 && p.i < d1; }); });
 
     // extremos: barras entram empilhadas (positivas e negativas em separado)
     var mn = Infinity, mx = -Infinity, pilhaPos = {}, pilhaNeg = {};
@@ -814,6 +816,27 @@
   }
 
   // ---------- passar o mouse ----------
+  // Mouse fino: a faixa é escolhida arrastando no gráfico. Dedo não arrasta
+  // (ali o arrasto é a rolagem da página), e o celular fica com os botões.
+  function mouseFino() {
+    try { return window.matchMedia("(pointer: fine)").matches; } catch (e) { return true; }
+  }
+
+  // Um só ouvinte para o Esc: `ligarHover` roda a cada pintura do cartão.
+  var cancelarArrasto = null;
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key === "Escape" && cancelarArrasto) cancelarArrasto();
+  });
+
+  function aplicarJanela(cartao, ini, fim) {
+    cartao.inicioIdx = ini;
+    cartao.fimIdx = fim;
+    cartao.periodo = ini === null && fim === null ? "tudo" : "faixa";
+    if (cartao.atualizarPeriodos) cartao.atualizarPeriodos();
+    desenhar(cartao, true);
+    if (visor && visor.cartao === cartao && !visor.box.hidden) pintarVisor();
+  }
+
   function ligarHover(cartao, desenho) {
     if (desenho.ranking) return;            // o valor já está escrito na barra
     var svg = desenho.svg, L = desenho.L, pal = desenho.pal, g = graficoDe(cartao), F = unidade(g);
@@ -874,9 +897,66 @@
         }
       });
     }
-    alvo.addEventListener("pointermove", mover);
-    alvo.addEventListener("pointerdown", mover);
-    alvo.addEventListener("pointerleave", limpar);
+    // ---- escolher o período arrastando, como no FRED ----
+    // A faixa fica numa camada própria, abaixo da do mouse: `limpar()` apaga a
+    // caixa de valores a cada movimento, e levaria o retângulo junto.
+    var faixa = el("rect", {
+      y: L.y0, height: L.y1 - L.y0, width: 0, fill: pal.suave, opacity: 0.2,
+      "pointer-events": "none", visibility: "hidden"
+    });
+    svg.insertBefore(faixa, camada);
+    var arrasto = null;
+
+    function xNoSvg(ev) {
+      var pt = svg.createSVGPoint();
+      pt.x = ev.clientX; pt.y = ev.clientY;
+      return pt.matrixTransform(svg.getScreenCTM().inverse()).x;
+    }
+    function idxNoX(x) {
+      var t = Math.min(Math.max(x, L.x0), L.x1);
+      return Math.floor(desenho.d0 + (t - L.x0) / (L.x1 - L.x0) * (desenho.d1 - desenho.d0));
+    }
+    function pintarFaixa() {
+      var a = Math.min(arrasto.a, arrasto.b), b = Math.max(arrasto.a, arrasto.b);
+      faixa.setAttribute("x", Math.max(L.x0, a));
+      faixa.setAttribute("width", Math.max(0, Math.min(L.x1, b) - Math.max(L.x0, a)));
+      faixa.setAttribute("visibility", "visible");
+    }
+    function encerrar() {
+      arrasto = null;
+      cancelarArrasto = null;
+      faixa.setAttribute("visibility", "hidden");
+    }
+
+    if (!g.categorias && mouseFino()) {
+      alvo.addEventListener("pointerdown", function (ev) {
+        if (ev.button !== 0 || ev.pointerType === "touch") return;
+        arrasto = { a: xNoSvg(ev), b: xNoSvg(ev) };
+        cancelarArrasto = encerrar;
+        try { alvo.setPointerCapture(ev.pointerId); } catch (e) {}
+        ev.preventDefault();
+      });
+      alvo.addEventListener("pointermove", function (ev) {
+        if (!arrasto) return;
+        arrasto.b = xNoSvg(ev);
+        pintarFaixa();
+      });
+      alvo.addEventListener("pointerup", function () {
+        if (!arrasto) return;
+        var a = Math.min(arrasto.a, arrasto.b), b = Math.max(arrasto.a, arrasto.b);
+        var i0 = idxNoX(a), i1 = idxNoX(b);
+        encerrar();
+        // arrasto curto é clique, não seleção
+        if (b - a < 8 || i1 - i0 < 1) return;
+        aplicarJanela(cartao, i0, i1);
+      });
+      alvo.addEventListener("pointercancel", encerrar);
+      alvo.addEventListener("dblclick", function () { aplicarJanela(cartao, null, null); });
+    }
+
+    alvo.addEventListener("pointermove", function (ev) { if (!arrasto) mover(ev); else limpar(); });
+    alvo.addEventListener("pointerdown", function (ev) { if (!arrasto) mover(ev); });
+    alvo.addEventListener("pointerleave", function () { if (!arrasto) limpar(); });
   }
 
   // ---------- retrátil (categorias, seções e cartões) ----------
@@ -1243,7 +1323,7 @@
   }
 
   function criarCartao(g) {
-    var cartao = { grafico: g, variante: 0, periodo: "tudo", inicioIdx: null, chave: null };
+    var cartao = { grafico: g, variante: 0, periodo: "tudo", inicioIdx: null, fimIdx: null, chave: null };
     var raiz = html("details", { "class": "card", id: g.id });
 
     var cabecalho = html("summary", { "class": "card-cabecalho" });
@@ -1281,19 +1361,36 @@
       var efetivo = graficoDe(cartao);
       var periodos = periodosDisponiveis(efetivo);
       grupo.innerHTML = "";
-      grupo.hidden = periodos.length < 2;
+      // com mouse o controle vale em todo gráfico de tempo (o ranking não tem
+      // eixo de tempo); sem mouse, só quando há mais de um recorte
+      var deTempo = !efetivo.categorias && efetivo.tipo !== "ranking";
+      grupo.hidden = mouseFino() ? !deTempo : periodos.length < 2;
       if (grupo.hidden) {
         cartao.periodo = "tudo";
-        cartao.inicioIdx = null;
+        cartao.inicioIdx = cartao.fimIdx = null;
+        return;
+      }
+      if (mouseFino()) {
+        // a faixa de um recorte não vale para o outro: trocar de variante volta tudo
+        if (cartao.periodo !== "faixa") { cartao.inicioIdx = cartao.fimIdx = null; }
+        grupo.appendChild(html("span", { "class": "periodos-dica",
+          texto: "Arraste no gráfico para escolher o período" }));
+        var volta = html("button", { type: "button", texto: "Ver tudo",
+          title: "Volta à série inteira (duplo clique no gráfico faz o mesmo)" });
+        volta.addEventListener("click", function () { aplicarJanela(cartao, null, null); });
+        grupo.appendChild(volta);
+        atualizarDica();
         return;
       }
       if (!periodos.some(function (p) { return p.id === cartao.periodo; })) cartao.periodo = "tudo";
       cartao.inicioIdx = inicioDoPeriodo(efetivo, cartao.periodo);
+      cartao.fimIdx = null;
       periodos.forEach(function (p) {
         var b = html("button", { type: "button", texto: p.rot, "data-p": p.id, "aria-pressed": String(p.id === cartao.periodo) });
         b.addEventListener("click", function () {
           cartao.periodo = p.id;
           cartao.inicioIdx = inicioDoPeriodo(graficoDe(cartao), p.id);
+          cartao.fimIdx = null;
           Array.prototype.forEach.call(grupo.children, function (x) {
             x.setAttribute("aria-pressed", String(x.getAttribute("data-p") === p.id));
           });
@@ -1302,6 +1399,22 @@
         grupo.appendChild(b);
       });
     }
+    // Com a faixa escolhida, a dica dá lugar ao recorte na tela, e o "Ver
+    // tudo" só aparece quando tem o que desfazer.
+    function atualizarDica() {
+      var dica = grupo.querySelector(".periodos-dica");
+      var botao = grupo.querySelector("button");
+      if (!dica || !botao) return;
+      var efetivo = graficoDe(cartao), zoom = cartao.periodo === "faixa";
+      function minusculo(t) { return t.charAt(0).toLowerCase() + t.slice(1); }
+      dica.textContent = zoom && cartao.inicioIdx !== null
+        ? minusculo(rotuloX(efetivo, cartao.inicioIdx, true)) + " a "
+          + minusculo(rotuloX(efetivo, cartao.fimIdx, true))
+        : "Arraste no gráfico para escolher o período";
+      dica.classList.toggle("escolhido", zoom);
+      botao.hidden = !zoom;
+    }
+    cartao.atualizarPeriodos = atualizarDica;
     cartao.periodo = g.periodoPadrao || "tudo";
     montarPeriodos();
     esquerda.appendChild(grupo);
@@ -1389,7 +1502,7 @@
     // cartão (ou seção) fechado mede zero: redesenha quando voltar a aparecer
     if (!cartao.frame.clientWidth) { cartao.chave = null; return; }
     var nomeLayout = cartao.frame.clientWidth < 700 || window.innerWidth < 700 ? "narrow" : "wide";
-    var chave = nomeLayout + "|" + tema() + "|" + cartao.periodo + "|" + cartao.variante;
+    var chave = nomeLayout + "|" + tema() + "|" + cartao.periodo + "|" + cartao.inicioIdx + "|" + cartao.fimIdx + "|" + cartao.variante;
     if (!forcar && cartao.chave === chave) return;
     cartao.chave = chave;
     if (graficoDe(cartao).tipo === "tabela") {

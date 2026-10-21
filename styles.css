@@ -465,3 +465,6 @@ body.visor-aberto { overflow: hidden; }
 .frame .tabela td:first-child, .frame .tabela th:first-child { white-space: nowrap; }
 /* parágrafos seguidos de nota: o espaço entre eles é menor que o do primeiro */
 .nota + .nota { margin-top: -6px; }
+.periodos-dica { font-size: 13px; font-weight: 300; color: var(--ink-2); align-self: center; }
+.periodos-dica.escolhido { color: var(--ink); font-weight: 600; }
+.periodos button[hidden] { display: none; }
