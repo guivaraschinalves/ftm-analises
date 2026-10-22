@@ -247,6 +247,9 @@
   var UNIDADES = {
     "%": { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v) + "%"; },
            valor: function (v) { return pct(v, 2); } },
+    // variação de uma casa (rankings de alta e queda)
+    pct1: { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v) + "%"; },
+            valor: function (v) { return pct(v, 1); } },
     bi: { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
           valor: function (v) { return "R$ " + nf(1).format(v) + " bi"; } },
     anos: { eixo: function (v, passo) { return nf(Math.max(1, casasDoPasso(passo))).format(v); },
@@ -418,19 +421,29 @@
     var fs = Math.round(L.tick * 1.15);
     var y0 = L.sub.y + L.sub.fs * 2.4, y1 = L.y1;
     var passo = (y1 - y0) / Math.max(itens.length, 1), alt = passo * 0.66;
+    // "sinal": o valor sai com + quando é alta (ranking de variação)
+    var rotulo = function (v) { return (g.sinal && v > 0 ? "+" : "") + F.valor(v); };
     var lw = Math.max.apply(null, [0].concat(itens.map(function (it) { return largura(it[0], fs); })));
-    var vw = Math.max.apply(null, [0].concat(itens.map(function (it) { return largura(F.valor(it[1]), fs, "bold"); })));
+    var vw = Math.max.apply(null, [0].concat(itens.map(function (it) { return largura(rotulo(it[1]), fs, "bold"); })));
     var x0 = L.titulo.x + lw + 18, x1 = L.W - L.titulo.x - vw - 16;
-    var mx = Math.max.apply(null, [0].concat(itens.map(function (it) { return it[1]; }))) || 1;
+    // valores negativos (quedas) saem para a esquerda de uma linha do zero; o
+    // número deles fica do lado direito do zero, para não bater nos nomes
+    var mx = Math.max.apply(null, [0].concat(itens.map(function (it) { return it[1]; })));
+    var mn = Math.min.apply(null, [0].concat(itens.map(function (it) { return it[1]; })));
+    if (mx - mn <= 0) mx = mn + 1;
+    var xz = x0 + (x1 - x0) * (-mn) / (mx - mn);
     itens.forEach(function (it, k) {
-      var yc = y0 + passo * (k + 0.5), w = Math.max(1, (x1 - x0) * it[1] / mx);
+      var yc = y0 + passo * (k + 0.5), w = Math.max(1, (x1 - x0) * Math.abs(it[1]) / (mx - mn));
       svg.appendChild(texto(it[0], { x: x0 - 14, y: yc, "font-size": fs, fill: pal.texto, "text-anchor": "end",
-                                     "dominant-baseline": "central" }));
-      svg.appendChild(el("rect", { x: x0, y: yc - alt / 2, width: w, height: alt, rx: 3,
+                                     "dominant-baseline": "central", "font-weight": it[3] ? "bold" : null }));
+      svg.appendChild(el("rect", { x: it[1] >= 0 ? xz : xz - w, y: yc - alt / 2, width: w, height: alt, rx: 3,
                                    fill: corNoTema(it[2] || "#4F81BD", pal) }));
-      svg.appendChild(texto(F.valor(it[1]), { x: x0 + w + 10, y: yc, "font-size": fs, "font-weight": "bold",
-                                              fill: pal.texto, "dominant-baseline": "central" }));
+      svg.appendChild(texto(rotulo(it[1]), { x: (it[1] >= 0 ? xz + w : xz) + 10, y: yc, "font-size": fs,
+                                              "font-weight": "bold", fill: pal.texto, "dominant-baseline": "central" }));
     });
+    if (mn < 0) {
+      svg.appendChild(el("line", { x1: xz, x2: xz, y1: y0, y2: y1, stroke: pal.zero || pal.texto, "stroke-width": 1.5 }));
+    }
     svg.appendChild(texto(g.titulo, {
       x: L.titulo.x, y: L.titulo.y, "font-weight": "bold", fill: pal.texto,
       "font-size": corpoQueCabe(g.titulo, L.titulo.fs, L.titulo.max, "bold")

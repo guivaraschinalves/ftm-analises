@@ -32,6 +32,14 @@ AS FONTES E AS CONTAS
     variação real da exportação e da importação que o IBGE publica (SIDRA 5932).
   - **Refino no mundo**: além do nível, a variação contra o mesmo mês do ano
     anterior, que é o que se compara num painel que não é o mundo inteiro.
+  - **Petróleo bruto no mundo**, JODI, base "primária" (world_primary_csv.zip),
+    CRUDEOIL em mil barris: produção (INDPROD), exportação (TOTEXPSB) e
+    importação (TOTIMPSB). Acumulado do ano até o último mês de cada país,
+    contra os mesmos meses do ano anterior, em média por dia. Rankings em % (só
+    quem passou de 100 mil b/d no ano anterior) e em mil b/d. A exportação
+    líquida entra só para quem era exportador líquido; quem não informa
+    importação nenhuma (Argentina, Guiana) conta como zero. A Venezuela fica
+    fora da exportação: informa só parte do que embarca.
   - **Brent**, FRED, MCOILBRENTEU (média mensal, EIA), CSV sem chave.
   - **Conta corrente**, Banco Central, tabela especial BalPagM.xlsx (BPM6,
     US$ milhões), com as linhas achadas pelo código SGS que o BC põe ao lado
@@ -57,6 +65,7 @@ ANP = "https://www.gov.br/anp/pt-br/centrais-de-conteudo/dados-abertos/arquivos/
 URL_PRODUCAO = ANP + "ppgn-el/producao-petroleo-m3.csv"
 URL_REFINARIAS = ANP + "pppd/producao-derivados-petroleo-por-refinaria-m3-1990-2025.csv"
 URL_JODI = "https://www.jodidata.org/_resources/files/downloads/oil-data/world_secondary_csv.zip"
+URL_JODI_PRIM = "https://www.jodidata.org/_resources/files/downloads/oil-data/world_primary_csv.zip"
 URL_BRENT = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=MCOILBRENTEU"
 NAVEGADOR = {"User-Agent": "Mozilla/5.0"}
 
@@ -66,6 +75,7 @@ MES_NUM = {m.upper(): i + 1 for i, m in enumerate(MESES)}
 
 AZUL, VERMELHO, VERDE, ROXO, CIANO, LARANJA = "#4F81BD", "#C0504D", "#9BBB59", "#8064A2", "#4BACC6", "#F79646"
 AZUL_ESCURO, BRANCO, CINZA, AREIA = "#1F497D", "#FFFFFF", "#95A5A6", "#D9B382"
+AMARELO = "#FFFF00"
 
 ANOS_FAIXA = 5
 INICIO_PAINEL = "2015-01"
@@ -310,6 +320,119 @@ def graficos_refino_mundo():
                      serie("Gasóleo/diesel (%d países)" % n_d, VERMELHO, var_anual(die), 1, rotulo=True),
                      serie("Gasolina (%d países)" % n_g, AZUL, var_anual(gas), 1, rotulo=True)]),
              ]),
+    ]
+
+
+# Petróleo bruto no mundo: produção, exportação e exportação líquida no
+# acumulado do ano contra o mesmo período do ano anterior (JODI, base primária)
+
+PAISES_JODI = {
+    "AE": "Emirados Árabes", "AO": "Angola", "AR": "Argentina", "AU": "Austrália", "AZ": "Azerbaijão",
+    "BH": "Bahrein", "BN": "Brunei", "BO": "Bolívia", "BR": "Brasil", "CA": "Canadá", "CN": "China",
+    "CO": "Colômbia", "DE": "Alemanha", "DK": "Dinamarca", "DZ": "Argélia", "EC": "Equador", "EG": "Egito",
+    "FR": "França", "GA": "Gabão", "GB": "Reino Unido", "GY": "Guiana", "ID": "Indonésia", "IN": "Índia",
+    "IQ": "Iraque", "IR": "Irã", "IT": "Itália", "JP": "Japão", "KR": "Coreia do Sul", "KW": "Kuwait",
+    "KZ": "Cazaquistão", "LY": "Líbia", "MX": "México", "MY": "Malásia", "NG": "Nigéria", "NL": "Holanda",
+    "NO": "Noruega", "NZ": "Nova Zelândia", "OM": "Omã", "PE": "Peru", "QA": "Catar", "RO": "Romênia",
+    "RU": "Rússia", "SA": "Arábia Saudita", "SG": "Cingapura", "TH": "Tailândia", "TN": "Tunísia",
+    "TR": "Turquia", "TT": "Trinidad e Tobago", "US": "EUA", "VE": "Venezuela", "VN": "Vietnã",
+    "YE": "Iêmen", "HU": "Hungria", "PL": "Polônia", "ES": "Espanha",
+}
+# a Venezuela informa à JODI só parte da exportação (perto de 200 mil b/d
+# contra os ~800 mil que ela de fato embarca): fica fora dos rankings de
+# exportação, e entra no de produção
+FORA_EXPORTACAO = {"VE"}
+PISO_KBD = 100      # no ranking em %, só quem passa disso em 2025 (país pequeno distorce)
+
+
+def jodi_bruto():
+    """{(país, fluxo): {mês: mil barris}} do petróleo bruto, 2025 em diante."""
+    zipado = os.path.join(CACHE_JODI, "world_primary_csv.zip")
+    baixar(URL_JODI_PRIM, zipado)
+    d = {}
+    with zipfile.ZipFile(zipado) as z:
+        nome = [n for n in z.namelist() if n.lower().endswith(".csv")][0]
+        with z.open(nome) as bruto:
+            for l in csv.DictReader(io.TextIOWrapper(bruto, encoding="utf-8", errors="replace")):
+                if (l["ENERGY_PRODUCT"] != "CRUDEOIL" or l["UNIT_MEASURE"] != "KBBL"
+                        or l["FLOW_BREAKDOWN"] not in ("INDPROD", "TOTEXPSB", "TOTIMPSB")
+                        or l["TIME_PERIOD"] < "2025-01"):
+                    continue
+                try:
+                    d.setdefault((l["REF_AREA"], l["FLOW_BREAKDOWN"]), {})[l["TIME_PERIOD"]] = float(l["OBS_VALUE"])
+                except ValueError:
+                    pass
+    return d
+
+
+def acumulado_ano(serie_, ano):
+    """(meses de `ano` que têm o mesmo mês no ano anterior, média em mil b/d no
+    ano anterior, média no ano) — None com menos de 3 meses."""
+    ms = [m for m in sorted(serie_) if m.startswith(str(ano)) and "%d%s" % (ano - 1, m[4:]) in serie_]
+    if len(ms) < 3:
+        return None
+    ant = ["%d%s" % (ano - 1, m[4:]) for m in ms]
+    dias = lambda xs: sum(calendar.monthrange(int(m[:4]), int(m[5:]))[1] for m in xs)   # noqa: E731
+    return ms, sum(serie_[m] for m in ant) / dias(ant), sum(serie_[m] for m in ms) / dias(ms)
+
+
+def graficos_petroleo_mundo():
+    d = jodi_bruto()
+    ano = max(int(m[:4]) for s_ in d.values() for m in s_)
+    linhas = {"INDPROD": [], "TOTEXPSB": [], "LIQ": []}
+    for pais in {p for p, _ in d}:
+        nome = PAISES_JODI.get(pais)
+        if not nome:
+            continue
+        for fluxo in ("INDPROD", "TOTEXPSB"):
+            r = d.get((pais, fluxo)) and acumulado_ano(d[(pais, fluxo)], ano)
+            if r and r[1] > 0 and not (fluxo == "TOTEXPSB" and pais in FORA_EXPORTACAO):
+                linhas[fluxo].append((pais, nome) + r)
+        # exportação líquida: quem informa exportação e importação nos mesmos
+        # meses e era exportador líquido no ano anterior. Quem não informa
+        # importação nenhuma (Argentina, Guiana) não importa petróleo bruto:
+        # conta como zero
+        e = d.get((pais, "TOTEXPSB")) and acumulado_ano(d[(pais, "TOTEXPSB")], ano)
+        i = d.get((pais, "TOTIMPSB")) and acumulado_ano(d[(pais, "TOTIMPSB")], ano)
+        if e and (pais, "TOTIMPSB") not in d:
+            i = (e[0], 0, 0)
+        if e and i and e[0] == i[0] and e[1] - i[1] > 0 and pais not in FORA_EXPORTACAO:
+            linhas["LIQ"].append((pais, nome, e[0], e[1] - i[1], e[2] - i[2]))
+    fim_comum = max((r[2][-1] for r in linhas["INDPROD"]), key=lambda m: sum(r[2][-1] == m for r in linhas["INDPROD"]))
+
+    def ranking(rows, chave, unidade, casas):
+        ordem = sorted(rows, key=chave, reverse=True)
+        def item(r, pos=None):
+            pais, nome, ms = r[0], r[1], r[2]
+            rot = nome + ("" if ms[-1] == fim_comum else " (até %s)" % MESES[int(ms[-1][5:]) - 1])
+            if pos:
+                rot += " (%dº)" % pos
+            br = pais == "BR"
+            return [rot, round(chave(r), casas), AMARELO if br else AZUL] + ([1] if br else [])
+        top = [item(r) for r in ordem[:10]]
+        if not any(r[0] == "BR" for r in ordem[:10]):
+            pos = next((k + 1 for k, r in enumerate(ordem) if r[0] == "BR"), None)
+            if pos:
+                top.append(item(ordem[pos - 1], pos))
+        rot = "Em %%, países acima de %d mil b/d em %d" % (PISO_KBD, ano - 1) if unidade == "pct1" else "Em mil barris por dia"
+        return dict(rot=rot, unidade=unidade, itens=top)
+
+    pct = lambda r: 100 * (r[4] / r[3] - 1)          # noqa: E731
+    dif = lambda r: r[4] - r[3]                      # noqa: E731
+    mes_fim = "%s/%s" % (MESES[int(fim_comum[5:]) - 1], fim_comum[2:4])
+    sub = "Petróleo bruto, jan a %s de %d contra o mesmo período de %d" % (mes_fim.split("/")[0], ano, ano - 1)
+    def grafico(id_, titulo, rows, extra=""):
+        grandes = [r for r in rows if r[3] >= PISO_KBD]
+        return dict(id=id_, tipo="ranking", titulo=titulo, subtitulo=sub + extra, unidade="pct1", sinal=True,
+                    fonte="JODI e FtM", variantes=[ranking(grandes, pct, "pct1", 1), ranking(rows, dif, "kbd", 0)])
+    for k, v in linhas.items():
+        print("  JODI bruto %s: %d países, até %s na maioria" % (k, len(v), fim_comum))
+    return [
+        grafico("mundo-producao-petroleo", "Maiores variações na produção de petróleo em %d" % ano, linhas["INDPROD"]),
+        grafico("mundo-exportacao-petroleo", "Maiores variações na exportação de petróleo em %d" % ano,
+                linhas["TOTEXPSB"], "; sem a Venezuela, que informa só parte"),
+        grafico("mundo-exportacao-liquida-petroleo", "Maiores variações na exportação líquida de petróleo em %d" % ano,
+                linhas["LIQ"], "; exportação menos importação dos exportadores líquidos de %d" % (ano - 1)),
     ]
 
 
@@ -651,9 +774,11 @@ def secoes_extra():
     refino = graficos_refino_brasil()
     print("JODI…")
     mundo = graficos_refino_mundo()
+    print("JODI, petróleo bruto…")
+    bruto = dict(titulo="Petróleo no mundo", graficos=graficos_petroleo_mundo())
     print("IBGE…")
     pib = graficos_pib()
-    return [cc, diesel, prod, dict(titulo="Refino", graficos=refino + mundo), pib]
+    return [cc, diesel, prod, bruto, dict(titulo="Refino", graficos=refino + mundo), pib]
 
 
 if __name__ == "__main__":

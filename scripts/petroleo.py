@@ -805,7 +805,7 @@ def main():
     for sec in doc["secoes"]:
         for g in sec["graficos"]:
             if g.get("tipo") == "ranking":
-                print("  %-26s %s" % (g["id"], "; ".join("%s=%s" % (n, v) for n, v in g["itens"][:3])))
+                print("  %-26s %s" % (g["id"], "; ".join("%s=%s" % (it[0], it[1]) for it in (g.get("itens") or g["variantes"][0]["itens"])[:3])))
                 continue
             ss = g.get("series") or g["variantes"][-1]["series"]
             print("  %-26s %s" % (g["id"], "; ".join("%s=%s" % (s["nome"][:18], s["dados"][-1][1])
