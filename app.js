@@ -410,6 +410,145 @@
   // "itens": [[rótulo, valor, cor?]]. Mesmo título, subtítulo, fonte e logo
   // dos outros gráficos, sem eixo de tempo e sem caixa do mouse (o valor já
   // vai escrito na ponta de cada barra).
+  // Mapa de bolhas: os estados (IBGE) ao fundo e uma bolha por item, com a
+  // área proporcional ao valor. "vista" é o recorte do mapa ([x0, y0, x1, y1],
+  // nas coordenadas já projetadas do "mapa"). Bolha com "abre" leva, no
+  // clique, à variante de número "abre" (mar ou terra → o detalhe).
+  function construirMapa(cartao, L0, nomeTema) {
+    var g = graficoDe(cartao), pal = PALETAS[nomeTema], F = unidade(g);
+    var L = Object.assign({}, L0);
+    var svg = el("svg", {
+      xmlns: NS, viewBox: "0 0 " + L.W + " " + L.H, width: L.W, height: L.H,
+      role: "img", "aria-label": g.titulo + (g.subtitulo ? " — " + g.subtitulo : "")
+    });
+    var ax0 = L.titulo.x, ax1 = L.W - L.titulo.x, ay0 = L.sub.y + L.sub.fs * 1.6, ay1 = L.fonte.y - L.fonte.fs * 2;
+    var v = g.vista, sx = (ax1 - ax0) / (v[2] - v[0]), sy = (ay1 - ay0) / (v[3] - v[1]), esc = Math.min(sx, sy);
+    var tx = ax0 + ((ax1 - ax0) - (v[2] - v[0]) * esc) / 2, ty = ay0 + ((ay1 - ay0) - (v[3] - v[1]) * esc) / 2;
+    var X = function (x) { return tx + (x - v[0]) * esc; }, Y = function (y) { return ty + (y - v[1]) * esc; };
+    var idClip = "clip-mapa-" + g.id + "-" + nomeTema;
+    svg.appendChild(el("defs", {}, [el("clipPath", { id: idClip }, [
+      el("rect", { x: ax0, y: ay0, width: ax1 - ax0, height: ay1 - ay0 })])]));
+    var fundo = el("g", { "clip-path": "url(#" + idClip + ")" });
+    var estados = el("g", { transform: "translate(" + tx + " " + ty + ") scale(" + esc + ") translate(" + (-v[0]) + " " + (-v[1]) + ")" });
+    (g.mapa || []).forEach(function (uf) {
+      estados.appendChild(el("path", { d: uf[1], fill: pal.suave, "fill-opacity": 0.22, stroke: pal.suave,
+                                       "stroke-width": 1.2, "vector-effect": "non-scaling-stroke" }));
+    });
+    fundo.appendChild(estados);
+    svg.appendChild(fundo);
+
+    // bolhas: a área é proporcional ao valor; as que se encostam são
+    // afastadas, com um traço até o lugar de verdade
+    var bolhas = g.bolhas || [], mx = Math.max.apply(null, [0].concat(bolhas.map(function (b) { return b.pct; }))) || 1;
+    var rMax = Math.min(ax1 - ax0, ay1 - ay0) * (g.raio || 0.17);
+    var pos = bolhas.map(function (b) {
+      var r = Math.max(7, rMax * Math.sqrt(b.pct / mx));
+      return { b: b, ax: X(b.x), ay: Y(b.y), x: X(b.x), y: Y(b.y), r: r };
+    });
+    for (var it = 0; it < 400; it++) {
+      for (var i = 0; i < pos.length; i++) {
+        for (var j = i + 1; j < pos.length; j++) {
+          var p = pos[i], q = pos[j], dx = q.x - p.x, dy = q.y - p.y, dist = Math.sqrt(dx * dx + dy * dy) || 0.01;
+          var falta = p.r + q.r + 4 - dist;
+          if (falta > 0) {
+            var wp = q.r / (p.r + q.r), wq = p.r / (p.r + q.r);
+            p.x -= dx / dist * falta * wp; p.y -= dy / dist * falta * wp;
+            q.x += dx / dist * falta * wq; q.y += dy / dist * falta * wq;
+          }
+        }
+      }
+      pos.forEach(function (o) {
+        o.x += (o.ax - o.x) * 0.02; o.y += (o.ay - o.y) * 0.02;
+        o.x = Math.min(Math.max(o.x, ax0 + o.r), ax1 - o.r);
+        o.y = Math.min(Math.max(o.y, ay0 + o.r), ay1 - o.r);
+      });
+    }
+    var fs = Math.round(L.tick * 1.05), rotulos = [];
+    var cxm = pos.reduce(function (a, o) { return a + o.x; }, 0) / (pos.length || 1);
+    // rótulo por cima de tudo, com contorno da cor do fundo: legível mesmo
+    // quando encosta numa bolha vizinha
+    var halo = { stroke: pal.bg, "stroke-width": 6, "stroke-linejoin": "round" };
+    pos.forEach(function (o) {
+      if (Math.abs(o.x - o.ax) + Math.abs(o.y - o.ay) > 6) {
+        svg.appendChild(el("line", { x1: o.ax, y1: o.ay, x2: o.x, y2: o.y, stroke: pal.texto, "stroke-width": 1.2,
+                                     opacity: 0.6 }));
+        svg.appendChild(el("circle", { cx: o.ax, cy: o.ay, r: 3.5, fill: pal.texto, opacity: 0.8 }));
+      }
+    });
+    pos.forEach(function (o) {
+      var b = o.b, grupo = el("g", {});
+      var c = el("circle", { cx: o.x, cy: o.y, r: o.r, fill: corNoTema(b.cor || "#4F81BD", pal), "fill-opacity": 0.95,
+                             stroke: pal.bg, "stroke-width": 1.5 });
+      var dica = el("title", {});
+      dica.textContent = b.nome + ": " + F.valor(b.pct) + " da produção do país (" + nf(0).format(b.kbd) + " mil b/d)";
+      c.appendChild(dica);
+      grupo.appendChild(c);
+      // dentro da bolha, numa letra que caiba (até 60% da normal)
+      var fsIn = Math.min(fs, fs * o.r * 1.8 / Math.max(largura(b.nome, fs, "bold"), 1), o.r / 1.15);
+      var dentro = fsIn >= fs * 0.6;
+      if (dentro) {
+        grupo.appendChild(texto(b.nome, { x: o.x, y: o.y - fsIn * 0.15, "font-size": fsIn, "font-weight": "bold",
+                                          fill: "#000", "text-anchor": "middle", "pointer-events": "none" }));
+        grupo.appendChild(texto(F.valor(b.pct), { x: o.x, y: o.y + fsIn * 1.05, "font-size": fsIn, fill: "#000",
+                                                   "text-anchor": "middle", "pointer-events": "none" }));
+      } else {
+        // fora da bolha: à direita, à esquerda, em cima ou embaixo, o lado que
+        // bater em menos bolhas (e não sair do quadro)
+        var txt = b.nome + " " + F.valor(b.pct), fsr = fs * 0.85, w = largura(txt, fsr), h = fsr * 1.2;
+        var lados = [
+          { x: o.x + o.r + 8, y: o.y, a: "start", bx: o.x + o.r + 8 },
+          { x: o.x - o.r - 8, y: o.y, a: "end", bx: o.x - o.r - 8 - w },
+          { x: o.x, y: o.y - o.r - h * 0.7, a: "middle", bx: o.x - w / 2 },
+          { x: o.x, y: o.y + o.r + h * 0.7, a: "middle", bx: o.x - w / 2 }
+        ];
+        var melhor = null;
+        lados.forEach(function (l, k) {
+          var fora = l.bx < ax0 || l.bx + w > ax1 ? 100 : 0, bate = 0;
+          pos.forEach(function (q) {
+            if (q === o) return;
+            var nx = Math.max(l.bx, Math.min(q.x, l.bx + w)), ny = Math.max(l.y - h / 2, Math.min(q.y, l.y + h / 2));
+            if ((nx - q.x) * (nx - q.x) + (ny - q.y) * (ny - q.y) < q.r * q.r) bate++;
+          });
+          var custo = fora + bate * 10 + k;
+          if (!melhor || custo < melhor.custo) melhor = { l: l, custo: custo };
+        });
+        var at = { x: melhor.l.x, y: melhor.l.y, "font-size": fsr, "dominant-baseline": "central",
+                   "text-anchor": melhor.l.a, "pointer-events": "none" };
+        rotulos.push(texto(txt, Object.assign({}, at, halo, { fill: pal.bg })));
+        rotulos.push(texto(txt, Object.assign({}, at, { fill: pal.texto })));
+      }
+      if (b.abre !== undefined && cartao.trocarVariante) {
+        grupo.setAttribute("style", "cursor:pointer");
+        grupo.addEventListener("click", function () { cartao.trocarVariante(b.abre); });
+      }
+      svg.appendChild(grupo);
+    });
+    rotulos.forEach(function (t) { svg.appendChild(t); });
+
+    svg.appendChild(texto(g.titulo, {
+      x: L.titulo.x, y: L.titulo.y, "font-weight": "bold", fill: pal.texto,
+      "font-size": corpoQueCabe(g.titulo, L.titulo.fs, L.titulo.max, "bold")
+    }));
+    if (g.subtitulo) {
+      svg.appendChild(texto(g.subtitulo, {
+        x: L.sub.x, y: L.sub.y, "font-style": "italic", fill: pal.texto,
+        "font-size": corpoQueCabe(g.subtitulo, L.sub.fs, L.sub.max, "italic")
+      }));
+    }
+    svg.appendChild(texto("Fonte: " + g.fonte + ".", {
+      x: L.fonte.x, y: L.fonte.y, "font-size": L.fonte.fs, fill: pal.texto, "text-anchor": "end"
+    }));
+    if (logoSvg) {
+      var lh = L.logo.w * logoSvg.razao;
+      var gl = el("svg", { x: L.logo.x, y: L.logo.y, width: L.logo.w, height: lh, viewBox: logoSvg.viewBox });
+      var gg = el("g", { fill: pal.logo });
+      logoSvg.nos.forEach(function (n) { gg.appendChild(n.cloneNode(true)); });
+      gl.appendChild(gg);
+      svg.appendChild(gl);
+    }
+    return { svg: svg, L: L, pal: pal, ranking: true };
+  }
+
   function construirRanking(cartao, L0, nomeTema) {
     var g = graficoDe(cartao), pal = PALETAS[nomeTema], F = unidade(g);
     var L = Object.assign({}, L0);
@@ -471,6 +610,7 @@
   function construir(cartao, L0, nomeTema) {
     var g = graficoDe(cartao), pal = PALETAS[nomeTema], F = unidade(g);
     if (g.tipo === "ranking") return construirRanking(cartao, L0, nomeTema);
+    if (g.tipo === "mapa") return construirMapa(cartao, L0, nomeTema);
     var L = Object.assign({}, L0);
 
     // subtítulo que não cabe numa linha quebra em duas (versão estreita)
@@ -1353,16 +1493,19 @@
     // externa, % ou R$, um título ou um detentor…)
     if (g.variantes) {
       var grupoVar = html("div", { "class": "periodos", role: "group", "aria-label": "Recorte de " + g.titulo });
+      // também chamada pelo clique numa bolha do mapa (mar → campos)
+      cartao.trocarVariante = function (k) {
+        cartao.variante = k;
+        Array.prototype.forEach.call(grupoVar.children, function (x, j) {
+          x.setAttribute("aria-pressed", String(j === k));
+        });
+        montarPeriodos();
+        desenhar(cartao, true);
+        if (visor && visor.cartao === cartao && !visor.box.hidden) pintarVisor();
+      };
       g.variantes.forEach(function (v, k) {
         var b = html("button", { type: "button", texto: v.rot, "aria-pressed": String(k === 0) });
-        b.addEventListener("click", function () {
-          cartao.variante = k;
-          Array.prototype.forEach.call(grupoVar.children, function (x, j) {
-            x.setAttribute("aria-pressed", String(j === k));
-          });
-          montarPeriodos();
-          desenhar(cartao, true);
-        });
+        b.addEventListener("click", function () { cartao.trocarVariante(k); });
         grupoVar.appendChild(b);
       });
       esquerda.appendChild(grupoVar);
@@ -1376,7 +1519,7 @@
       grupo.innerHTML = "";
       // com mouse o controle vale em todo gráfico de tempo (o ranking não tem
       // eixo de tempo); sem mouse, só quando há mais de um recorte
-      var deTempo = !efetivo.categorias && efetivo.tipo !== "ranking";
+      var deTempo = !efetivo.categorias && efetivo.tipo !== "ranking" && efetivo.tipo !== "mapa";
       grupo.hidden = mouseFino() ? !deTempo : periodos.length < 2;
       if (grupo.hidden) {
         cartao.periodo = "tudo";
@@ -1692,6 +1835,11 @@
     // legenda é decisão de leitura do gráfico, não de exportação do dado
     // (linha única num cartão de uma série só). Nome repetido vira "nome (2)".
     var g = graficoDe(cartao);
+    if (g.tipo === "mapa") {
+      return salvar(new Blob(["\ufeff" + ["item;pct_do_pais;mil_barris_dia"].concat((g.bolhas || []).map(function (b) {
+        return b.nome.replace(/;/g, ",") + ";" + String(b.pct).replace(".", ",") + ";" + b.kbd;
+      })).join("\r\n")], { type: "text/csv;charset=utf-8" }), nomeArquivo(cartao, "csv"));
+    }
     if (g.tipo === "ranking") {
       return salvar(new Blob(["\ufeff" + ["item;valor"].concat((g.itens || []).map(function (it) {
         return it[0].replace(/;/g, ",") + ";" + String(it[1]).replace(".", ",");

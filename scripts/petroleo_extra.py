@@ -40,6 +40,14 @@ AS FONTES E AS CONTAS
     líquida entra só para quem era exportador líquido; quem não informa
     importação nenhuma (Argentina, Guiana) conta como zero. A Venezuela fica
     fora da exportação: informa só parte do que embarca.
+  - **Mapa da produção**: mar e terra, e a terra por estado, da mesma planilha
+    da ANP por estado e localização (últimos 12 meses). O mar por campo vem da
+    tabela "Distribuição da produção dos campos do Pré-sal" do Boletim Mensal da
+    Produção (PDF, um por mês, lido com o pypdf): óleo do pré e do pós-sal de
+    cada campo que tem pré-sal; o resto do mar vira "demais campos". As áreas
+    que os boletins antigos separam (Sul de Tupi, Itapu_Eco…) somam no campo
+    principal. Sem o pypdf ou sem algum boletim, o mar sai por estado. Os
+    estados vêm da malha do IBGE; a posição de cada campo é aproximada.
   - **Brent**, FRED, MCOILBRENTEU (média mensal, EIA), CSV sem chave.
   - **Conta corrente**, Banco Central, tabela especial BalPagM.xlsx (BPM6,
     US$ milhões), com as linhas achadas pelo código SGS que o BC põe ao lado
@@ -47,6 +55,7 @@ AS FONTES E AS CONTAS
     a projeção do BC do RPM de setembro de 2026 (PROJ_BC, trocar a cada RPM).
 """
 import calendar
+import gzip
 import csv
 import re
 from xml.etree import ElementTree as ET
@@ -68,6 +77,10 @@ URL_JODI = "https://www.jodidata.org/_resources/files/downloads/oil-data/world_s
 URL_JODI_PRIM = "https://www.jodidata.org/_resources/files/downloads/oil-data/world_primary_csv.zip"
 URL_ANP_COMERCIO = ANP + "ie/petroleo/importacoes-exportacoes-petroleo-2000-2025.csv"   # vai além de 2025
 URL_STEO = "https://www.eia.gov/outlooks/steo/xls/STEO_m.xlsx"
+URL_BOLETIM = ("https://www.gov.br/anp/pt-br/centrais-de-conteudo/publicacoes/boletins-anp/"
+               "arquivos-bmppgn/%s/%s.pdf")
+URL_MALHA_UF = ("https://servicodados.ibge.gov.br/api/v3/malhas/paises/BR?formato=application/vnd.geo%2Bjson"
+                "&qualidade=minima&intrarregiao=UF")
 URL_CREA = ("https://api.russiafossiltracker.com/v0/counter?format=json&date_from=2021-01-01"
             "&aggregate_by=commodity,month&commodity_group=oil")
 URL_AR_PROD = ("https://apis.datos.gob.ar/series/api/series/?ids=363.3_PRODUCCIONUDO__28"
@@ -708,6 +721,189 @@ def graficos_petroleo_mundo(d=None):
 
 
 # --------------------------------------------------------------------------
+# Mapa da produção de petróleo: mar e terra, e o detalhe de cada um
+# --------------------------------------------------------------------------
+
+MESES_BOLETIM = ["janeiro", "fevereiro", "marco", "abril", "maio", "junho", "julho", "agosto",
+                 "setembro", "outubro", "novembro", "dezembro"]
+# os boletins antigos separam áreas que os novos já somam ao campo principal
+CAMPO_PRINCIPAL = {
+    "Itapu_Eco": "Itapu", "Sul de Tupi": "Tupi", "Anc_Tupi": "Tupi", "Anc_Mero": "Mero",
+    "Oeste de Atapu": "Atapu", "Anc_Norte_Atapu": "Atapu", "Atapu_Eco": "Atapu", "Sépia Leste": "Sépia",
+    "Sépia_Eco": "Sépia", "Sul de Berbigão": "Berbigão", "Noroeste de Sapinhoá": "Sapinhoá",
+    "Sudoeste de Sapinhoá": "Sapinhoá", "Nordeste de Sapinhoá": "Sapinhoá",
+    "Anc_Jubarte_Sudoeste": "Jubarte", "Anc_Jubarte_Nordeste": "Jubarte", "Búzios_Eco": "Búzios",
+    "Bacalhau Norte": "Bacalhau",
+    # o complexo de Marlim, na Bacia de Campos, vira uma bolha só
+    "Marlim": "Complexo de Marlim", "Marlim Sul": "Complexo de Marlim", "Marlim Leste": "Complexo de Marlim",
+    "Voador": "Complexo de Marlim",
+}
+# onde fica cada campo (lat, lon), aproximado: é para pôr a bolha no lugar
+# certo do mapa, não para navegar
+LOCAL_CAMPO = {
+    "Búzios": (-24.75, -42.45), "Mero": (-24.35, -42.85), "Tupi": (-25.35, -42.85),
+    "Sépia": (-24.95, -42.3), "Atapu": (-24.8, -42.1), "Itapu": (-24.6, -42.2),
+    "Berbigão": (-25.55, -43.05), "Sapinhoá": (-25.75, -43.35), "Lapa": (-25.6, -43.75),
+    "Bacalhau": (-25.25, -44.45), "Wahoo": (-22.75, -40.6), "Jubarte": (-21.25, -40.05),
+    "Complexo de Marlim": (-22.45, -40.05),
+    "Barracuda": (-22.6, -40.45), "Caratinga": (-22.55, -40.35), "Voador": (-22.35, -40.3),
+    "Tambuatá": (-24.65, -42.6), "Argonauta": (-21.5, -40.0), "Espadim": (-22.7, -40.3),
+}
+OUTROS_MAR = (-22.25, -39.6)          # a bolha do resto do mar, na Bacia de Campos
+# a produção em terra, pela bacia de cada estado
+LOCAL_UF_TERRA = {
+    "RIO GRANDE DO NORTE": ("RN", (-5.4, -36.9)), "BAHIA": ("BA", (-12.4, -38.5)),
+    "SERGIPE": ("SE", (-10.75, -37.05)), "AMAZONAS": ("AM", (-4.9, -65.3)),
+    "ESPÍRITO SANTO": ("ES", (-18.85, -40.0)), "ALAGOAS": ("AL", (-9.6, -35.95)),
+    "PARANÁ": ("PR", (-25.9, -50.4)), "CEARÁ": ("CE", (-4.7, -37.7)), "MARANHÃO": ("MA", (-4.9, -44.6)),
+}
+PISO_MAPA = 1.0        # campo com menos que isso (% do país) entra no "demais"
+
+
+def boletim_campos(meses):
+    """{mês: {campo: bbl/d}} da tabela "Distribuição da produção dos campos do
+    Pré-sal" do Boletim Mensal da ANP (pré-sal + pós-sal de cada campo). None se
+    o pypdf não está instalado ou algum boletim não sai."""
+    try:
+        import pypdf
+    except ImportError:
+        print("  sem o pypdf: o mapa fica sem o detalhe por campo")
+        return None
+    num = r"(-?\d[\d.]*(?:,\d+)?)"
+    linha = re.compile(r"^(\D.*?)\s+" + r"\s+".join([num] * 6) + r"\s*$")
+    fora = {}
+    for m in meses:
+        destino = os.path.join(CACHE_ANP, "boletins", "%s.pdf" % m)
+        if not os.path.exists(destino):
+            try:
+                baixar(URL_BOLETIM % (m[:4], MESES_BOLETIM[int(m[5:]) - 1]), destino, tentativas=2)
+            except RuntimeError:
+                print("  boletim de %s não saiu" % m)
+                return None
+        campos = {}
+        for pg in pypdf.PdfReader(destino).pages:
+            t = pg.extract_text() or ""
+            if "Distribuição da produção dos campos do Pré-sal" not in t:
+                continue
+            for l in t.splitlines():
+                r = linha.match(l.strip())
+                if not r:
+                    continue
+                nome = re.sub(r"[\ue000-\uf8ff]", "", r.group(1)).strip()
+                if nome == "Total":
+                    continue
+                v = sum(float(r.group(k).replace(".", "").replace(",", ".")) for k in (2, 3))
+                nome = CAMPO_PRINCIPAL.get(nome, nome)
+                campos[nome] = campos.get(nome, 0) + v
+            break
+        if not campos:
+            print("  boletim de %s sem a tabela do pré-sal" % m)
+            return None
+        fora[m] = campos
+    return fora
+
+
+def malha_uf():
+    """[[sigla, caminho SVG]] dos estados (IBGE), em centésimos de grau já
+    projetados: x = (lon + 74) * cos 15°, y = 5,5 − lat."""
+    siglas = {11: "RO", 12: "AC", 13: "AM", 14: "RR", 15: "PA", 16: "AP", 17: "TO", 21: "MA", 22: "PI",
+              23: "CE", 24: "RN", 25: "PB", 26: "PE", 27: "AL", 28: "SE", 29: "BA", 31: "MG", 32: "ES",
+              33: "RJ", 35: "SP", 41: "PR", 42: "SC", 43: "RS", 50: "MS", 51: "MT", 52: "GO", 53: "DF"}
+    corpo = baixar(URL_MALHA_UF, headers={"Accept": "application/vnd.geo+json"})
+    if corpo[:2] == b"\x1f\x8b":               # o IBGE manda comprimido
+        corpo = gzip.decompress(corpo)
+    geo = json.loads(corpo.decode("utf-8"))
+    out = []
+    for f in geo["features"]:
+        g = f["geometry"]
+        polis = [g["coordinates"]] if g["type"] == "Polygon" else g["coordinates"]
+        d = ""
+        for poli in polis:
+            for anel in poli:
+                pts = [projetar(lat, lon) for lon, lat in anel]
+                d += "M" + "L".join("%d %d" % p_ for p_ in pts) + "Z"
+        out.append([siglas[int(f["properties"]["codarea"])], d])
+    return out
+
+
+def projetar(lat, lon):
+    return round((lon + 74) * 0.9659 * 100), round((5.5 - lat) * 100)
+
+
+def graficos_mapa():
+    # mar e terra, e a terra por estado: a planilha da ANP (automática)
+    por, total_mes = {}, {}
+    for l in linhas_anp(URL_PRODUCAO, "producao-petroleo-m3.csv"):
+        m = "%s-%02d" % (l["ANO"], MES_NUM[l["MÊS"].strip().upper()[:3]])
+        v = float(l["PRODUÇÃO"].replace(",", ".") or 0)
+        k = (l["LOCALIZAÇÃO"].strip().upper(), l["UNIDADE DA FEDERAÇÃO"].strip().upper())
+        por.setdefault(k, {})[m] = por.get(k, {}).get(m, 0) + v
+        total_mes[m] = total_mes.get(m, 0) + v
+    ultimo = max(m for m, v in total_mes.items() if v > 0)
+    meses = sorted(m for m in total_mes if m <= ultimo)[-12:]
+    total = sum(total_mes[m] for m in meses)
+    dias = sum(dias_mes(m) for m in meses)
+    pct = lambda k: 100 * sum(por[k].get(m, 0) for m in meses) / total     # noqa: E731
+    mar = sum(pct(k) for k in por if k[0] == "MAR")
+    terra = sum(pct(k) for k in por if k[0] == "TERRA")
+    kbd_pais = total * M3_BBL / dias / 1000
+    periodo = "%s/%s a %s/%s" % (MESES[int(meses[0][5:]) - 1], meses[0][2:4],
+                                MESES[int(meses[-1][5:]) - 1], meses[-1][2:4])
+
+    def bolha(nome, pct_, lat, lon, cor, **extra):
+        x, y = projetar(lat, lon)
+        return dict(nome=nome, pct=round(pct_, 2), kbd=round(pct_ / 100 * kbd_pais), x=x, y=y, cor=cor, **extra)
+
+    # vistas: [x0, y0, x1, y1] em lat/lon (sul, oeste, norte, leste)
+    def vista(sul, oeste, norte, leste):
+        x0, y0 = projetar(norte, oeste)
+        x1, y1 = projetar(sul, leste)
+        return [x0, y0, x1, y1]
+    brasil = vista(-34, -74.5, 5.5, -32)
+
+    v_geral = dict(rot="Mar e terra", vista=brasil, raio=0.2, bolhas=[
+        bolha("Mar", mar, -24.2, -40.2, AZUL, abre=1),
+        bolha("Terra", terra, -9.5, -41.5, LARANJA, abre=2)])
+    # mar por campo: o boletim; se faltar, o mar por estado
+    campos = boletim_campos(meses)
+    bolhas_mar = []
+    if campos:
+        media = {}
+        for m, cs in campos.items():
+            for c, v in cs.items():
+                media[c] = media.get(c, 0) + v * dias_mes(m)
+        soma_campos = 0
+        for c, v in sorted(media.items(), key=lambda kv: -kv[1]):
+            p_ = 100 * (v / dias) / 1000 / kbd_pais
+            if p_ >= PISO_MAPA and c in LOCAL_CAMPO:
+                bolhas_mar.append(bolha(c, p_, *LOCAL_CAMPO[c], AZUL))
+                soma_campos += p_
+        bolhas_mar.append(bolha("Demais campos do mar", mar - soma_campos, *OUTROS_MAR, CINZA))
+        nota_mar = "campos pela tabela do pré-sal do Boletim Mensal da ANP"
+    else:
+        for (loc, uf), _ in por.items():
+            if loc == "MAR" and pct((loc, uf)) > 0.05:
+                bolhas_mar.append(bolha(uf.title(), pct((loc, uf)), *{"RIO DE JANEIRO": (-23.6, -41.5),
+                                        "SÃO PAULO": (-25.2, -45.0), "ESPÍRITO SANTO": (-20.6, -39.7)}
+                                        .get(uf, (-24, -41)), AZUL))
+        nota_mar = "por estado"
+    v_mar = dict(rot="Mar: campos", vista=vista(-26.6, -46.2, -20.4, -37.6), raio=0.16, bolhas=bolhas_mar)
+    bolhas_terra = []
+    for (loc, uf), _ in sorted(por.items(), key=lambda kv: -pct(kv[0])):
+        if loc == "TERRA" and pct((loc, uf)) >= 0.05 and uf in LOCAL_UF_TERRA:
+            sigla, lugar = LOCAL_UF_TERRA[uf]
+            bolhas_terra.append(bolha(uf.title().replace(" Do ", " do ").replace(" De ", " de "), pct((loc, uf)),
+                                      *lugar, LARANJA))
+    v_terra = dict(rot="Terra: estados", vista=brasil, raio=0.1, bolhas=bolhas_terra)
+    print("  mapa: mar %.1f%%, terra %.1f%%, %d campos, %s" % (mar, terra, len(bolhas_mar) - 1, nota_mar))
+    return [dict(id="mapa-producao-petroleo", tipo="mapa", unidade="pct1",
+                 titulo="Onde o Brasil produz petróleo",
+                 subtitulo="Participação na produção de petróleo do país, %s" % periodo,
+                 fonte="ANP (produção por estado e Boletim Mensal da Produção de Petróleo) e FtM",
+                 mapa=malha_uf(), variantes=[v_geral, v_mar, v_terra])]
+
+
+# --------------------------------------------------------------------------
 # IBGE
 # --------------------------------------------------------------------------
 
@@ -1042,6 +1238,7 @@ def secoes_extra():
     print("ANP…")
     diesel = graficos_diesel_importado()
     prod = graficos_producao()
+    prod["graficos"] += graficos_mapa()
     refino = graficos_refino_brasil()
     print("JODI…")
     mundo = graficos_refino_mundo()
