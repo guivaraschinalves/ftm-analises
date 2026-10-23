@@ -66,6 +66,13 @@ URL_PRODUCAO = ANP + "ppgn-el/producao-petroleo-m3.csv"
 URL_REFINARIAS = ANP + "pppd/producao-derivados-petroleo-por-refinaria-m3-1990-2025.csv"
 URL_JODI = "https://www.jodidata.org/_resources/files/downloads/oil-data/world_secondary_csv.zip"
 URL_JODI_PRIM = "https://www.jodidata.org/_resources/files/downloads/oil-data/world_primary_csv.zip"
+URL_ANP_COMERCIO = ANP + "ie/petroleo/importacoes-exportacoes-petroleo-2000-2025.csv"   # vai além de 2025
+URL_STEO = "https://www.eia.gov/outlooks/steo/xls/STEO_m.xlsx"
+URL_CREA = ("https://api.russiafossiltracker.com/v0/counter?format=json&date_from=2021-01-01"
+            "&aggregate_by=commodity,month&commodity_group=oil")
+URL_AR_PROD = ("https://apis.datos.gob.ar/series/api/series/?ids=363.3_PRODUCCIONUDO__28"
+               "&limit=1000&format=json")
+TONELADA_BBL = 7.33     # barris por tonelada, petróleo russo (Urals)
 URL_BRENT = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=MCOILBRENTEU"
 NAVEGADOR = {"User-Agent": "Mozilla/5.0"}
 
@@ -345,8 +352,8 @@ FORA_EXPORTACAO = {"VE"}
 PISO_KBD = 100      # no ranking em %, só quem passa disso em 2025 (país pequeno distorce)
 
 
-def jodi_bruto():
-    """{(país, fluxo): {mês: mil barris}} do petróleo bruto, 2025 em diante."""
+def jodi_bruto(desde="2025-01"):
+    """{(país, fluxo): {mês: mil barris}} do petróleo bruto, de `desde` em diante."""
     zipado = os.path.join(CACHE_JODI, "world_primary_csv.zip")
     baixar(URL_JODI_PRIM, zipado)
     d = {}
@@ -356,13 +363,211 @@ def jodi_bruto():
             for l in csv.DictReader(io.TextIOWrapper(bruto, encoding="utf-8", errors="replace")):
                 if (l["ENERGY_PRODUCT"] != "CRUDEOIL" or l["UNIT_MEASURE"] != "KBBL"
                         or l["FLOW_BREAKDOWN"] not in ("INDPROD", "TOTEXPSB", "TOTIMPSB")
-                        or l["TIME_PERIOD"] < "2025-01"):
+                        or l["TIME_PERIOD"] < desde):
                     continue
                 try:
                     d.setdefault((l["REF_AREA"], l["FLOW_BREAKDOWN"]), {})[l["TIME_PERIOD"]] = float(l["OBS_VALUE"])
                 except ValueError:
                     pass
     return d
+
+
+def xlsx_steo(conteudo, aba, codigo):
+    """{mês: mil b/d} de uma linha do STEO da EIA, só os meses históricos."""
+    z = zipfile.ZipFile(io.BytesIO(conteudo))
+    ns = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+    rns = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
+    textos = ["".join(t.text or "" for t in si.iter(ns + "t")) for si in ET.fromstring(z.read("xl/sharedStrings.xml"))]
+    rels = {r.get("Id"): r.get("Target") for r in ET.fromstring(z.read("xl/_rels/workbook.xml.rels"))}
+    abas = {a.get("name"): rels[a.get(rns + "id")] for a in ET.fromstring(z.read("xl/workbook.xml")).iter(ns + "sheet")}
+
+    def linhas(nome):
+        alvo = abas[nome].lstrip("/")
+        alvo = alvo if alvo.startswith("xl/") else "xl/" + alvo
+        out = {}
+        for c in ET.fromstring(z.read(alvo)).iter(ns + "c"):
+            v = c.find(ns + "v")
+            if v is not None and v.text is not None:
+                ref = c.get("r")
+                col = re.match(r"[A-Z]+", ref).group(0)
+                out.setdefault(int(ref[len(col):]), {})[col] = textos[int(v.text)] if c.get("t") == "s" else v.text
+        return out
+    datas = linhas("Dates")
+    def numero(c):
+        for k in sorted(c, key=lambda x: (len(x), x)):
+            try:
+                return str(int(float(c[k])))
+            except ValueError:
+                pass
+    ultimo = next(numero(c) for c in datas.values() if str(c.get("A", "")).startswith("Last Historical"))
+    ultimo = ultimo[:4] + "-" + ultimo[4:]
+    t = linhas(aba)
+    MES = {m: i + 1 for i, m in enumerate(["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"])}
+    ordem = lambda c: sum((ord(ch) - 64) * 26 ** k for k, ch in enumerate(reversed(c)))   # noqa: E731
+    ano, cols = None, {}
+    for c in sorted(t[4], key=ordem):
+        ano = t[3].get(c, ano)
+        if t[4][c] in MES and ano:
+            cols[c] = "%s-%02d" % (ano, MES[t[4][c]])
+    r = next(c for c in t.values() if c.get("A") == codigo)
+    out = {}
+    for c, m in cols.items():
+        try:
+            if m <= ultimo:
+                out[m] = float(r[c]) * 1000
+        except (KeyError, ValueError):
+            pass
+    return out
+
+
+def dias_mes(m):
+    return calendar.monthrange(int(m[:4]), int(m[5:]))[1]
+
+
+def base_petroleo():
+    """{(país, fluxo): {mês: mil barris}} desde 2002: a JODI, com os buracos
+    dos países que comparamos ao Brasil cobertos por outras fontes.
+
+      - Brasil: tudo da ANP (é dela que a JODI tira o Brasil, e falta 2023).
+      - Guiana: a JODI erra o começo de 2025 (~890 mil b/d, quando o Ministério
+        das Finanças informou ~640 mil) e tem buraco de 2017 a 2024. Fica a EIA
+        (STEO), de 2022 em diante; exportação = produção (sem refinaria).
+      - Argentina: produção de 2020 a 2024 do governo (datos.gob.ar, série
+        363.3_PRODUCCIONUDO__28, igual à JODI onde as duas existem). A
+        exportação desses anos fica em branco: não há o volume mensal aberto.
+      - Rússia: produção da JODI até mar/2023 e depois a EIA (STEO, copr_rs),
+        multiplicada pela razão média JODI/EIA de 2022 (~1,02, o condensado);
+        exportação da JODI até dez/2021 e depois a do CREA (petróleo por navio e
+        oleoduto, em toneladas, x 7,33 barris), multiplicada pela razão JODI/CREA
+        de 2021 (~1,16: o rastreamento de navios não pega tudo).
+      - Argentina, Guiana e Rússia não importam petróleo bruto: importação zero
+        onde não há o dado."""
+    d = jodi_bruto("2002-01")
+    # Brasil, ANP
+    for k in [k for k in d if k[0] == "BR"]:
+        del d[k]
+    p = producao_petroleo()
+    d[("BR", "INDPROD")] = {m: (p["MAR"].get(m, 0) + p["TERRA"].get(m, 0)) * M3_BBL / 1000
+                            for m in set(p["MAR"]) | set(p["TERRA"]) if m >= "2002-01"}
+    for l in linhas_anp(URL_ANP_COMERCIO, "comercio-petroleo.csv"):
+        if l["PRODUTO"].strip().upper() != "PETRÓLEO":
+            continue
+        m = "%s-%02d" % (l["ANO"], MES_NUM[l["MÊS"].strip().upper()[:3]])
+        f = "TOTEXPSB" if l["OPERAÇÃO COMERCIAL"].strip().upper().startswith("EXP") else "TOTIMPSB"
+        if m >= "2002-01":
+            d.setdefault(("BR", f), {})[m] = float(l["IMPORTADO / EXPORTADO"].replace(",", ".") or 0) * M3_BBL / 1000
+    steo = baixar(URL_STEO)
+    # Guiana, EIA
+    for k in [k for k in d if k[0] == "GY"]:
+        del d[k]
+    gy = {m: v * dias_mes(m) for m, v in xlsx_steo(steo, "3btab", "papr_GY").items()}
+    d[("GY", "INDPROD")], d[("GY", "TOTEXPSB")] = gy, dict(gy)
+    # Argentina, produção do governo onde a JODI tem buraco
+    ar = json.loads(baixar(URL_AR_PROD).decode("utf-8"))["data"]
+    prod_ar = d.setdefault(("AR", "INDPROD"), {})
+    for data, v in ar:
+        if v is not None and data[:7] not in prod_ar and data[:7] >= "2002-01":
+            prod_ar[data[:7]] = v * 1000 * M3_BBL / 1000
+    # Rússia
+    ru_p = d.setdefault(("RU", "INDPROD"), {})
+    eia = {m: v * dias_mes(m) for m, v in xlsx_steo(steo, "3dtab", "copr_rs").items()}
+    comum = [m for m in eia if m in ru_p and m < "2023-01"]
+    k_p = sum(ru_p[m] for m in comum) / sum(eia[m] for m in comum)
+    for m, v in eia.items():
+        if m not in ru_p:
+            ru_p[m] = v * k_p
+    crea = {}
+    for r in json.loads(baixar(URL_CREA).decode("utf-8"))["data"]:
+        if r["commodity"] in ("crude_oil", "pipeline_oil"):
+            crea[r["month"][:7]] = crea.get(r["month"][:7], 0) + r["value_tonne"] * TONELADA_BBL / 1000
+    ultimo_crea = max(crea)                     # o mês corrente vem pela metade
+    crea.pop(ultimo_crea)
+    ru_e = d.setdefault(("RU", "TOTEXPSB"), {})
+    comum = [m for m in crea if m in ru_e and m.startswith("2021")]
+    k_e = sum(ru_e[m] for m in comum) / sum(crea[m] for m in comum)
+    for m, v in crea.items():
+        if m not in ru_e:
+            ru_e[m] = v * k_e
+    # mês isolado que falta (a Rússia em 2013, a Argentina em 2017) apagaria
+    # 12 médias de 12 meses: vira a média dos dois vizinhos
+    for serie_ in d.values():
+        for m in sorted(serie_):
+            a, mm = int(m[:4]), int(m[5:])
+            seg = "%04d-%02d" % (a + mm // 12, mm % 12 + 1)
+            depois = "%04d-%02d" % (a + (mm + 1) // 12, (mm + 1) % 12 + 1)
+            if seg not in serie_ and depois in serie_:
+                serie_[seg] = (serie_[m] + serie_[depois]) / 2
+    print("  base: Rússia produção x%.3f (EIA), exportação x%.3f (CREA)" % (k_p, k_e))
+    return d
+
+
+SEM_IMPORTACAO = {"AR", "GY", "RU"}     # não importam petróleo bruto
+FONTE_PETROLEO_MUNDO = "JODI, ANP, EIA, CREA, Secretaría de Energía (Argentina) e FtM"
+
+
+def liquida(d, pais):
+    e, i = d.get((pais, "TOTEXPSB")), d.get((pais, "TOTIMPSB"), {})
+    if not e:
+        return None
+    if pais in SEM_IMPORTACAO or not i:
+        return {m: v - i.get(m, 0) for m, v in e.items()}
+    return {m: v - i[m] for m, v in e.items() if m in i}
+
+
+def soma_12(s):
+    """{mês: média em mil b/d dos 12 meses até ele}, só com os 12 meses."""
+    out = {}
+    for m in s:
+        a, mm = int(m[:4]), int(m[5:])
+        janela = ["%04d-%02d" % (a + (mm - k - 1) // 12, (mm - k - 1) % 12 + 1) for k in range(12)]
+        if all(j in s for j in janela):
+            out[m] = sum(s[j] for j in janela) / sum(dias_mes(j) for j in janela)
+    return out
+
+
+PARES = [("BR", "Brasil", AMARELO), ("US", "EUA", BRANCO), ("CA", "Canadá", VERMELHO),
+         ("NO", "Noruega", AZUL), ("GY", "Guiana", VERDE), ("AR", "Argentina", CIANO),
+         ("SA", "Arábia Saudita", LARANJA), ("RU", "Rússia", ROXO)]
+
+
+def graficos_pares(d):
+    def series(fluxo, var, sem=()):
+        out = []
+        for pais, nome, cor in PARES:
+            if pais in sem:
+                continue
+            s = liquida(d, pais) if fluxo == "LIQ" else d.get((pais, fluxo))
+            if not s:
+                continue
+            m12 = soma_12(s)
+            if var:
+                # base pequena faz a variação explodir (EUA antes de 2016,
+                # Argentina): só com mais de PISO_KBD nos 12 meses anteriores
+                v = {m: x for m, x in var_anual({m: x for m, x in m12.items() if x > 0}).items()
+                     if m12.get("%04d-%s" % (int(m[:4]) - 1, m[5:]), 0) >= PISO_KBD}
+            else:
+                v = m12
+            if v:
+                extra = dict(largura=6) if pais == "BR" else {}
+                out.append(serie(nome, cor, v, 1 if var else 0, rotulo=pais == "BR" or not var, **extra))
+        return out
+    sub = "Petróleo bruto, média de 12 meses em mil barris por dia"
+    fonte = FONTE_PETROLEO_MUNDO
+    def grafico(id_, titulo, fluxo, sub_extra="", sem=(), eixo=None):
+        var = dict(rot="Variação em 12 meses (%%), com base acima de %d mil b/d" % PISO_KBD, unidade="pct1",
+                   series=series(fluxo, True, sem))
+        if eixo:
+            var["eixo"] = eixo      # picos de base pequena (EUA em 2015, Brasil líquido) saem do quadro
+        return dict(id=id_, titulo=titulo, subtitulo=sub + sub_extra, unidade="kbd", fonte=fonte, variantes=[
+            dict(rot="Mil b/d", unidade="kbd", series=series(fluxo, False, sem)), var])
+    return [
+        grafico("pares-producao-petroleo", "Produção de petróleo: o Brasil e os pares", "INDPROD"),
+        grafico("pares-exportacao-petroleo", "Exportação de petróleo: o Brasil e os pares", "TOTEXPSB",
+                "; Argentina sem dado de 2020 a 2024", eixo=dict(min=-60, max=100)),
+        grafico("pares-exportacao-liquida-petroleo", "Exportação líquida de petróleo: o Brasil e os pares", "LIQ",
+                "; exportação menos importação; Argentina sem dado de 2020 a 2024; EUA fora (importador líquido)",
+                sem=("US",), eixo=dict(min=-60, max=100)),
+    ]
 
 
 def acumulado_ano(serie_, ano):
@@ -376,8 +581,8 @@ def acumulado_ano(serie_, ano):
     return ms, sum(serie_[m] for m in ant) / dias(ant), sum(serie_[m] for m in ms) / dias(ms)
 
 
-def graficos_petroleo_mundo():
-    d = jodi_bruto()
+def graficos_petroleo_mundo(d=None):
+    d = d or jodi_bruto()
     ano = max(int(m[:4]) for s_ in d.values() for m in s_)
     linhas = {"INDPROD": [], "TOTEXPSB": [], "LIQ": []}
     for pais in {p for p, _ in d}:
@@ -392,12 +597,10 @@ def graficos_petroleo_mundo():
         # meses e era exportador líquido no ano anterior. Quem não informa
         # importação nenhuma (Argentina, Guiana) não importa petróleo bruto:
         # conta como zero
-        e = d.get((pais, "TOTEXPSB")) and acumulado_ano(d[(pais, "TOTEXPSB")], ano)
-        i = d.get((pais, "TOTIMPSB")) and acumulado_ano(d[(pais, "TOTIMPSB")], ano)
-        if e and (pais, "TOTIMPSB") not in d:
-            i = (e[0], 0, 0)
-        if e and i and e[0] == i[0] and e[1] - i[1] > 0 and pais not in FORA_EXPORTACAO:
-            linhas["LIQ"].append((pais, nome, e[0], e[1] - i[1], e[2] - i[2]))
+        liq = liquida(d, pais)
+        r = liq and acumulado_ano(liq, ano)
+        if r and r[1] > 0 and pais not in FORA_EXPORTACAO:
+            linhas["LIQ"].append((pais, nome) + r)
     fim_comum = max((r[2][-1] for r in linhas["INDPROD"]), key=lambda m: sum(r[2][-1] == m for r in linhas["INDPROD"]))
 
     def ranking(rows, chave, unidade, casas):
@@ -424,7 +627,7 @@ def graficos_petroleo_mundo():
     def grafico(id_, titulo, rows, extra=""):
         grandes = [r for r in rows if r[3] >= PISO_KBD]
         return dict(id=id_, tipo="ranking", titulo=titulo, subtitulo=sub + extra, unidade="pct1", sinal=True,
-                    fonte="JODI e FtM", variantes=[ranking(grandes, pct, "pct1", 1), ranking(rows, dif, "kbd", 0)])
+                    fonte=FONTE_PETROLEO_MUNDO, variantes=[ranking(grandes, pct, "pct1", 1), ranking(rows, dif, "kbd", 0)])
     for k, v in linhas.items():
         print("  JODI bruto %s: %d países, até %s na maioria" % (k, len(v), fim_comum))
     return [
@@ -775,7 +978,8 @@ def secoes_extra():
     print("JODI…")
     mundo = graficos_refino_mundo()
     print("JODI, petróleo bruto…")
-    bruto = dict(titulo="Petróleo no mundo", graficos=graficos_petroleo_mundo())
+    base = base_petroleo()
+    bruto = dict(titulo="Petróleo no mundo", graficos=graficos_petroleo_mundo(base) + graficos_pares(base))
     print("IBGE…")
     pib = graficos_pib()
     return [cc, diesel, prod, bruto, dict(titulo="Refino", graficos=refino + mundo), pib]
