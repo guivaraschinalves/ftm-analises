@@ -530,6 +530,74 @@ PARES = [("BR", "Brasil", AMARELO), ("US", "EUA", BRANCO), ("CA", "Canadá", VER
          ("SA", "Arábia Saudita", LARANJA), ("RU", "Rússia", ROXO)]
 
 
+REGIOES = [
+    ("América do Norte", BRANCO, ["US", "CA", "MX"]),
+    ("América do Sul sem o Brasil", CIANO, ["AR", "CO", "EC", "GY", "VE", "PE", "BO", "TT"]),
+    ("Europa", AZUL, ["NO", "GB", "DK", "IT", "RO", "DE", "NL", "FR", "ES", "PL", "HU", "AT", "HR", "RS"]),
+    ("Rússia e Ásia Central", ROXO, ["RU", "KZ", "AZ"]),
+    ("Oriente Médio", LARANJA, ["SA", "KW", "BH", "OM", "QA", "AE", "IQ", "IR", "YE"]),
+    ("África", VERDE, ["NG", "DZ", "LY", "AO", "EG", "GA", "GQ", "TN", "ZA", "CG", "SD"]),
+    ("Ásia e Oceania", VERMELHO, ["CN", "IN", "ID", "MY", "AU", "TH", "VN", "BN", "NZ", "JP", "KR", "PH", "PG"]),
+]
+# regiões em que só parte dos países informa: os nomes vão para o subtítulo
+PARCIAIS = ("Oriente Médio", "África", "América do Sul sem o Brasil")
+
+
+def crescimento_regiao(d, paises, fluxo):
+    """Variação em 12 meses da soma da região, mês a mês, só com os países que
+    têm os 24 meses (os 12 até o mês e os 12 antes): país que entra ou sai da
+    JODI não cria salto. Devolve a variação e os países do último mês."""
+    m12 = {}
+    for p_ in paises:
+        if fluxo == "TOTEXPSB" and p_ in FORA_EXPORTACAO:
+            continue
+        s_ = d.get((p_, fluxo))
+        if s_:
+            m12[p_] = soma_12(s_)
+    meses = sorted({m for v in m12.values() for m in v})
+    out, quem, bases = {}, {}, {}
+    for m in meses:
+        ant = "%04d-%s" % (int(m[:4]) - 1, m[5:])
+        dentro = [p_ for p_, v in m12.items() if m in v and ant in v and v[ant] > 0]
+        base = sum(m12[p_][ant] for p_ in dentro)
+        if dentro and base >= PISO_KBD:
+            out[m] = 100 * (sum(m12[p_][m] for p_ in dentro) / base - 1)
+            quem[m], bases[m] = dentro, base
+    # o fim: corta os meses em que só parte da região já informou (em set/2026
+    # só a Guiana e a Rússia, que vêm da EIA) — menos de 90% da base de antes
+    ms = sorted(out)
+    while len(ms) > 1 and bases[ms[-1]] < 0.9 * bases[ms[-2]]:
+        out.pop(ms.pop())
+    return out, sorted(quem[ms[-1]], key=lambda p_: -m12[p_][ms[-1]]) if ms else []
+
+
+def graficos_regioes(d):
+    fonte = FONTE_PETROLEO_MUNDO
+    def grafico(id_, titulo, fluxo):
+        series, notas, mundo = [], [], []
+        br = d.get(("BR", fluxo))
+        series.append(serie("Brasil", AMARELO, var_anual(soma_12(br)), 1, rotulo=True, largura=6))
+        for nome, cor, paises in REGIOES:
+            v, quem = crescimento_regiao(d, paises, fluxo)
+            if v:
+                series.append(serie(nome, cor, v, 1, rotulo=True))
+            if nome in PARCIAIS and quem:
+                ns = [PAISES_JODI.get(q, q) for q in quem]
+                lista = ", ".join(ns[:-1]) + " e " + ns[-1] if len(ns) > 1 else ns[0]
+                notas.append("%s: %s" % (nome.split(" sem ")[0], lista))
+            mundo += paises
+        v, _ = crescimento_regiao(d, mundo + ["BR"], fluxo)
+        series.insert(1, serie("Mundo (quem informa)", CINZA, v, 1, rotulo=True))
+        sub = ("Petróleo bruto, variação da média de 12 meses; soma dos países que informam os 24 meses; "
+               + "; ".join(notas))
+        return dict(id=id_, titulo=titulo, subtitulo=sub, unidade="pct1", fonte=fonte, series=series,
+                    eixo=dict(min=-30, max=50))
+    return [
+        grafico("regioes-producao-petroleo", "Produção de petróleo: o Brasil e as regiões", "INDPROD"),
+        grafico("regioes-exportacao-petroleo", "Exportação de petróleo: o Brasil e as regiões", "TOTEXPSB"),
+    ]
+
+
 def graficos_pares(d):
     def series(fluxo, var, sem=()):
         out = []
@@ -979,7 +1047,8 @@ def secoes_extra():
     mundo = graficos_refino_mundo()
     print("JODI, petróleo bruto…")
     base = base_petroleo()
-    bruto = dict(titulo="Petróleo no mundo", graficos=graficos_petroleo_mundo(base) + graficos_pares(base))
+    bruto = dict(titulo="Petróleo no mundo",
+                 graficos=graficos_petroleo_mundo(base) + graficos_pares(base) + graficos_regioes(base))
     print("IBGE…")
     pib = graficos_pib()
     return [cc, diesel, prod, bruto, dict(titulo="Refino", graficos=refino + mundo), pib]
