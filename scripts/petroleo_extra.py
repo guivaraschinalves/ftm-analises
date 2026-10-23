@@ -53,6 +53,12 @@ AS FONTES E AS CONTAS
     bacia, ambiente e atividade, desde 2022) e o previsto pelas operadoras nos
     PAT/PAP (investimento-atividade.csv e investimento-bacia.csv, cinco anos).
     O previsto entra a partir do ano seguinte ao último realizado.
+  - **Investimento estrangeiro direto**, Banco Central, tabela especial
+    InvEstrp.xlsx: ingressos de participação no capital por setor (CNAE 1.0 de
+    2001 a 2005, "Extração de petróleo e serviços relacionados"; CNAE 2.0 de
+    2006 em diante, "Extração de petróleo e gás natural"), US$ milhões.
+  - **Investimento da Petrobras em E&P**, Form 20-F de cada ano (SEC): ver
+    PETROBRAS_EP, digitado à mão, uma linha por ano.
   - **Brent**, FRED, MCOILBRENTEU (média mensal, EIA), CSV sem chave.
   - **Conta corrente**, Banco Central, tabela especial BalPagM.xlsx (BPM6,
     US$ milhões), com as linhas achadas pelo código SGS que o BC põe ao lado
@@ -86,6 +92,27 @@ ANP_DP = ANP + "arquivos-fase-de-desenvolvimento-e-producao/"
 URL_INV_REALIZADO = ANP_DP + "atividades-e-investimentos-realizados/investimento-realizado.csv"
 URL_INV_PREV_ATIV = ANP_DP + "arquivos-previsao/investimento-atividade.csv"
 URL_INV_PREV_BACIA = ANP_DP + "arquivos-previsao/investimento-bacia.csv"
+URL_IDP_SETOR = "https://www.bcb.gov.br/content/estatisticas/Documents/Tabelas_especiais/InvEstrp.xlsx"
+# Investimento da Petrobras no segmento de Exploração e Produção, US$ milhões,
+# do Form 20-F de cada ano (SEC, "Capital expenditures" do segmento E&P). Vale
+# o valor do relatório mais recente que traz o ano, com duas exceções: 2013 e
+# 2014 ficam como no 20-F de 2014, porque a partir do de 2015 o segmento passou
+# a somar o E&P no exterior. Atualizar uma vez por ano, quando sai o 20-F.
+PETROBRAS_EP = {
+    2000: 2581, 2001: 2866,                     # 20-F 2001 (E&P no Brasil)
+    2002: 3156, 2003: 3658, 2004: 4574,         # 20-F 2004
+    2005: 6127,                                 # 20-F 2007
+    2006: 7329,                                 # 20-F 2008
+    2007: 9448,                                 # 20-F 2009
+    2008: 14293,                                # 20-F 2010
+    2009: 16162, 2010: 18621,                   # 20-F 2011 e 2012 (IFRS)
+    2011: 20405, 2012: 21959,                   # 20-F 2013 e 2014
+    2013: 27566, 2014: 24164,                   # 20-F 2014 (só Brasil)
+    2015: 19131, 2016: 13509,                   # 20-F 2017 e 2018
+    2017: 12397, 2018: 11592, 2019: 25081,      # 20-F 2019 e 2020
+    2020: 6557, 2021: 7129, 2022: 7844,         # 20-F 2022
+    2023: 10424, 2024: 13934, 2025: 17042,      # 20-F 2025
+}
 URL_BOLETIM = ("https://www.gov.br/anp/pt-br/centrais-de-conteudo/publicacoes/boletins-anp/"
                "arquivos-bmppgn/%s/%s.pdf")
 URL_MALHA_UF = ("https://servicodados.ibge.gov.br/api/v3/malhas/paises/BR?formato=application/vnd.geo%2Bjson"
@@ -818,6 +845,85 @@ def graficos_investimento():
                  ])]
 
 
+def xlsx_aba(conteudo, aba):
+    """{linha: {coluna: valor}} de uma aba de .xlsx (biblioteca padrão)."""
+    z = zipfile.ZipFile(io.BytesIO(conteudo))
+    ns = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+    rns = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
+    textos = ["".join(t.text or "" for t in si.iter(ns + "t")) for si in ET.fromstring(z.read("xl/sharedStrings.xml"))]
+    rels = {r.get("Id"): r.get("Target") for r in ET.fromstring(z.read("xl/_rels/workbook.xml.rels"))}
+    alvo = next(rels[a.get(rns + "id")] for a in ET.fromstring(z.read("xl/workbook.xml")).iter(ns + "sheet")
+                if a.get("name") == aba).lstrip("/")
+    alvo = alvo if alvo.startswith("xl/") else "xl/" + alvo
+    out = {}
+    for c in ET.fromstring(z.read(alvo)).iter(ns + "c"):
+        v = c.find(ns + "v")
+        if v is not None and v.text is not None:
+            ref = c.get("r")
+            col = re.match(r"[A-Z]+", ref).group(0)
+            out.setdefault(int(ref[len(col):]), {})[col] = textos[int(v.text)] if c.get("t") == "s" else v.text
+    return out
+
+
+def idp_extracao():
+    """Ingressos de investimento direto no país (participação no capital) na
+    extração de petróleo e no total, US$ milhões, por ano; e o rótulo do último
+    ano se ele for parcial ("jan-jun")."""
+    corpo = baixar(URL_IDP_SETOR)
+    setor, total, parcial = {}, {}, None
+    for aba, rotulo in (("IDP ingresso por setor CNAE 1.0", "Extração de petróleo e serviços relacionados"),
+                        ("IDP ingresso por setor CNAE 2.0", "Extração de petróleo e gás natural")):
+        linhas = xlsx_aba(corpo, aba)
+        cab = next(r for r in sorted(linhas) if str(linhas[r].get("A", "")).strip().startswith("Discrimina"))
+        anos = {c: int(float(v)) for c, v in linhas[cab].items() if c != "A"}
+        for r in sorted(linhas):
+            nome = str(linhas[r].get("A", "")).strip()
+            for c, ano in anos.items():
+                try:
+                    v = float(linhas[r].get(c))
+                except (TypeError, ValueError):
+                    continue
+                if nome == rotulo:
+                    setor[ano] = v
+                elif nome == "Total" and r > cab:
+                    total.setdefault(ano, v)
+        for r in sorted(linhas):
+            for c, v in linhas[r].items():
+                if str(v).strip().lower().startswith("jan-"):
+                    parcial = str(v).strip().lower()
+    return setor, total, parcial
+
+
+def graficos_investimento_longo():
+    setor, total, parcial = idp_extracao()
+    anos = sorted(setor)
+    ult = anos[-1]
+    cats = [str(a) + ("*" if a == ult and parcial else "") for a in anos]
+    nota_parcial = "; %d*: %s" % (ult, parcial.replace("-", " a ")) if parcial else ""
+    print("  IDP extração: %d–%d, último %s; Petrobras E&P %d–%d" % (anos[0], ult, cats[-1], min(PETROBRAS_EP),
+                                                                     max(PETROBRAS_EP)))
+    idp_bi = {str(k): setor[a] / 1000 for k, a in enumerate(anos)}
+    idp_pct = {str(k): 100 * setor[a] / total[a] for k, a in enumerate(anos) if total.get(a)}
+    pb_anos = sorted(PETROBRAS_EP)
+    return [
+        dict(id="idp-extracao-petroleo", titulo="Investimento estrangeiro direto na extração de petróleo e gás",
+             subtitulo="Ingressos de participação no capital, sem reinvestimento de lucros; "
+                       "até 2005, inclui serviços ligados à extração" + nota_parcial,
+             unidade="usd-bi", fonte="Banco Central e FtM", categorias=cats, barra=0.7, variantes=[
+                 dict(rot="US$ bilhões", unidade="usd-bi",
+                      series=[serie("Extração de petróleo e gás", AZUL, idp_bi, 2, tipo="barra", rotulo=True)]),
+                 dict(rot="% do investimento estrangeiro direto no país", unidade="pct1",
+                      series=[serie("Extração de petróleo e gás", AZUL, idp_pct, 1, tipo="barra", rotulo=True)]),
+             ]),
+        dict(id="petrobras-investimento-ep", titulo="Investimento da Petrobras em exploração e produção",
+             subtitulo="US$ bilhões; até 2014, só no Brasil; 2019 inclui o bônus de assinatura dos excedentes "
+                       "da cessão onerosa (Búzios e Itapu)",
+             unidade="usd-bi", fonte="Petrobras (Form 20-F) e FtM", categorias=[str(a) for a in pb_anos], barra=0.7,
+             series=[serie("Exploração e produção", AZUL, {str(k): PETROBRAS_EP[a] / 1000 for k, a in enumerate(pb_anos)},
+                           2, tipo="barra", rotulo=True)]),
+    ]
+
+
 # --------------------------------------------------------------------------
 # Mapa da produção de petróleo: mar e terra, e o detalhe de cada um
 # --------------------------------------------------------------------------
@@ -1336,7 +1442,7 @@ def secoes_extra():
     print("ANP…")
     diesel = graficos_diesel_importado()
     prod = graficos_producao()
-    prod["graficos"] += graficos_mapa() + graficos_investimento()
+    prod["graficos"] += graficos_mapa() + graficos_investimento() + graficos_investimento_longo()
     refino = graficos_refino_brasil()
     print("JODI…")
     mundo = graficos_refino_mundo()
