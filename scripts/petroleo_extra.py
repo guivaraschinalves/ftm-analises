@@ -48,6 +48,11 @@ AS FONTES E AS CONTAS
     que os boletins antigos separam (Sul de Tupi, Itapu_Eco…) somam no campo
     principal. Sem o pypdf ou sem algum boletim, o mar sai por estado. Os
     estados vêm da malha do IBGE; a posição de cada campo é aproximada.
+  - **Investimento na fase de produção**, ANP, dados abertos da fase de
+    desenvolvimento e produção: o realizado (investimento-realizado.csv, por
+    bacia, ambiente e atividade, desde 2022) e o previsto pelas operadoras nos
+    PAT/PAP (investimento-atividade.csv e investimento-bacia.csv, cinco anos).
+    O previsto entra a partir do ano seguinte ao último realizado.
   - **Brent**, FRED, MCOILBRENTEU (média mensal, EIA), CSV sem chave.
   - **Conta corrente**, Banco Central, tabela especial BalPagM.xlsx (BPM6,
     US$ milhões), com as linhas achadas pelo código SGS que o BC põe ao lado
@@ -77,6 +82,10 @@ URL_JODI = "https://www.jodidata.org/_resources/files/downloads/oil-data/world_s
 URL_JODI_PRIM = "https://www.jodidata.org/_resources/files/downloads/oil-data/world_primary_csv.zip"
 URL_ANP_COMERCIO = ANP + "ie/petroleo/importacoes-exportacoes-petroleo-2000-2025.csv"   # vai além de 2025
 URL_STEO = "https://www.eia.gov/outlooks/steo/xls/STEO_m.xlsx"
+ANP_DP = ANP + "arquivos-fase-de-desenvolvimento-e-producao/"
+URL_INV_REALIZADO = ANP_DP + "atividades-e-investimentos-realizados/investimento-realizado.csv"
+URL_INV_PREV_ATIV = ANP_DP + "arquivos-previsao/investimento-atividade.csv"
+URL_INV_PREV_BACIA = ANP_DP + "arquivos-previsao/investimento-bacia.csv"
 URL_BOLETIM = ("https://www.gov.br/anp/pt-br/centrais-de-conteudo/publicacoes/boletins-anp/"
                "arquivos-bmppgn/%s/%s.pdf")
 URL_MALHA_UF = ("https://servicodados.ibge.gov.br/api/v3/malhas/paises/BR?formato=application/vnd.geo%2Bjson"
@@ -721,6 +730,95 @@ def graficos_petroleo_mundo(d=None):
 
 
 # --------------------------------------------------------------------------
+# Investimento na fase de produção (ANP): realizado e previsto
+# --------------------------------------------------------------------------
+
+GRUPOS_ATIVIDADE = [("Plataformas", AZUL, ("UEP",)), ("Linhas e risers", CIANO, ("Coleta",)),
+                    ("Perfuração", LARANJA, ("Perfuração",)), ("Completação", VERDE, ("Completação", "Recompletação")),
+                    ("Abandono", VERMELHO, ("Abandono",)), ("Demais", CINZA, ())]
+GRUPOS_BACIA = [("Santos", AZUL), ("Campos", CIANO), ("Demais bacias do mar", ROXO), ("Terra", LARANJA)]
+
+
+def csv_anp_virgula(url, nome):
+    """CSV da ANP separado por vírgula, com número "1.234,56"."""
+    caminho = os.path.join(CACHE_ANP, nome)
+    baixar(url, caminho)
+    with open(caminho, encoding="utf-8-sig", newline="") as f:
+        return [{k.strip().upper(): v for k, v in l.items()} for l in csv.DictReader(f)]
+
+
+def num_br(txt):
+    return float(txt.replace(".", "").replace(",", ".") or 0)
+
+
+def grupo_atividade(atividade):
+    for nome, _, chaves in GRUPOS_ATIVIDADE:
+        if any(atividade.startswith(c) for c in chaves):
+            return nome
+    return "Demais"
+
+
+def grupo_bacia(bacia, ambiente):
+    if ambiente.strip().upper() == "TERRA":
+        return "Terra"
+    return bacia if bacia in ("Santos", "Campos") else "Demais bacias do mar"
+
+
+def investimento_anp():
+    """{("atividade"|"bacia", moeda): {ano: {grupo: bilhões}}} e o último ano realizado.
+    Realizado até o último ano do arquivo; daí em diante, o previsto."""
+    real = csv_anp_virgula(URL_INV_REALIZADO, "investimento-realizado.csv")
+    ult = max(int(l["ANO"]) for l in real)
+    out = {}
+    def soma(chave, ano, grupo, v):
+        d = out.setdefault(chave, {}).setdefault(ano, {})
+        d[grupo] = d.get(grupo, 0) + v / 1e9
+    for l in real:
+        for moeda, col in (("US$", "INVESTIMENTO US$"), ("R$", "INVESTIMENTO R$")):
+            v, ano = num_br(l[col]), int(l["ANO"])
+            soma(("atividade", moeda), ano, grupo_atividade(l["ATIVIDADE"]), v)
+            soma(("bacia", moeda), ano, grupo_bacia(l["BACIA"], l["AMBIENTE"]), v)
+    for l in csv_anp_virgula(URL_INV_PREV_ATIV, "investimento-atividade.csv"):
+        ano = int(l["ANO"])
+        if ano > ult:
+            for moeda, col in (("US$", "INVESTIMENTO US$"), ("R$", "INVESTIMENTO R$")):
+                soma(("atividade", moeda), ano, grupo_atividade(l["ATIVIDADE"]), num_br(l[col]))
+    for l in csv_anp_virgula(URL_INV_PREV_BACIA, "investimento-bacia.csv"):
+        ano = int(l["ANO"])
+        if ano > ult:
+            for moeda, col in (("US$", "INVESTIMENTO US$"), ("R$", "INVESTIMENTO R$")):
+                soma(("bacia", moeda), ano, grupo_bacia(l["BACIA"], l["AMBIENTE"]), num_br(l[col]))
+    return out, ult
+
+
+def graficos_investimento():
+    dados, ult = investimento_anp()
+    anos = sorted(dados[("atividade", "US$")])
+    cats = [str(a) + ("*" if a > ult else "") for a in anos]
+
+    def series(chave, grupos):
+        d = dados[chave]
+        out = []
+        for nome, cor in grupos:
+            real = {str(k): d[a].get(nome, 0) for k, a in enumerate(anos) if a <= ult}
+            prev = {str(k): d[a].get(nome, 0) for k, a in enumerate(anos) if a > ult}
+            out.append(serie(nome, cor, real, 2, tipo="barra"))
+            out.append(serie(nome + " (previsto)", cor, prev, 2, tipo="barra", opacidade=0.6, legenda=False))
+        return out
+    ativ = [(n, c) for n, c, _ in GRUPOS_ATIVIDADE]
+    tot = {a: sum(dados[("atividade", "US$")][a].values()) for a in anos}
+    print("  investimento (US$ bi): " + ", ".join("%d %.1f" % (a, tot[a]) for a in anos))
+    return [dict(id="investimento-producao-petroleo", titulo="Investimento na produção de petróleo e gás",
+                 subtitulo="Fase de produção; realizado até %d, previsto pelas operadoras de %d a %d (*)"
+                 % (ult, ult + 1, anos[-1]),
+                 unidade="usd-bi", fonte="ANP e FtM", categorias=cats, barra=0.7, variantes=[
+                     dict(rot="Por atividade, US$ bilhões", unidade="usd-bi", series=series(("atividade", "US$"), ativ)),
+                     dict(rot="Por bacia, US$ bilhões", unidade="usd-bi", series=series(("bacia", "US$"), GRUPOS_BACIA)),
+                     dict(rot="Por atividade, R$ bilhões", unidade="bi", series=series(("atividade", "R$"), ativ)),
+                 ])]
+
+
+# --------------------------------------------------------------------------
 # Mapa da produção de petróleo: mar e terra, e o detalhe de cada um
 # --------------------------------------------------------------------------
 
@@ -1238,7 +1336,7 @@ def secoes_extra():
     print("ANP…")
     diesel = graficos_diesel_importado()
     prod = graficos_producao()
-    prod["graficos"] += graficos_mapa()
+    prod["graficos"] += graficos_mapa() + graficos_investimento()
     refino = graficos_refino_brasil()
     print("JODI…")
     mundo = graficos_refino_mundo()
