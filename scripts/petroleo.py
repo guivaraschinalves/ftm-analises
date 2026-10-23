@@ -762,6 +762,30 @@ def graficos_icbr():
     ]), max(total)
 
 
+# As seções da análise, na ordem da página, e os gráficos de cada uma.
+SECOES_ARTIGO = [
+    ("Produção no Brasil", ["producao-petroleo", "producao-petroleo-sazonal", "mapa-producao-petroleo"]),
+    ("Investimento", ["investimento-producao-petroleo", "petrobras-investimento-ep", "idp-extracao-petroleo"]),
+    ("O Brasil entre os produtores", [
+        "mundo-producao-petroleo", "mundo-exportacao-petroleo", "mundo-exportacao-liquida-petroleo",
+        "pares-producao-petroleo", "pares-exportacao-petroleo", "pares-exportacao-liquida-petroleo",
+        "regioes-producao-petroleo", "regioes-exportacao-petroleo"]),
+    ("Comércio exterior", [
+        "exportacao-pauta", "exportacao-pauta-pct", "importacao-pauta", "importacao-pauta-pct",
+        "exportacao-top10-2025", "exportacao-top10-2026", "saldo-comercial-petroleo",
+        "petroleo-derivados-12m", "petroleo-derivados-var", "petroleo-destinos", "petroleo-destinos-pct",
+        "derivados-origens", "derivados-origens-pct"]),
+    ("Preço e custo do que se importa", [
+        "importados-preco", "importados-volume", "importados-fob-cif", "importados-frete-pct", "diesel-cif-ppi"]),
+    ("Refino e abastecimento", [
+        "refino-brasil", "refino-brasil-diesel-gasolina", "refino-mundo", "fornecimento-diesel",
+        "fornecimento-gasolina", "diesel-importado-origem", "diesel-importado-petrobras"]),
+    ("Efeitos na economia", [
+        "conta-corrente-projecao", "pib-nominal-contribuicao", "pib-setor-externo-real", "termos-de-troca",
+        "icbr-usd"]),
+]
+
+
 def main():
     print("Comex Stat…")
     exp, imp = comex("EXP"), comex("IMP")
@@ -790,18 +814,25 @@ def main():
     print("Termos de troca…")
     secoes.append(pe.termos_de_troca())
 
-    # Por enquanto, só o título do assunto e os gráficos em sequência: uma
-    # seção sem título, no formato de artigo (que não põe seção sem título no
-    # índice). A ordem das seções acima continua sendo a ordem dos gráficos.
-    todos = [g for s in secoes for g in s["graficos"]]
+    # As seções do artigo: os gráficos vão para a seção que os lista em
+    # SECOES_ARTIGO, na ordem de lá. Gráfico novo que ninguém pôs em seção cai
+    # em "Outros gráficos", com aviso. O texto de cada seção vem de
+    # textos/petroleo.md, pelo título (aplicar_texto, no fim).
+    todos = {g["id"]: g for s in secoes for g in s["graficos"]}
+    artigo = [dict(titulo=t, graficos=[todos.pop(i) for i in ids if i in todos]) for t, ids in SECOES_ARTIGO]
+    if todos:
+        print("  AVISO: gráficos sem seção em SECOES_ARTIGO: %s" % ", ".join(todos))
+        artigo.append(dict(titulo="Outros gráficos", graficos=list(todos.values())))
     doc = dict(atualizado=datetime.date.today().isoformat(), referencia=ref, formato="artigo",
                fonte=FONTE_COMEX, assunto="Petróleo, derivados e comércio exterior",
-               secoes=[dict(titulo="", graficos=todos)])
+               secoes=[s_ for s_ in artigo if s_["graficos"]])
     with open(SAIDA, "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False, separators=(",", ":"))
         f.write("\n")
     print("gravado %s (%.0f KB); Comex até %s, IC-Br até %s"
           % (SAIDA, os.path.getsize(SAIDA) / 1024, ref, ref_icbr))
+    import aplicar_texto                     # a prosa de textos/petroleo.md
+    aplicar_texto.aplicar("petroleo.md", "petroleo.json")
     for sec in doc["secoes"]:
         for g in sec["graficos"]:
             if g.get("tipo") == "ranking":

@@ -31,7 +31,8 @@ RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(RAIZ, "scripts"))
 import texto_assunto as ta                                    # noqa: E402
 
-PARES = [("defasagem-combustiveis.md", "defasagem-combustiveis.json")]
+PARES = [("defasagem-combustiveis.md", "defasagem-combustiveis.json"),
+         ("petroleo.md", "petroleo.json")]
 
 
 def aplicar(nome_texto, nome_json):
