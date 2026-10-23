@@ -899,10 +899,17 @@ def graficos_investimento_longo():
     anos = sorted(setor)
     ult = anos[-1]
     cats = [str(a) + ("*" if a == ult and parcial else "") for a in anos]
-    nota_parcial = "; %d*: %s" % (ult, parcial.replace("-", " a ")) if parcial else ""
+    # ano pela metade: anualizado (x 12 / meses) no gráfico em US$; a fatia em
+    # % não muda, porque setor e total crescem na mesma proporção
+    fator, nota_parcial = 1, ""
+    if parcial:
+        nomes = [m[:3] for m in MESES]
+        meses = nomes.index(parcial.split("-")[1][:3]) - nomes.index(parcial.split("-")[0][:3]) + 1
+        fator = 12 / meses
+        nota_parcial = "; %d* anualizado (dados de %s)" % (ult, parcial.replace("-", " a "))
     print("  IDP extração: %d–%d, último %s; Petrobras E&P %d–%d" % (anos[0], ult, cats[-1], min(PETROBRAS_EP),
                                                                      max(PETROBRAS_EP)))
-    idp_bi = {str(k): setor[a] / 1000 for k, a in enumerate(anos)}
+    idp_bi = {str(k): setor[a] / 1000 * (fator if a == ult else 1) for k, a in enumerate(anos)}
     idp_pct = {str(k): 100 * setor[a] / total[a] for k, a in enumerate(anos) if total.get(a)}
     pb_anos = sorted(PETROBRAS_EP)
     return [
