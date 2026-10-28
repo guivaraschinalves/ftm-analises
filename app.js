@@ -73,7 +73,7 @@
   // aqui é a ordem da página.
   // A análise vem primeiro: ela é o que se lê de ponta a ponta. Os painéis
   // antigos ficam embaixo, fechados, como acervo.
-  var FONTES = ["dados/defasagem-combustiveis.json", "dados/juros-eua.json", "dados/eleicoes.json",
+  var FONTES = ["dados/defasagem-combustiveis.json", "dados/juros-eua.json", "dados/gave.json", "dados/eleicoes.json",
                 "dados/petroleo.json", "dados/cenario-2026-10-28-fomc.json"];
   // Uma página pode pedir outros arquivos: <body data-fontes="dados/x.json">.
   if (document.body && document.body.getAttribute("data-fontes")) {

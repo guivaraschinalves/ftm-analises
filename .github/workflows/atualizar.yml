@@ -28,6 +28,9 @@ jobs:
       - name: Taxa de 10 anos dos EUA — baixa as séries do FRED
         run: python scripts/juros_eua.py
 
+      - name: Quadrantes de Charles Gave — Shiller, FRED e ouro do Banco Mundial
+        run: python scripts/gave.py
+
       - name: Commita, se algum número mudou
         run: |
           if git diff --quiet -- dados; then

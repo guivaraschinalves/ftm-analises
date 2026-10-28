@@ -272,6 +272,28 @@ mesma escala com outra unidade, um para um. É o gráfico dos ativos do Fed, com
 trilhões à esquerda e % à direita. A série que usa a unidade da direita leva
 `unidade` própria, que vale para o rótulo do último ponto e para a caixa do mouse.
 
+## Os quatro quadrantes de Charles Gave
+
+`python3 scripts/gave.py` grava `dados/gave.json` (roda na Action diária). É o
+método do livro *The General Theory of Portfolio Construction* (Charles Gave,
+Gavekal, 2024), capítulos 3, 4 e 6: cada razão contra a própria média móvel de
+7 anos (84 meses), +1 acima e -1 abaixo.
+
+| Razão | Eixo |
+|---|---|
+| S&P 500 / WTI | eficiência energética (direita ou esquerda) |
+| retorno total do título de 10 anos / ouro | moeda boa ou ruim (baixo ou cima) |
+| S&P 500 / ouro | mercado de alta ou de baixa |
+| ouro / WTI | antecede recessões (cap. 6) |
+
+Fontes: S&P 500 e juro longo do Shiller (Yale, até ago/2023; o arquivo parou
+ali) emendados com SP500 e GS10 do FRED (a diferença nos meses comuns é zero);
+WTISPLC do FRED; ouro do `datasets/gold-prices` (Pink Sheet do Banco Mundial
+desde 1960, média anual antes). O retorno total do título é calculado do juro
+(título ao par, vendido um mês depois ao juro novo). O mês corrente fica de
+fora. A cópia do arquivo de Yale fica em `dados/.cache-gave/` para quando o
+site não responder.
+
 ## A bolsa nas eleições presidenciais
 
 `python3 scripts/eleicoes.py` baixa da API OData aberta do Ipeadata (sem chave)
