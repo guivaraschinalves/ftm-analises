@@ -570,3 +570,37 @@ body.visor-aberto { overflow: hidden; }
   .leitor-titulo { font-size: 18px; flex-basis: 100%; }
   .leitor .comparador-texto p { font-size: 17px; }
 }
+
+/* Comentário do autor à direita do gráfico (análise de cenário). Fechado,
+   só a aba com o balão; aberto, um painel de 250px como a margem do Word (mais largo, o gráfico cairia abaixo de 700px e trocaria para o desenho de celular). */
+.card-corpo { display: flex; align-items: stretch; border-top: 1px solid var(--border); }
+.card-corpo .frame { flex: 1 1 auto; min-width: 0; border-top: none; }
+.comentario { flex: 0 0 auto; display: flex; border-left: 1px solid var(--border); background: var(--surface); }
+.comentario-aba {
+  display: flex; flex-direction: column; align-items: center; gap: 8px; width: 42px; padding: 14px 0;
+  font: inherit; font-size: 12.5px; color: var(--accent); background: transparent; border: none; cursor: pointer;
+}
+.comentario-aba span { writing-mode: vertical-rl; letter-spacing: .04em; }
+.comentario-aba svg { width: 18px; height: 18px; }
+.comentario-aba:hover { background: var(--accent-wash); }
+.comentario-painel { display: none; width: 250px; padding: 12px 16px 14px; box-sizing: border-box;
+  border-left: 3px solid var(--accent); overflow-y: auto; }
+.comentario.aberto .comentario-aba { display: none; }
+.comentario.aberto .comentario-painel { display: block; }
+.comentario-topo { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.comentario-rot { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+.comentario-fechar {
+  width: 28px; height: 28px; border-radius: 7px; font-size: 20px; line-height: 1; cursor: pointer;
+  color: var(--ink-2); background: transparent; border: 1px solid var(--border);
+}
+.comentario-fechar:hover { background: var(--accent-wash); color: var(--ink); }
+.comentario-texto { margin: 0 0 10px; font-size: 14.5px; line-height: 1.55; color: var(--ink); }
+.comentario-texto:last-child { margin-bottom: 0; }
+/* tela estreita: o comentário vai para baixo do gráfico */
+@media (max-width: 760px) {
+  .card-corpo { flex-direction: column; }
+  .comentario { border-left: none; border-top: 1px solid var(--border); }
+  .comentario-aba { flex-direction: row; width: 100%; padding: 10px 14px; justify-content: flex-start; }
+  .comentario-aba span { writing-mode: horizontal-tb; }
+  .comentario-painel { width: 100%; border-left: none; border-top: 3px solid var(--accent); }
+}

@@ -1162,6 +1162,7 @@
       "aria-hidden": "true" }, [el("path", { d: d })]);
   }
   var ICO_ENTRAR = "M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6";
+  var ICO_COMENTARIO = "M4 5h16v11H9l-5 4z";
   var ICO_ZOOM = "M11 4a7 7 0 1 0 0 14a7 7 0 0 0 0-14zM20 20l-4.2-4.2M11 8v6M8 11h6";
 
   // ---------- tela cheia (API do navegador, com o prefixo do Safari) ----------
@@ -1765,7 +1766,41 @@
     raiz.appendChild(ferramentas);
 
     cartao.frame = html("div", { "class": "frame" });
-    raiz.appendChild(cartao.frame);
+    if (g.comentario) {
+      // Comentário do autor, à direita do gráfico como na margem do Word.
+      // Retrátil: fechado, fica só a aba com o balão; aberto, o gráfico
+      // estreita e é redesenhado na largura nova.
+      var corpo = html("div", { "class": "card-corpo" });
+      var aside = html("aside", { "class": "comentario" });
+      var aba = html("button", { type: "button", "class": "comentario-aba", title: "Mostrar o comentário" });
+      aba.appendChild(icone(ICO_COMENTARIO));
+      aba.appendChild(html("span", { texto: "Comentário" }));
+      var painel = html("div", { "class": "comentario-painel" });
+      var topo = html("div", { "class": "comentario-topo" });
+      topo.appendChild(html("span", { "class": "comentario-rot", texto: "Comentário" }));
+      var fechar = html("button", { type: "button", "class": "comentario-fechar", title: "Recolher o comentário",
+                                    "aria-label": "Recolher o comentário", texto: "›" });
+      topo.appendChild(fechar);
+      painel.appendChild(topo);
+      paragrafos(g.comentario, "comentario-texto").forEach(function (p) { painel.appendChild(p); });
+      aside.appendChild(aba);
+      aside.appendChild(painel);
+      var abrir = function (sim) {
+        aside.classList.toggle("aberto", sim);
+        aba.setAttribute("aria-expanded", String(sim));
+        desenhar(cartao, true);
+      };
+      aba.addEventListener("click", function () { abrir(true); });
+      fechar.addEventListener("click", function () { abrir(false); });
+      // nasce aberto quando sobra largura; no celular, recolhido
+      aside.classList.toggle("aberto", window.innerWidth >= 1100);
+      aba.setAttribute("aria-expanded", String(window.innerWidth >= 1100));
+      corpo.appendChild(cartao.frame);
+      corpo.appendChild(aside);
+      raiz.appendChild(corpo);
+    } else {
+      raiz.appendChild(cartao.frame);
+    }
     paragrafos(g.nota, "nota").forEach(function (p) { raiz.appendChild(p); });
     // o gráfico leva o rótulo curto do acontecimento; a explicação inteira fica
     // aqui embaixo, em lista, na ordem em que aconteceu

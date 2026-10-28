@@ -25,11 +25,26 @@ O QUE ACONTECE SE AS SEÇÕES NÃO BATEREM
 import io
 import json
 import os
+import re
 import sys
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(RAIZ, "scripts"))
 import texto_assunto as ta                                    # noqa: E402
+
+# Comentários do autor, um por gráfico, à direita dele (só a análise de
+# cenário). O arquivo é este:
+#
+#     # Comentários
+#
+#     ## Votos dissidentes no FOMC
+#     Parágrafo do comentário, com **negrito** se precisar.
+#
+#     Outro parágrafo.
+#
+# Cada "##" é o TÍTULO do gráfico como aparece no site (ou o id dele). Apagar
+# o bloco apaga o comentário.
+COMENTARIOS = {"cenario-2026-10-28-fomc.json": "comentarios/cenario-2026-10-28-fomc.md"}
 
 PARES = [("defasagem-combustiveis.md", "defasagem-combustiveis.json"),
          ("petroleo.md", "petroleo.json"),
@@ -69,6 +84,7 @@ def aplicar(nome_texto, nome_json):
 
     perdidos = [t for t, g in antigos.items() if g]
     doc["assunto"] = dt["assunto"]
+    erro_coment = aplicar_comentarios(doc, nome_json)
 
     with io.open(caminho, "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False, separators=(",", ":"))
@@ -84,6 +100,49 @@ def aplicar(nome_texto, nome_json):
         print("  AVISO: estes gráficos ficaram órfãos porque a seção mudou de "
               "nome: %s. Rode o gerador completo." % "; ".join(perdidos),
               file=sys.stderr)
+        return 1
+    return erro_coment
+
+
+def ler_comentarios(caminho):
+    """{título ou id do gráfico: texto}."""
+    out, atual, linhas = {}, None, []
+    def fecha():
+        if atual is not None:
+            out[atual] = "\n".join(linhas).strip()
+    with io.open(caminho, encoding="utf-8") as f:
+        for linha in f:
+            linha = linha.rstrip("\n")
+            if linha.startswith("## "):
+                fecha()
+                atual, linhas = linha[3:].strip(), []
+            elif linha.startswith("# "):
+                continue
+            elif atual is not None:
+                linhas.append(linha)
+    fecha()
+    return {k: re.sub(r"\n{3,}", "\n\n", v) for k, v in out.items() if v}
+
+
+def aplicar_comentarios(doc, nome_json):
+    if nome_json not in COMENTARIOS:
+        return 0
+    caminho = os.path.join(RAIZ, "textos", COMENTARIOS[nome_json])
+    coment = ler_comentarios(caminho) if os.path.exists(caminho) else {}
+    graficos = [g for s in doc["secoes"] for g in s.get("graficos", [])]
+    usados = set()
+    for g in graficos:
+        txt = coment.get(g.get("titulo")) or coment.get(g.get("id"))
+        if txt:
+            g["comentario"] = txt
+            usados.update(k for k in (g.get("titulo"), g.get("id")) if k in coment)
+        else:
+            g.pop("comentario", None)
+    sobra = [k for k in coment if k not in usados]
+    print("  %d comentários" % (len(coment) - len(sobra)))
+    if sobra:
+        print("  AVISO: comentário sem gráfico com esse título: %s. Os títulos são: %s"
+              % ("; ".join(sobra), "; ".join(g["titulo"] for g in graficos)), file=sys.stderr)
         return 1
     return 0
 

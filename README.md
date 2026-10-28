@@ -157,6 +157,22 @@ técnico no meio da explicação sem o texto virar um bloco só, e de propósito
 
 ## Análise de Cenário
 
+**Comentários (só na análise de cenário)**: escritos em
+`textos/comentarios/cenario-2026-10-28-fomc.md`, um bloco por gráfico:
+
+```
+## Votos dissidentes no FOMC
+Texto do comentário, com **negrito** se precisar.
+
+Outro parágrafo.
+```
+
+O `##` é o título do gráfico como aparece no site (ou o id dele). Editou e deu
+push (dá pelo próprio GitHub, até do celular), a Action "Publica o texto"
+costura no JSON e o comentário aparece à direita do gráfico, num painel que
+abre e fecha. Título que não casa com nenhum gráfico faz a Action falhar e
+listar os títulos certos. Apagar o bloco apaga o comentário.
+
 **Votos dissidentes do FOMC**: planilha de Thornton e Wheelock que o St. Louis
 Fed mantém (`fomc_dissents_data.xlsx`, desde 1936; baixa só **sem**
 User-Agent de navegador, como o FRED). Reunião que a planilha ainda não tem
