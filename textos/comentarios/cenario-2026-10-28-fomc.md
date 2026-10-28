@@ -6,3 +6,6 @@ Segundo Waller: "But I am concerned that the recent acceleration in inflation—
 
 ## Payroll e o breakeven do mercado de trabalho
 Com menos imigração, a economia só precisa de cerca de 68 mil vagas por mês para manter o desemprego estável. Payroll "fraco" não significa desemprego subindo.
+
+## Salário por hora e horas trabalhadas
+Indica que inflação não está vindo dos salários, mas isso pesa sobre o consumo
