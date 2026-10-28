@@ -287,6 +287,8 @@
          valor: function (v) { return nf(1).format(v) + " h"; } },
     pp: { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
           valor: function (v) { return nf(2).format(v) + " p.p."; } },
+    votos: { eixo: function (v, passo) { return nf(0).format(Math.abs(v)); },
+             valor: function (v) { var n = Math.abs(v); return nf(0).format(n) + (n === 1 ? " voto" : " votos"); } },
     "usd-tri": { eixo: function (v, passo) { return "US$ " + nf(casasDoPasso(passo)).format(v); },
                  valor: function (v) { return "US$ " + nf(2).format(v) + " tri"; } },
     "usd-bbl": { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },

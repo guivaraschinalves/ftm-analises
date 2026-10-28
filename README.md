@@ -157,6 +157,12 @@ técnico no meio da explicação sem o texto virar um bloco só, e de propósito
 
 ## Análise de Cenário
 
+**Votos dissidentes do FOMC**: planilha de Thornton e Wheelock que o St. Louis
+Fed mantém (`fomc_dissents_data.xlsx`, desde 1936; baixa só **sem**
+User-Agent de navegador, como o FRED). Reunião que a planilha ainda não tem
+entra à mão em `DISSIDENTES_MANUAL` no `cenario_fomc.py`, lida do comunicado;
+a planilha ganha quando trouxer a data.
+
 Um retrato da economia numa data, um arquivo por cenário. O campo `"grupo":
 "Análise de Cenário"` no JSON junta esses assuntos sob um cabeçalho no índice
 e põe o nome do grupo acima do título do artigo. O próximo cenário é outro

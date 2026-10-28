@@ -1077,7 +1077,7 @@ def comunicados_fomc():
     return [dict(id="fomc-comunicados", tipo="comunicados", titulo="Comparador dos comunicados do FOMC",
                  subtitulo="Escolha dois comunicados: o que saiu do texto aparece riscado em vermelho, o que entrou, "
                            "em verde",
-                 fonte="Federal Reserve", comunicados=out), balanco_fed()]
+                 fonte="Federal Reserve", comunicados=out), dissidentes_fomc(), balanco_fed()]
 
 
 def fim_de_mes(s):
@@ -1086,6 +1086,58 @@ def fim_de_mes(s):
     for k in sorted(s):
         out[k[:7]] = s[k]
     return out
+
+
+DISSIDENTES_XLSX = ("https://www.stlouisfed.org/-/media/project/frbstl/stlouisfed/files/excel/"
+                    "fomc_dissents_data.xlsx?sc_lang=en&hash=F0F9B5EE285AD7B8977AAB646B908BE8")
+# Reuniões que a planilha do St. Louis Fed ainda não tem: (mais dura, mais
+# frouxa, outro motivo), lidas do comunicado. Sai daqui quando a planilha
+# trouxer a reunião (a planilha ganha).
+DISSIDENTES_MANUAL = {
+    "2026-10-28": (2, 0, 0),     # Cook e Hammack queriam subir 0,25 p.p.
+}
+
+
+def dissidentes_fomc():
+    """Votos contra a decisão em cada reunião desde 1936, da planilha de
+    Thornton e Wheelock que o St. Louis Fed mantém atualizada. Como no FRED,
+    o site trava com User-Agent de navegador: vai sem headers."""
+    t = xlsx_aba(baixar(DISSIDENTES_XLSX), "Data")
+    cab = next(r for r in t.values() if r.get("A") == "Year")
+    col = {v: k for k, v in cab.items()}
+    num = lambda r, nome: int(numero(r.get(col[nome])) or 0)          # noqa: E731
+    dura, frouxa, outro, chefes, vistas = {}, {}, {}, [], set()
+    for r in t.values():
+        if not str(r.get("A", "")).strip().isdigit() or numero(r.get("B")) is None:
+            continue
+        data = (datetime.date(1899, 12, 30) + datetime.timedelta(days=int(float(r["B"])))).isoformat()
+        vistas.add(data)
+        m = data[:7]
+        d = num(r, "No. Governors for Tighter") + num(r, "No. Presidents for Tighter")
+        f = num(r, "No. Governors for Easier") + num(r, "No. Presidents for Easier")
+        o = num(r, "Votes Against Action") - d - f
+        dura[m], frouxa[m], outro[m] = dura.get(m, 0) + d, frouxa.get(m, 0) - f, outro.get(m, 0) + o
+        chefe = str(r.get(col["Chair"], "")).strip()
+        if chefe and (not chefes or chefes[-1][1] != chefe):
+            chefes.append((m, chefe))
+    ult = max(vistas)
+    for data, (d, f, o) in DISSIDENTES_MANUAL.items():
+        if data in vistas:
+            continue
+        m = data[:7]
+        dura[m], frouxa[m], outro[m] = dura.get(m, 0) + d, frouxa.get(m, 0) - f, outro.get(m, 0) + o
+        ult = max(ult, data)
+    print("  dissidentes: planilha até %s; última reunião %s" % (max(vistas), ult))
+    return dict(id="fomc-dissidentes", titulo="Votos dissidentes no FOMC",
+                subtitulo="votos contra a decisão em cada reunião; acima de zero, por política mais dura; "
+                          "abaixo, por política mais frouxa",
+                unidade="votos", periodoPadrao="20", fonte="Federal Reserve Bank of St. Louis, Federal Reserve e FtM",
+                eventos=[dict(em=m, rot=n) for m, n in chefes[1:]],
+                nota="Até os anos 1970 o comitê se reunia mais de uma vez em alguns meses; nesses, a barra soma as "
+                     "reuniões do mês. Os nomes no alto marcam a troca de presidente do Fed.",
+                series=[serie("Por política mais dura", VERMELHO, dura, 0, tipo="barra"),
+                        serie("Por outro motivo", CINZA, outro, 0, tipo="barra"),
+                        serie("Por política mais frouxa", AZUL, frouxa, 0, tipo="barra")])
 
 
 def balanco_fed():
