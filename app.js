@@ -6,7 +6,7 @@
  * fundo).
  *
  * Os dados já chegam prontos: as contas ficam nos scripts de cada assunto
- * (scripts/juros_eua.py e afins).
+ * (scripts/gave.py e afins).
  *
  * O mesmo desenho serve para o cartão da página e para o visor (um gráfico só,
  * grande, com tela cheia e anotação à mão por cima, num <canvas>).
@@ -73,7 +73,7 @@
   // aqui é a ordem da página.
   // A análise vem primeiro: ela é o que se lê de ponta a ponta. Os painéis
   // antigos ficam embaixo, fechados, como acervo.
-  var FONTES = ["dados/defasagem-combustiveis.json", "dados/juros-eua.json", "dados/gave.json", "dados/eleicoes.json",
+  var FONTES = ["dados/defasagem-combustiveis.json", "dados/gave.json", "dados/eleicoes.json",
                 "dados/petroleo.json", "dados/cenario-2026-10-28-fomc.json"];
   // Uma página pode pedir outros arquivos: <body data-fontes="dados/x.json">.
   if (document.body && document.body.getAttribute("data-fontes")) {

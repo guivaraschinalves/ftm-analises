@@ -2,8 +2,7 @@ name: Atualiza os dados
 
 on:
   schedule:
-    # 21:30 UTC (18:30 em Brasília), todo dia. O FRED publica o DGS10 do dia
-    # por volta das 16h de Nova York, depois do fechamento do mercado de juros.
+    # 21:30 UTC (18:30 em Brasília), todo dia, depois do fechamento em Nova York.
     - cron: "30 21 * * *"
   workflow_dispatch: {}
 
@@ -25,9 +24,6 @@ jobs:
           python-version: "3.12"
 
       # Só biblioteca padrão: nada para instalar.
-      - name: Taxa de 10 anos dos EUA — baixa as séries do FRED
-        run: python scripts/juros_eua.py
-
       - name: Quadrantes de Charles Gave — Shiller, FRED e ouro do Banco Mundial
         run: python scripts/gave.py
 

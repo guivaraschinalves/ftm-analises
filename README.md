@@ -9,8 +9,8 @@ No ar: <https://guivaraschinalves.github.io/ftm-analises/>
 
 | Assunto | Dados | De onde vêm |
 |---|---|---|
-| **Taxa de 10 anos dos EUA** | `dados/juros-eua.json` | Baixados **sozinhos** todo dia do FRED (St. Louis Fed), séries `DGS10` e `GS10`, e do investing.com (intradiário) |
 | **A bolsa nas eleições presidenciais** | `dados/eleicoes.json` | Baixados da API aberta do Ipeadata (Ibovespa diário desde 1993); `scripts/eleicoes.py`, rodado à mão |
+| **Os quatro quadrantes de Charles Gave** | `dados/gave.json` | Shiller (Yale), FRED, Banco Mundial e Ken French; `scripts/gave.py`, **sozinho** todo dia |
 | **Análise de Cenário: 28/10/26 - Decisão do FOMC** | `dados/cenario-2026-10-28-fomc.json` | FRED, BLS, Fed de San Francisco, ISM (investing.com), Tesouro (MTS e TIC), Census e BIS; `scripts/cenario_fomc.py`, rodado à mão |
 | **A defasagem dos combustíveis** | `dados/defasagem-combustiveis.json` | Montados a partir das planilhas de [`planilhas/`](planilhas/); `scripts/defasagem_combustiveis.py`, rodado à mão |
 
@@ -24,9 +24,6 @@ da **JODI**, das contas nacionais do **IBGE** (SIDRA), do IC-Br em dólar do
 cabeçalho de `scripts/petroleo.py` e de `scripts/petroleo_extra.py`. O agregado
 mensal do Comex fica em `dados/.cache-comex/` (versionado, 2 MB): sem ele a
 primeira rodada baixa 5 GB e leva uma hora.
-
-O acervo intradiário fica à parte, em `dados/intradiario-10a.json`: é o arquivo
-que **acumula** as cotações de 15 em 15 minutos (veja abaixo).
 
 Fora do site, em **[`planilhas/`](planilhas/)**, ficam sete planilhas de
 petróleo, derivados e Petrobras: oferta de diesel e de gasolina, defasagem
@@ -78,83 +75,6 @@ gerador completo à mão:
 ```bash
 python scripts/defasagem_combustiveis.py
 ```
-
-## A taxa de 10 anos dos EUA
-
-Três gráficos: a história inteira, o ano corrente e o mês em detalhe. Os dois
-primeiros vêm do **FRED**; o terceiro é intradiário e vem de outra fonte.
-
-**Por que o CSV e não a API.** O FRED tem duas portas para o mesmo dado: a API
-JSON (`api.stlouisfed.org`), que **exige chave** — sem `api_key` ela responde
-`400 Variable api_key is not set` —, e o CSV público do gráfico
-(`fredgraph.csv?id=SERIE`), que não exige nada e devolve a série inteira. O
-script usa o CSV. Se um dia precisarmos de *vintages* (o que o mercado via em
-cada data, no ALFRED) ou dos metadados da série, é trocar `baixar_serie` por uma
-chamada à API com a chave num segredo do repositório — o resto do arquivo não
-muda.
-
-**Armadilha do FRED:** ele **trava** (timeout, não 403) quando a requisição se
-identifica como navegador. Sem headers, com o `User-Agent` do `urllib`, responde
-em 0,3 s. Não acrescente `User-Agent` em `scripts/juros_eua.py`.
-
-**As séries:**
-
-- `DGS10` — *Market Yield on U.S. Treasury Securities at 10-Year Constant
-  Maturity*, **diária, desde 02/01/1962**: a taxa que o Tesouro americano
-  publica na curva de *par yields*, interpolada para o prazo cheio de 10 anos.
-  Fim de semana e feriado não existem no arquivo, e pregão sem cotação vem como
-  `.` (o script descarta). O maior buraco da série é de 5 dias, e o site só
-  corta a linha acima de 6 (`buracoMax`), então ela atravessa feriado sem
-  furo.
-- `GS10` — a mesma taxa na **média do mês, desde abril de 1953**. São nove anos
-  a mais de história e é o mais longo que o FRED tem para o prazo de 10 anos;
-  entra como o segundo recorte do cartão. (Existe uma série do NBER com yields
-  de títulos longos do Tesouro de 1919 a 1944, mas ali "longo" não é 10 anos:
-  é outro instrumento, não dá para emendar na mesma linha.)
-
-O gráfico do ano corrente é a série diária filtrada pelo ano em `ANO_RECENTE`
-(hoje 2026) — virado o ano, é só mudar essa constante. O do mês em detalhe sai
-de `MES_DETALHE` (hoje `2026-09`).
-
-### O intradiário
-
-O FRED não tem dado intradiário: o `DGS10` é **uma cotação por dia**, a das
-15h30 de Nova York. Para o gráfico do mês, a fonte é o endpoint de gráfico do
-**investing.com** (id 23705), que responde sem chave desde que a requisição
-mande o header `Domain-Id: www`. Duas coisas importam:
-
-- **a janela é curta.** O endpoint devolve no máximo 744 pontos: ~1 mês de
-  cotação horária (`PT1H`) ou ~13 dias de 15 em 15 minutos (`PT15M`). Por isso
-  existe o acervo `dados/intradiario-10a.json`, que **só cresce**: cada rodada
-  junta o que baixou ao que já estava guardado, e o gráfico é montado do
-  acervo. **O que não for guardado hoje não volta mais** — se o site ficar um
-  mês sem rodar, aquele mês fica sem intradiário;
-- **não é o dado oficial.** É a cotação de mercado do papel, não o cálculo do
-  Tesouro. O script compara as duas todo dia e imprime o resultado: na primeira
-  carga, 20 dias conferidos, diferença média de **0,007 p.p.** e máxima de
-  0,018 p.p. A linha atravessa a madrugada porque o Treasury é negociado na
-  Ásia e na Europa; o corte no fim de semana é o mercado fechado.
-
-A hora gravada é a de **Nova York** (é nela que saem o dado e a decisão do
-Fed). A chave é o horário escrito por extenso (`2026-09-16T14:00`) e o
-navegador a lê como se fosse UTC: o que importa é o espaçamento, e assim o
-rótulo sai direto da chave, sem conta de fuso. Na virada do horário de verão
-americano a hora repetida vira uma chave só.
-
-Se a fonte intradiária cair, o script segue: mantém o acervo e continua
-atualizando o resto.
-
-### Os acontecimentos marcados
-
-Os dois gráficos de 2026 levam uma linha do tempo: linha vertical na data,
-rótulo curto no gráfico e a explicação inteira na lista embaixo do cartão, com
-a fonte de cada uma. As listas estão em `EVENTOS_ANO` e `EVENTOS_MES`, no
-script — **escritas na mão**, com data e número conferidos na fonte citada.
-Nada ali é deduzido do próprio gráfico, e a nota do cartão diz o que a marca
-significa: coincidência de data, não prova de causa.
-
-No gráfico do mês a hora entra na marca (`2026-09-16T14:00`), então o dado das
-8h30 e a decisão do Fed das 14h caem no ponto exato do salto.
 
 ## Para acrescentar um assunto
 
@@ -215,8 +135,8 @@ python3 -m http.server 8000   # http://localhost:8000
 ```
 index.html  styles.css  app.js
 assets/     fundo.jpg (fundo dos slides do FtM), logo-ftm.svg, favicon.svg
-dados/      juros-eua.json (gerado) + intradiario-10a.json (o acervo que acumula)
-scripts/    juros_eua.py (FRED e intradiário, automático)
+dados/      um JSON por assunto (gerado pelos scripts)
+scripts/    um gerador por assunto; gave.py roda sozinho na Action
 .github/workflows/atualizar.yml
 ```
 
