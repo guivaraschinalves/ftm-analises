@@ -141,7 +141,7 @@ details[open] > summary > .seta, details[open] > .nav-rotulo > .seta, details[op
    860px é o compromisso: a prosa fica presa em 66ch, que é a medida em que o
    olho acha a linha seguinte sozinho, e o gráfico, que é 16:9 e precisa de
    espaço, usa a coluna inteira. */
-.conteudo { width: 100%; max-width: 860px; margin: 0 auto; padding: 44px 24px 80px; }
+.conteudo { width: 100%; max-width: 1040px; margin: 0 auto; padding: 44px 24px 80px; }
 .sobrancelha { margin: 0; color: var(--accent); font-size: 12.5px; letter-spacing: .12em; text-transform: uppercase; }
 .titulo-pagina { margin: 6px 0 10px; font-size: 34px; letter-spacing: -.01em; }
 .lede { margin: 0 0 26px; color: var(--ink-2); font-size: 17px; line-height: 1.6; }
@@ -218,7 +218,7 @@ ul.artigo-texto ul li { margin: 0 0 4px; }
 .nota-margem a:hover { text-decoration: underline; }
 .nota-margem.aceso { border-left-color: var(--accent); }
 
-@media (min-width: 1240px) {
+@media (min-width: 1500px) {
   .nota-margem {
     position: absolute; left: -222px; width: 196px;
     margin: 0; padding: 0 14px 0 0;

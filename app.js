@@ -2313,11 +2313,11 @@
   // só se sabe com o layout pronto. Daí ser recalculado aqui, e de novo a
   // cada redimensionamento.
   //
-  // Abaixo de 1240px as notas voltam ao fluxo (o CSS cuida disso) e esta
+  // Abaixo de 1500px as notas voltam ao fluxo (o CSS cuida disso) e esta
   // função não mexe em nada: na coluna estreita não há margem para ocupar.
   var secoesComNotas = [];
   function posicionarNotas(secoes) {
-    if (!window.matchMedia || !window.matchMedia("(min-width: 1240px)").matches) {
+    if (!window.matchMedia || !window.matchMedia("(min-width: 1500px)").matches) {
       (secoes || []).forEach(function (secao) {
         [].forEach.call(secao.querySelectorAll(".nota-margem"), function (n) {
           n.style.top = "";
