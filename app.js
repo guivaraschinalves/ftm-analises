@@ -1884,9 +1884,13 @@
           btnFs.textContent = ativo ? "Sair da tela cheia" : "Tela cheia";
           if (!ativo && leitor.soTelaCheia && !box.hidden) fecharLeitor();
           if (ativo) leitor.entrou = true;
+          if (!box.hidden) setTimeout(ajustarLeitor, 60);
         });
       });
-      leitor = { box: box, titulo: titulo, corpo: corpo, sair: btnSair };
+      // trocar o comunicado muda o tamanho do texto: reajusta a letra
+      corpo.addEventListener("change", function () { setTimeout(ajustarLeitor, 0); });
+      window.addEventListener("resize", function () { if (!box.hidden) ajustarLeitor(); });
+      leitor = { box: box, titulo: titulo, corpo: corpo, sair: btnSair, barra: barra };
     }
     var no = cartao.frame.querySelector(".comparador");
     if (!no) return;
@@ -1899,8 +1903,30 @@
     leitor.corpo.appendChild(no);
     leitor.box.hidden = false;
     document.body.classList.add("visor-aberto");
+    ajustarLeitor();
     if (comTelaCheia && fullscreenSuportado(leitor.box)) entrarFullscreen(leitor.box);
     (comTelaCheia ? no.querySelector("select") : leitor.sair).focus();
+  }
+  // Como o zoom dos gráficos: o texto cresce até encher a tela. Busca a maior
+  // letra (entre 16 e 40px) com que o comparador inteiro cabe na altura livre;
+  // se nem com 16 couber (comunicado longo), fica 16 e a janela rola.
+  function ajustarLeitor() {
+    if (!leitor || leitor.box.hidden) return;
+    var corpo = leitor.corpo, box = leitor.box;
+    var no = corpo.querySelector(".comparador");
+    if (!no) return;
+    var livre = box.clientHeight - leitor.barra.offsetHeight - 70;
+    var lo = 16, hi = 40;
+    corpo.style.setProperty("--fs", hi + "px");
+    // mede o comparador, não o corpo: o corpo estica até a altura da janela
+    if (no.offsetHeight > livre) {
+      for (var k = 0; k < 8; k++) {
+        var meio = (lo + hi) / 2;
+        corpo.style.setProperty("--fs", meio + "px");
+        if (no.offsetHeight <= livre) lo = meio; else hi = meio;
+      }
+      corpo.style.setProperty("--fs", lo.toFixed(1) + "px");
+    }
   }
   function fecharLeitor() {
     if (!leitor || leitor.box.hidden) return;

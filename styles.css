@@ -549,27 +549,33 @@ body.visor-aberto { overflow: hidden; }
 .comparador-links { font-size: 13px; color: var(--ink-2); margin: 4px 0 10px; }
 .comparador-links a { color: var(--accent); }
 
-/* Zoom do comparador: o mesmo nó, numa janela que cobre a página, com letra
-   maior e a largura de leitura limitada */
+/* Zoom do comparador: o mesmo nó, numa janela que cobre a página, com o fundo
+   dos gráficos, o texto centrado na vertical e a letra (--fs) calculada para
+   encher a tela, como o zoom dos gráficos */
 .leitor {
-  position: fixed; inset: 0; z-index: 100; background: var(--bg); overflow-y: auto;
-  padding: 20px 24px 40px;
+  position: fixed; inset: 0; z-index: 100; background: var(--chart-bg); overflow-y: auto;
+  padding: 20px 28px 32px; display: flex; flex-direction: column;
 }
 .leitor[hidden] { display: none; }
 .leitor-barra {
-  max-width: 1080px; margin: 0 auto 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  width: 100%; max-width: min(1500px, 94vw); margin: 0 auto 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
 }
 .leitor-titulo { flex: 1 1 auto; margin: 0; font-size: 22px; color: var(--ink); }
-.leitor-corpo { max-width: 1080px; margin: 0 auto; }
+.leitor-corpo {
+  --fs: 20px;
+  flex: 1 0 auto; width: 100%; max-width: min(1500px, 94vw); margin: 0 auto;
+  display: flex; flex-direction: column; justify-content: center;
+}
 .leitor .comparador { padding: 8px 0; }
-.leitor .comparador select { font-size: 16px; }
-.leitor .comparador-resumo { font-size: 15px; }
-.leitor .comparador-texto p { font-size: 20px; line-height: 1.7; }
+.leitor .comparador-escolhas label { font-size: calc(var(--fs) * .62); }
+.leitor .comparador select { font-size: calc(var(--fs) * .8); }
+.leitor .comparador-resumo { font-size: calc(var(--fs) * .75); }
+.leitor .comparador-texto p { font-size: var(--fs); line-height: 1.6; margin-bottom: calc(var(--fs) * .6); }
+.leitor .comparador-links { font-size: calc(var(--fs) * .65); }
 .leitor:fullscreen { padding-top: 28px; }
 @media (max-width: 700px) {
   .leitor { padding: 14px 16px 32px; }
   .leitor-titulo { font-size: 18px; flex-basis: 100%; }
-  .leitor .comparador-texto p { font-size: 17px; }
 }
 
 /* Comentário do autor à direita do gráfico (análise de cenário). Fechado,
