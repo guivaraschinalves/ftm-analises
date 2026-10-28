@@ -1766,37 +1766,10 @@
     raiz.appendChild(ferramentas);
 
     cartao.frame = html("div", { "class": "frame" });
-    if (g.comentario) {
-      // Comentário do autor, à direita do gráfico como na margem do Word.
-      // Retrátil: fechado, fica só a aba com o balão; aberto, o gráfico
-      // estreita e é redesenhado na largura nova.
+    if (g._comentarios && g.tipo !== "comunicados") {
       var corpo = html("div", { "class": "card-corpo" });
-      var aside = html("aside", { "class": "comentario" });
-      var aba = html("button", { type: "button", "class": "comentario-aba", title: "Mostrar o comentário" });
-      aba.appendChild(icone(ICO_COMENTARIO));
-      aba.appendChild(html("span", { texto: "Comentário" }));
-      var painel = html("div", { "class": "comentario-painel" });
-      var topo = html("div", { "class": "comentario-topo" });
-      topo.appendChild(html("span", { "class": "comentario-rot", texto: "Comentário" }));
-      var fechar = html("button", { type: "button", "class": "comentario-fechar", title: "Recolher o comentário",
-                                    "aria-label": "Recolher o comentário", texto: "›" });
-      topo.appendChild(fechar);
-      painel.appendChild(topo);
-      paragrafos(g.comentario, "comentario-texto").forEach(function (p) { painel.appendChild(p); });
-      aside.appendChild(aba);
-      aside.appendChild(painel);
-      var abrir = function (sim) {
-        aside.classList.toggle("aberto", sim);
-        aba.setAttribute("aria-expanded", String(sim));
-        desenhar(cartao, true);
-      };
-      aba.addEventListener("click", function () { abrir(true); });
-      fechar.addEventListener("click", function () { abrir(false); });
-      // nasce aberto quando sobra largura; no celular, recolhido
-      aside.classList.toggle("aberto", window.innerWidth >= 1100);
-      aba.setAttribute("aria-expanded", String(window.innerWidth >= 1100));
       corpo.appendChild(cartao.frame);
-      corpo.appendChild(aside);
+      corpo.appendChild(montarComentario(cartao));
       raiz.appendChild(corpo);
     } else {
       raiz.appendChild(cartao.frame);
@@ -1929,6 +1902,174 @@
     document.body.classList.remove("visor-aberto");
     if (leitor.origem) leitor.origem.focus({ preventScroll: true });
     leitor.cartao = null;
+  }
+
+  // ---------- comentários do autor (análise de cenário) ----------
+  // À direita do gráfico, como a margem do Word, e retrátil. Quem tem a chave
+  // do GitHub escreve ali mesmo: o texto vai para o arquivo de comentários do
+  // assunto (textos/comentarios/…md) pela API do GitHub, e a Action "Publica
+  // o texto" o costura no JSON em cerca de um minuto. Até lá, o navegador de
+  // quem escreveu mostra a versão nova (guardada em "pendentes").
+  var REPO = "guivaraschinalves/ftm-analises", RAMO = "main";
+  var CHAVE_GH = "ftm_analises_github", CHAVE_PEND = "ftm_analises_comentarios_pendentes";
+  function lerLocal(k, padrao) {
+    try { var v = localStorage.getItem(k); return v === null ? padrao : JSON.parse(v); } catch (e) { return padrao; }
+  }
+  function gravarLocal(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+
+  function textoDoComentario(g) {
+    var pend = lerLocal(CHAVE_PEND, {})[g._comentarios + "|" + g.titulo];
+    if (!pend) return g.comentario || "";
+    // o JSON já trouxe a versão gravada, ou passou tempo demais: vale o JSON
+    if ((g.comentario || "") === pend.texto || Date.now() - pend.em > 15 * 60 * 1000) {
+      var todos = lerLocal(CHAVE_PEND, {});
+      delete todos[g._comentarios + "|" + g.titulo];
+      gravarLocal(CHAVE_PEND, todos);
+      return g.comentario || "";
+    }
+    return pend.texto;
+  }
+
+  function b64ParaTexto(b) {
+    var bin = atob(b.replace(/\s/g, "")), bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder().decode(bytes);
+  }
+  function textoParaB64(t) {
+    var bytes = new TextEncoder().encode(t), bin = "";
+    for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin);
+  }
+  // troca (ou cria, ou apaga, se vazio) o bloco "## título" do arquivo
+  function trocarBloco(md, titulo, texto) {
+    var linhas = md.replace(/\s+$/, "").split("\n"), ini = -1, fim = linhas.length;
+    for (var i = 0; i < linhas.length; i++) {
+      if (ini < 0 && linhas[i].trim() === "## " + titulo) { ini = i; continue; }
+      if (ini >= 0 && /^##? /.test(linhas[i])) { fim = i; break; }
+    }
+    var bloco = texto ? ["## " + titulo].concat(texto.split("\n"), [""]) : [];
+    if (ini >= 0) linhas.splice.apply(linhas, [ini, fim - ini].concat(bloco));
+    else if (texto) linhas = linhas.concat([""], bloco);
+    return linhas.join("\n").replace(/\n{3,}/g, "\n\n").replace(/\s*$/, "\n");
+  }
+  function chaveGitHub(pedirDeNovo) {
+    var t = pedirDeNovo ? null : lerLocal(CHAVE_GH, null);
+    if (t) return t;
+    t = window.prompt("Para gravar, cole a chave do GitHub (token com permissão de escrita no " +
+                      "repositório ftm-analises). Ela fica salva só neste navegador.");
+    if (t) gravarLocal(CHAVE_GH, t.trim());
+    return t ? t.trim() : null;
+  }
+  function gravarComentario(arquivo, titulo, texto, tentativa) {
+    var token = chaveGitHub(tentativa === "nova-chave");
+    if (!token) return Promise.reject(new Error("sem chave"));
+    var url = "https://api.github.com/repos/" + REPO + "/contents/" + arquivo;
+    var cab = { Authorization: "Bearer " + token, Accept: "application/vnd.github+json" };
+    return fetch(url + "?ref=" + RAMO + "&t=" + Date.now(), { headers: cab, cache: "no-store" }).then(function (r) {
+      if (r.status === 401 || r.status === 403) throw { chave: true };
+      if (r.status === 404) return { sha: null, md: "" };
+      if (!r.ok) throw new Error("GitHub respondeu " + r.status);
+      return r.json().then(function (j) { return { sha: j.sha, md: b64ParaTexto(j.content) }; });
+    }).then(function (atual) {
+      var novo = trocarBloco(atual.md || "# Comentários\n", titulo, texto);
+      var corpo = { message: (texto ? "Comentário: " : "Apaga comentário: ") + titulo,
+                    content: textoParaB64(novo), branch: RAMO };
+      if (atual.sha) corpo.sha = atual.sha;
+      return fetch(url, { method: "PUT", headers: cab, body: JSON.stringify(corpo) });
+    }).then(function (r) {
+      if (r.status === 401 || r.status === 403) throw { chave: true };
+      if ((r.status === 409 || r.status === 422) && !tentativa) return gravarComentario(arquivo, titulo, texto, "de-novo");
+      if (!r.ok) throw new Error("GitHub respondeu " + r.status);
+    }).catch(function (e) {
+      if (e && e.chave && tentativa !== "nova-chave") {
+        window.alert("A chave do GitHub não foi aceita. Cole outra.");
+        return gravarComentario(arquivo, titulo, texto, "nova-chave");
+      }
+      throw e;
+    });
+  }
+
+  function montarComentario(cartao) {
+    var g = cartao.grafico;
+    var aside = html("aside", { "class": "comentario" });
+    var aba = html("button", { type: "button", "class": "comentario-aba" });
+    aba.appendChild(icone(ICO_COMENTARIO));
+    var rotAba = html("span", {});
+    aba.appendChild(rotAba);
+    var painel = html("div", { "class": "comentario-painel" });
+    var topo = html("div", { "class": "comentario-topo" });
+    topo.appendChild(html("span", { "class": "comentario-rot", texto: "Comentário" }));
+    var fechar = html("button", { type: "button", "class": "comentario-fechar", title: "Recolher",
+                                  "aria-label": "Recolher o comentário", texto: "›" });
+    topo.appendChild(fechar);
+    var leitura = html("div", { "class": "comentario-leitura" });
+    var acoes = html("div", { "class": "comentario-acoes" });
+    var btnEditar = html("button", { type: "button", "class": "btn" });
+    acoes.appendChild(btnEditar);
+    var edicao = html("div", { "class": "comentario-edicao", hidden: "" });
+    var caixa = html("textarea", { rows: "8", placeholder: "Escreva o comentário. Linha em branco separa parágrafo; **assim** fica em negrito." });
+    var botoes = html("div", { "class": "comentario-acoes" });
+    var btnSalvar = html("button", { type: "button", "class": "btn btn-forte", texto: "Salvar" });
+    var btnCancelar = html("button", { type: "button", "class": "btn", texto: "Cancelar" });
+    var btnApagar = html("button", { type: "button", "class": "btn", texto: "Apagar" });
+    botoes.appendChild(btnSalvar); botoes.appendChild(btnCancelar); botoes.appendChild(btnApagar);
+    var aviso = html("p", { "class": "comentario-aviso" });
+    edicao.appendChild(caixa); edicao.appendChild(botoes);
+    painel.appendChild(topo); painel.appendChild(leitura); painel.appendChild(acoes);
+    painel.appendChild(edicao); painel.appendChild(aviso);
+    aside.appendChild(aba); aside.appendChild(painel);
+
+    var atual = textoDoComentario(g);
+    function mostrar() {
+      leitura.innerHTML = "";
+      paragrafos(atual, "comentario-texto").forEach(function (p) { leitura.appendChild(p); });
+      leitura.hidden = !atual;
+      btnEditar.textContent = atual ? "Editar" : "Escrever comentário";
+      rotAba.textContent = atual ? "Comentário" : "Comentar";
+      aba.title = atual ? "Mostrar o comentário" : "Escrever um comentário";
+      aside.classList.toggle("vazio", !atual);
+    }
+    function abrir(sim) {
+      aside.classList.toggle("aberto", sim);
+      aba.setAttribute("aria-expanded", String(sim));
+      desenhar(cartao, true);
+    }
+    function editar(sim) {
+      edicao.hidden = !sim; acoes.hidden = sim; leitura.hidden = sim || !atual;
+      if (sim) { caixa.value = atual; caixa.focus(); }
+    }
+    function salvar(texto) {
+      texto = texto.replace(/\r/g, "").replace(/\n{3,}/g, "\n\n").trim();
+      btnSalvar.disabled = btnApagar.disabled = true;
+      aviso.textContent = "Gravando…";
+      gravarComentario(g._comentarios, g.titulo, texto).then(function () {
+        atual = texto;
+        var todos = lerLocal(CHAVE_PEND, {});
+        todos[g._comentarios + "|" + g.titulo] = { texto: texto, em: Date.now() };
+        gravarLocal(CHAVE_PEND, todos);
+        mostrar(); editar(false);
+        aviso.textContent = "Gravado. Aparece para todos em cerca de um minuto.";
+        if (!texto) abrir(false);
+      }).catch(function (e) {
+        aviso.textContent = e && e.message === "sem chave" ? "Sem a chave do GitHub, não dá para gravar."
+          : "Não gravou: " + ((e && e.message) || "erro") + ". O texto continua na caixa.";
+      }).then(function () { btnSalvar.disabled = btnApagar.disabled = false; });
+    }
+    aba.addEventListener("click", function () { abrir(true); if (!atual) editar(true); });
+    fechar.addEventListener("click", function () { editar(false); aviso.textContent = ""; abrir(false); });
+    btnEditar.addEventListener("click", function () { editar(true); });
+    btnCancelar.addEventListener("click", function () { editar(false); aviso.textContent = ""; if (!atual) abrir(false); });
+    btnSalvar.addEventListener("click", function () { salvar(caixa.value); });
+    btnApagar.addEventListener("click", function () {
+      if (atual && window.confirm("Apagar este comentário?")) salvar("");
+      else if (!atual) { editar(false); abrir(false); }
+    });
+    mostrar();
+    // com comentário e largura sobrando, nasce aberto; sem, só a aba
+    var nasceAberto = !!atual && window.innerWidth >= 1100;
+    aside.classList.toggle("aberto", nasceAberto);
+    aba.setAttribute("aria-expanded", String(nasceAberto));
+    return aside;
   }
 
   function montarComparador(g) {
@@ -2490,6 +2631,7 @@
       });
       sec.graficos.forEach(function (g) {
         g.fonte = g.fonte || dados.fonte;
+        g._comentarios = dados.comentarios || null;
         var c = criarCartao(g);
         c.raiz.open = true;
         cartoes.push(c);
@@ -2553,6 +2695,7 @@
       var daSecao = [];
       sec.graficos.forEach(function (g) {
         g.fonte = g.fonte || dados.fonte;
+        g._comentarios = dados.comentarios || null;
         var c = criarCartao(g);
         c.raiz.open = true;
         cartoes.push(c);

@@ -126,7 +126,10 @@ def ler_comentarios(caminho):
 
 def aplicar_comentarios(doc, nome_json):
     if nome_json not in COMENTARIOS:
+        doc.pop("comentarios", None)
         return 0
+    # o site escreve neste arquivo (pela API do GitHub), então ele vai no JSON
+    doc["comentarios"] = "textos/" + COMENTARIOS[nome_json]
     caminho = os.path.join(RAIZ, "textos", COMENTARIOS[nome_json])
     coment = ler_comentarios(caminho) if os.path.exists(caminho) else {}
     graficos = [g for s in doc["secoes"] for g in s.get("graficos", [])]

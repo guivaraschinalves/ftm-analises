@@ -604,3 +604,16 @@ body.visor-aberto { overflow: hidden; }
   .comentario-aba span { writing-mode: horizontal-tb; }
   .comentario-painel { width: 100%; border-left: none; border-top: 3px solid var(--accent); }
 }
+.comentario.vazio .comentario-aba { color: var(--ink-2); }
+.comentario-leitura[hidden], .comentario-edicao[hidden], .comentario-acoes[hidden] { display: none; }
+.comentario-acoes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.comentario-acoes .btn { font-size: 13px; padding: 4px 10px; }
+.btn-forte { color: var(--ink); border-color: var(--accent); }
+.comentario-edicao textarea {
+  width: 100%; box-sizing: border-box; resize: vertical; min-height: 150px;
+  font: inherit; font-size: 14px; line-height: 1.5; color: var(--ink); background: var(--bg);
+  border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
+}
+.comentario-edicao textarea:focus { outline: 2px solid var(--accent); outline-offset: 0; }
+.comentario-aviso { margin: 8px 0 0; font-size: 12.5px; color: var(--ink-2); }
+.comentario-aviso:empty { display: none; }

@@ -167,6 +167,14 @@ Texto do comentário, com **negrito** se precisar.
 Outro parágrafo.
 ```
 
+**Pelo próprio site:** cada gráfico da análise de cenário tem, à direita, a
+aba "Comentar" / "Comentário". Abre, escreve, "Salvar": o site grava neste
+mesmo arquivo pela API do GitHub. Na primeira gravação ele pede uma chave do
+GitHub (token *fine-grained* com **Contents: Read and write** só no
+ftm-analises), que fica no `localStorage` do navegador
+(`ftm_analises_github`). Até a Action publicar, o navegador de quem escreveu
+mostra a versão nova (`ftm_analises_comentarios_pendentes`, 15 min).
+
 O `##` é o título do gráfico como aparece no site (ou o id dele). Editou e deu
 push (dá pelo próprio GitHub, até do celular), a Action "Publica o texto"
 costura no JSON e o comentário aparece à direita do gráfico, num painel que
