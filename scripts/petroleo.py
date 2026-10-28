@@ -824,7 +824,7 @@ def main():
         print("  AVISO: gráficos sem seção em SECOES_ARTIGO: %s" % ", ".join(todos))
         artigo.append(dict(titulo="Outros gráficos", graficos=list(todos.values())))
     doc = dict(atualizado=datetime.date.today().isoformat(), referencia=ref, formato="artigo",
-               fonte=FONTE_COMEX, assunto="Petróleo, derivados e comércio exterior",
+               fonte=FONTE_COMEX, grupo="Análises Variadas", assunto="Petróleo, derivados e comércio exterior",
                secoes=[s_ for s_ in artigo if s_["graficos"]])
     with open(SAIDA, "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False, separators=(",", ":"))

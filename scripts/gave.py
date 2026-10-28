@@ -543,7 +543,7 @@ def montar():
         cart,
     ]
     return dict(atualizado=hoje.isoformat(), referencia=ult, formato="artigo",
-                assunto="Os quatro quadrantes de Charles Gave",
+                assunto="Os quatro quadrantes de Charles Gave", grupo="O Ciclo Econômico",
                 fonte="Shiller (Yale), FRED, Banco Mundial (via datahub) e FtM",
                 apresentacao=("Os indicadores de Charles Gave, da Gavekal, no livro The General Theory of Portfolio "
                               "Construction (2024), refeitos com dados públicos. Em %s, a economia americana "

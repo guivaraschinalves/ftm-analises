@@ -758,6 +758,7 @@ def main():
         "referencia": ultima_data(secoes) or hoje.isoformat(),
         "fonte": FONTE_ANP,
         "assunto": dt["assunto"],
+        "grupo": "Análises Variadas",
         # Este assunto é uma análise, não um painel: o leitor precisa ser
         # levado na ordem, e obrigá-lo a abrir capítulo é atrito. Ver
         # montarArtigo() no app.js.

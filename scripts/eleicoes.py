@@ -677,6 +677,7 @@ def main():
         referencia=base.pregoes[-1],
         fonte=FONTE,
         assunto="A bolsa nas eleições presidenciais",
+        grupo="Análises Variadas",
         apresentacao=(
             "Nove eleições presidenciais desde o Real — 15 turnos já realizados, com o 2º turno "
             "de 2026 ainda pela frente —, medidos contra os 8.315 pregões do Ibovespa que o "
