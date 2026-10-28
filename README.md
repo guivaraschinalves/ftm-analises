@@ -249,15 +249,19 @@ armadilhas de cada uma estão no cabeçalho do script. As principais:
 
 - **FRED sem User-Agent, uma série por pedido.** Num lote, um id que não existe
   derruba o lote inteiro com 404.
-- **CPI por componente vem do Fed de San Francisco** (o Excel da página "CPI inflation contributions"), com a contribuição de cada grupo e de cada item do núcleo.
 - **CPI em 12 meses pelo índice sem ajuste sazonal**, que é o oficial. Com
   ajuste, set/26 dá 4,0% em vez de 3,7%.
 - **ISM** não está mais no FRED: vem do gráfico de eventos do investing.com,
   com a data da divulgação (o mês de referência é o anterior).
 - **TIC**: o arquivo antigo (`s1_globl`) parou em jan/2023; o novo (SLT) tem o
   fluxo desde 2023.
-- **Breakeven do payroll** usa a variação mensal da população sem os meses de
-  janeiro, que trazem o ajuste anual de população do Census.
+- **Breakeven do payroll** segue o método do St. Louis Fed: crescimento da
+  população de 16+ × participação × (1 − desemprego) × razão entre o emprego do
+  payroll e o da pesquisa domiciliar. A população é a realizada, sem os meses
+  de janeiro, que trazem o ajuste anual do Census. A faixa cinza é a
+  estimativa do próprio St. Louis Fed para 2026 (15 a 87 mil).
+- **CPI e PCE por componente** vêm dos Excels do Fed de San Francisco; o link
+  muda a cada atualização e o script o acha na página.
 
 Duas opções novas no `app.js` vieram com ele: `sombras` (faixas de fundo,
 `[{de, ate}]`, usadas para as recessões do NBER) e as unidades `mil`, `h` e `pb` (pontos-base).

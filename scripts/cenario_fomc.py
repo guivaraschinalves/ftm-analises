@@ -51,6 +51,7 @@ import os
 import re
 import sys
 import time
+import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 import zipfile
@@ -214,21 +215,6 @@ def graficos_inflacao():
               series=[serie("CPI cheio", BRANCO, desde(cheio, "1958-01"), rotulo=True),
                       serie("Núcleo", LARANJA, desde(nucleo, "1958-01"), rotulo=True)])
 
-    ini = "2015-01"
-    pce = [("PCE cheio", "PCEPI", BRANCO), ("Núcleo", "PCEPILFE", LARANJA), ("Bens", "DGDSRG3M086SBEA", AZUL),
-           ("Serviços", "DSERRG3M086SBEA", VERDE), ("Serviços sem energia e moradia", "IA001260M", CIANO)]
-    pce_ext = [("Energia", "DNRGRG3M086SBEA", AMARELO), ("Alimentos", "DFXARG3M086SBEA", VERDE)]
-    g3 = dict(id="pce-componentes", titulo="Inflação do consumo das famílias (PCE) por componente",
-              subtitulo="Deflator do PCE, com ajuste sazonal", unidade="%", fonte="BEA (via FRED) e FtM",
-              periodoPadrao="5", variantes=[
-                  dict(rot="% em 12 meses",
-                       series=[serie(n, c, desde(var(fred(i)), ini), rotulo=True) for n, i, c in pce]),
-                  dict(rot="% em 3 meses anualizado",
-                       series=[serie(n, c, desde(anualizado(fred(i)), ini), rotulo=True) for n, i, c in pce]),
-                  dict(rot="Energia e alimentos, % em 12 meses",
-                       series=[serie(n, c, desde(var(fred(i)), ini), rotulo=True) for n, i, c in pce_ext]),
-              ])
-
     npce = var(fred("PCEPILFE"))
     comum = {m: nucleo[m] - npce[m] for m in npce if m in nucleo}
     g4 = dict(id="nucleo-pce-cpi", titulo="Núcleo do PCE e núcleo do CPI",
@@ -240,7 +226,7 @@ def graficos_inflacao():
                   dict(rot="Diferença, CPI menos PCE, p.p.", unidade="pp", series=[
                       serie("CPI menos PCE", AZUL, desde(comum, "1960-01"), tipo="barra", legenda=False)]),
               ])
-    return [g1] + graficos_frbsf() + [g3, g4, tabela_ppi()]
+    return [g1] + graficos_frbsf() + [graficos_frbsf_pce(), g4, tabela_ppi()]
 
 
 # ---- contribuições por componente: Fed de San Francisco
@@ -302,10 +288,13 @@ def numero(v):
         return None                                      # "NA" e vazio
 
 
-def graficos_frbsf():
-    pagina = baixar(FRBSF_PAGINA, headers=NAVEGADOR).decode("utf-8", "replace")
-    url = re.search(r'href="([^"]*cpi-contributors-data\.xlsx[^"]*)"', pagina).group(1).replace("&amp;", "&")
-    conteudo = baixar(url, headers=NAVEGADOR)
+def frbsf_excel(pagina_url, arquivo):
+    """Função que lê uma aba do Excel do FRBSF: {"AAAA-MM": {coluna: valor}}.
+    O link tem um "?data" que muda a cada atualização, e às vezes vem
+    relativo ("/wp-content/..."): por isso sai da página."""
+    pagina = baixar(pagina_url, headers=NAVEGADOR).decode("utf-8", "replace")
+    url = re.search(r'href="([^"]*%s[^"]*)"' % re.escape(arquivo), pagina).group(1).replace("&amp;", "&")
+    conteudo = baixar(urllib.parse.urljoin(pagina_url, url), headers=NAVEGADOR)
 
     def aba(nome, col_data="A"):
         linhas = xlsx_aba(conteudo, nome)
@@ -318,6 +307,11 @@ def graficos_frbsf():
             m = data_excel(linhas[r][col_data])
             out[m] = {nomes[c]: numero(v) for c, v in linhas[r].items() if c in nomes and c != col_data}
         return out
+    return aba
+
+
+def graficos_frbsf():
+    aba = frbsf_excel(FRBSF_PAGINA, "cpi-contributors-data.xlsx")
     a12, am = aba("chart2_headlineCPI_contr_YoY"), aba("chart4_headlineCPI_contr_MoM")
     t12, tm = aba("chart1_CPI_YoY"), aba("chart3_CPI_MoM")
 
@@ -353,6 +347,46 @@ def graficos_frbsf():
                    itens=[[ITENS_NUCLEO[k], round(100 * v, 1), VERMELHO if v > 0 else AZUL] for k, v in escolha])
     print("  FRBSF: contribuições até %s, itens do núcleo até %s" % (ult, m))
     return [g, g_itens]
+
+
+FRBSF_PCE = ("https://www.frbsf.org/research-and-insights/data-and-indicators/"
+             "pce-inflation-contributions-from-goods-and-services/")
+PCE_GRUPOS = {"Energy": ("Energia", AMARELO), "Food": ("Alimentos", VERDE), "Core Goods": ("Bens do núcleo", AZUL),
+              "Core Services exc. Housing": ("Serviços sem moradia", LARANJA), "Housing": ("Moradia", CIANO),
+              "Health Care": ("Saúde", VERDE), "Financial & Insurance": ("Serviços financeiros e seguros", ROXO),
+              "Financial Services & Insurance": ("Serviços financeiros e seguros", ROXO),
+              "Food Services & Accommodations": ("Restaurantes e hospedagem", LARANJA),
+              "Transportation Services": ("Transporte", AZUL), "Other Services": ("Outros serviços", CINZA)}
+
+
+def graficos_frbsf_pce():
+    """O mesmo gráfico do CPI, com o Excel do PCE do FRBSF: contribuição para
+    o PCE cheio, para o núcleo e para o supercore (serviços sem energia e
+    moradia), em 12 meses e no mês, desde 1960."""
+    aba = frbsf_excel(FRBSF_PCE, "pce-contributions-data.xlsx")
+    recortes = [("PCE cheio", "chart1_headlinePCEPI_YoY", "chart2_headlinePCEPI_MoM"),
+                ("Núcleo", "chart3_corePCEPI_YoY", "extra_corePCEPI_MoM"),
+                ("Supercore (serviços sem energia e moradia)", "chart4_supercorePCEPI_YoY",
+                 "extra_supercorePCEPI_MoM")]
+    variantes, ult = [], None
+    for nome, a12, am in recortes:
+        for quando, nome_aba in (("em 12 meses", a12), ("no mês", am)):
+            d = aba(nome_aba)
+            total = next(k for k in next(iter(d.values())) if k.startswith("Total"))
+            grupos = [k for k in next(iter(d.values())) if k in PCE_GRUPOS]
+            series = [serie(PCE_GRUPOS[k][0], PCE_GRUPOS[k][1],
+                            {m: r[k] for m, r in d.items() if m >= "1990-01" and r.get(k) is not None}, 2,
+                            tipo="barra") for k in grupos]
+            series.append(serie(nome.split(" (")[0], BRANCO,
+                                {m: r[total] for m, r in d.items() if m >= "1990-01" and r.get(total) is not None},
+                                2, rotulo=True))
+            variantes.append(dict(rot="%s, %s" % (nome, quando), series=series))
+            ult = max(m for m, r in d.items() if r.get(total) is not None)
+    print("  FRBSF PCE até %s" % ult)
+    return dict(id="pce-componentes", titulo="Contribuição de cada componente para a inflação do consumo (PCE)",
+                subtitulo="Barras = contribuição em p.p.; linha = inflação, %; com ajuste sazonal",
+                unidade="%", barra=1, periodoPadrao="5", variantes=variantes,
+                fonte="Federal Reserve Bank of San Francisco, BEA e FtM")
 
 
 PPI = [("FD4", "Demanda final", True), ("FD41", "Bens", False), ("FD411", "Alimentos", False),
@@ -492,27 +526,38 @@ def graficos_trabalho():
                                rotulo=True, legenda=False)]),
                  ])
 
-    # Breakeven: quantas vagas por mês mantêm a taxa de emprego (emprego ÷
-    # população) parada = crescimento mensal da população em idade de
-    # trabalhar × taxa de emprego. A população é a da pesquisa domiciliar, e o
-    # salto de janeiro (o ajuste anual de população do Census, que nos últimos
-    # anos foi a revisão da imigração) muda o nível de uma vez.
-    # Por isso a conta usa a variação MÊS A MÊS da população, sem as de
-    # janeiro: o degrau do ajuste não é crescimento, é revisão do nível, e
-    # deixá-lo na média faria o breakeven despencar em janeiro e voltar aos
-    # poucos ao longo do ano. O mês sem pesquisa (out/2025, na paralisação do
-    # governo) também fica fora.
+    # Breakeven, pelo método do St. Louis Fed ("Breakeven employment growth:
+    # a simple, useful benchmark", abr/2025):
+    #
+    #   breakeven = crescimento da população de 16+ × participação
+    #               × (1 − desemprego) × (emprego do payroll ÷ emprego da
+    #               pesquisa domiciliar)
+    #
+    # A participação é a média de 12 meses, como lá; a razão entre as duas
+    # pesquisas (0,979 no artigo) sai dos dados, também em média de 12 meses.
+    # O St. Louis usa a projeção de população do CBO; aqui o crescimento é o
+    # realizado da pesquisa domiciliar, em média dos últimos 12 meses SEM os
+    # janeiros: em janeiro entra o ajuste anual de população do Census (nos
+    # últimos anos, a revisão da imigração), que muda o nível de uma vez e não
+    # é crescimento. O mês sem pesquisa (out/2025) fica fora.
     pop, emp = fred("CNP16OV"), fred("CE16OV")
+    part12, u = media(fred("CIVPART"), 12), fred("UNRATE")
+    razao = media({m: total[m] / emp[m] for m in emp if m in total}, 12)
     dpop = {m: pop[m] - pop[mes_mais(m, -1)] for m in pop if mes_mais(m, -1) in pop and m[5:] != "01"}
     be = {}
     for m in pop:
         janela = [dpop[k] for k in (mes_mais(m, -i) for i in range(12)) if k in dpop]
-        if len(janela) >= 9 and m in emp:
-            be[m] = sum(janela) / len(janela) * emp[m] / pop[m]
+        if len(janela) >= 9 and m in part12 and m in u and m in razao:
+            be[m] = sum(janela) / len(janela) * part12[m] / 100 * (1 - u[m] / 100) * razao[m]
+    # a faixa do próprio St. Louis Fed para 2026 (mar/2026): 15 mil no cenário
+    # baixo de imigração da AEI-Brookings, 87 mil no do CBO
+    faixa_stl = {m: (15, 87) for m in sorted(be) if m >= "2026-01"}
     g_be = dict(id="payroll-breakeven", titulo="Payroll e o breakeven do mercado de trabalho",
-                subtitulo="Mil vagas por mês; breakeven = crescimento mensal médio da população de 16 anos ou "
-                          "mais nos últimos 12 meses, sem o ajuste anual de janeiro, vezes a taxa de emprego",
-                unidade="mil", fonte="BLS (via FRED) e FtM", series=[
+                subtitulo="Mil vagas por mês; breakeven = crescimento da população de 16 anos ou mais × participação "
+                          "× (1 − desemprego) × razão payroll/pesquisa domiciliar, o método do St. Louis Fed",
+                unidade="mil", fonte="BLS (via FRED), St. Louis Fed e FtM", series=[
+                    dict(nome="Faixa do St. Louis Fed para 2026 (cenários de imigração)", cor=CINZA, tipo="faixa",
+                         dados=[[m, a, b] for m, (a, b) in faixa_stl.items()]),
                     serie("Payroll, média de 3 meses", BRANCO, desde(media(dif(total)), ini), 0, rotulo=True),
                     serie("Breakeven estimado", LARANJA, desde(be, ini), 0, rotulo=True)])
 
