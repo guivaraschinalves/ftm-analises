@@ -51,7 +51,9 @@ import json
 import os
 import sys
 import time
+import math
 import urllib.request
+import zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import xls  # noqa: E402
@@ -62,6 +64,7 @@ CACHE = os.path.join(RAIZ, "dados", ".cache-gave")
 
 SHILLER = "http://www.econ.yale.edu/~shiller/data/ie_data.xls"
 OURO = "https://raw.githubusercontent.com/datasets/gold-prices/main/data/monthly.csv"
+FRENCH = "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/12_Industry_Portfolios_CSV.zip"
 LIVRO = "https://web.gavekal.com/media/ebook_files/PDF_The_General_Theory_of_Portfolio_Construction.pdf"
 
 MESES_MEDIA = 84
@@ -141,7 +144,7 @@ def shiller():
         print("  [!] Yale não respondeu; uso a cópia guardada")
         conteudo = open(caminho, "rb").read()
     c = xls.abas(conteudo)["Data"]
-    preco, juro = {}, {}
+    preco, juro, divid = {}, {}, {}
     for r in range(8, max(r for r, _ in c) + 1):
         d = c.get((r, 0))
         if not isinstance(d, float):
@@ -152,7 +155,9 @@ def shiller():
             preco[m] = c[(r, 1)]
         if isinstance(c.get((r, 6)), float):
             juro[m] = c[(r, 6)]
-    return preco, juro
+        if isinstance(c.get((r, 2)), float):
+            divid[m] = c[(r, 2)]
+    return preco, juro, divid
 
 
 def ouro():
@@ -242,11 +247,134 @@ def grafico_razao(id_, titulo, sub_razao, nome, r, mm, fonte, casas=3, unidade="
             serie("Distância da média de 7 anos", BRANCO, dist, 1, rotulo=True, legenda=False)])])
 
 
+# ---------------------------------------------------------------- carteiras
+
+def energia_french():
+    """Retorno mensal (fração) da carteira de energia (valor ponderado) do
+    Ken French, a das 12 indústrias, "Enrgy": petróleo, gás e carvão."""
+    z = zipfile.ZipFile(io.BytesIO(baixar(FRENCH)))
+    linhas = z.read(z.namelist()[0]).decode("latin-1").splitlines()
+    i = next(k for k, l in enumerate(linhas) if "Value Weighted Returns -- Monthly" in l)
+    cab = [c.strip() for c in linhas[i + 1].split(",")]
+    col = cab.index("Enrgy")
+    out = {}
+    for l in linhas[i + 2:]:
+        p = [c.strip() for c in l.split(",")]
+        if len(p) < len(cab) or len(p[0]) != 6 or not p[0].isdigit():
+            break
+        if float(p[col]) > -99:
+            out[p[0][:4] + "-" + p[0][4:]] = float(p[col]) / 100
+    return out
+
+
+CARTEIRAS = [  # nome, pesos (a chave "def" é ouro ou título, pela regra de Gave), retorno real no livro
+    ("Permanente de Browne", {"acoes": .25, "titulo": .25, "ouro": .25, "caixa": .25}, "4,1%"),
+    ("Três ativos de Gave", {"acoes": 1 / 3, "caixa": 1 / 3, "def": 1 / 3}, "5,5%"),
+    ("Browne com energia", {"acoes": .2, "energia": .2, "titulo": .2, "ouro": .2, "caixa": .2}, "cerca de 5%"),
+    ("Browne dinâmica", {"acoes": .25, "energia": .25, "caixa": .25, "def": .25}, "6,1%"),
+    ("S&P 500 com dividendos", {"acoes": 1.0}, "6,8%"),
+]
+CORES_CART = [AZUL, CIANO, LARANJA, VERDE, BRANCO]
+INI_CART = "1970-01"
+
+
+def secao_carteiras(sp, divid, tr, au, r_mo, mm_mo):
+    caixa = {m: v / 1200 for m, v in mensal(fred("TB3MS")).items()}
+    cpi = mensal(fred("CPIAUCNS"))
+    # out/2025 não teve coleta (paralisação do governo): média geométrica dos vizinhos
+    for m in sorted(cpi):
+        a, b = mes_mais(m, -2), mes_mais(m, -1)
+        if b not in cpi and a in cpi:
+            cpi[b] = math.sqrt(cpi[a] * cpi[m])
+    en = energia_french()
+    # dividendos: os do Shiller enquanto houver; depois, o último rendimento
+    ult_d = max(divid)
+    rend = divid[ult_d] / sp[ult_d]
+    ret = {"acoes": {}, "titulo": {}, "ouro": {}, "caixa": {}, "energia": en}
+    for m in sorted(sp):
+        a = mes_mais(m, -1)
+        if a in sp:
+            d = divid.get(m, rend * sp[m])
+            ret["acoes"][m] = (sp[m] + d / 12) / sp[a] - 1
+        if a in tr:
+            ret["titulo"][m] = tr[m] / tr[a] - 1
+        if a in au:
+            ret["ouro"][m] = au[m] / au[a] - 1
+        if a in caixa:
+            ret["caixa"][m] = caixa[a]           # o juro do mês anterior é o que se ganha neste
+    fim = min(max(v) for v in ret.values())
+    fim = min(fim, max(cpi))
+    meses = [m for m in sorted(ret["acoes"]) if INI_CART <= m <= fim]
+    # a regra: no fim do mês anterior, título acima da média de 7 anos contra o ouro -> título; senão, ouro
+    defesa = {m: "titulo" if r_mo[mes_mais(m, -1)] > mm_mo[mes_mais(m, -1)] else "ouro" for m in meses}
+    base_cpi = cpi[mes_mais(INI_CART, -1)]
+    nominal, real, linhas = [], [], []
+    print("  carteiras de %s a %s (ações de energia do Ken French até %s)" % (meses[0], fim, max(en)))
+    for (nome, pesos, livro), cor in zip(CARTEIRAS, CORES_CART):
+        v, serie_n, serie_r, rets, pico, queda = 1.0, {}, {}, [], 1.0, 0.0
+        for m in meses:
+            r = sum(w * ret[defesa[m] if k == "def" else k][m] for k, w in pesos.items())
+            rets.append(r)
+            v *= 1 + r
+            vr = v * base_cpi / cpi[m]
+            serie_n[m], serie_r[m] = v, vr
+            pico = max(pico, vr)
+            queda = min(queda, vr / pico - 1)
+        anos = len(meses) / 12
+        an_n = 100 * (v ** (1 / anos) - 1)
+        an_r = 100 * ((v * base_cpi / cpi[fim]) ** (1 / anos) - 1)
+        med = sum(rets) / len(rets)
+        vol = 100 * math.sqrt(sum((x - med) ** 2 for x in rets) / (len(rets) - 1) * 12)
+        print("  %-24s %5.1f%% nominal, %4.1f%% real, vol %4.1f%%, queda máx. real %5.1f%%"
+              % (nome, an_n, an_r, vol, 100 * queda))
+        nominal.append(serie(nome, cor, serie_n, 3, rotulo=True))
+        real.append(serie(nome, cor, serie_r, 3, rotulo=True))
+        linhas.append([{"t": nome, "forte": nome == "Browne dinâmica"}, {"t": br(an_n, 1) + "%"},
+                       {"t": br(an_r, 1) + "%"}, {"t": livro}, {"t": br(vol, 1) + "%"},
+                       {"t": br(100 * queda, 1) + "%", "cor": VERMELHO}])
+    hoje_def = "ouro" if defesa[fim] == "ouro" else "título de 10 anos"
+    k = fim
+    while mes_mais(k, -1) in defesa and defesa[mes_mais(k, -1)] == defesa[fim]:
+        k = mes_mais(k, -1)
+    periodo = "de %s a %s" % (rot_mes(meses[0]), rot_mes(fim))
+    g = dict(id="gave-carteiras", titulo="Quanto rendeu US$ 1 em cada carteira",
+             subtitulo="US$ 1 aplicado no fim de 1969, rebalanceado todo mês", unidade="x", fonte=(
+                 "Shiller (Yale), FRED, Banco Mundial, Ken French (Dartmouth) e FtM"),
+             variantes=[dict(rot="descontada a inflação (CPI)", series=real),
+                        dict(rot="em dólares correntes", series=nominal)])
+    tab = dict(id="gave-carteiras-tabela", tipo="tabela", titulo="As carteiras lado a lado",
+               subtitulo="%s; retornos ao ano; queda máxima descontada a inflação" % periodo,
+               fonte="Shiller (Yale), FRED, Banco Mundial, Ken French (Dartmouth), Charles Gave e FtM",
+               colunas=[{"rot": "Carteira"}, {"rot": "Retorno nominal", "num": True},
+                        {"rot": "Retorno real", "num": True}, {"rot": "Real, no livro", "num": True},
+                        {"rot": "Volatilidade", "num": True}, {"rot": "Queda máxima", "num": True}],
+               linhas=linhas,
+               nota="Os preços são a média de cada mês (é o que a série do Shiller tem), o que alisa os "
+                    "movimentos: a volatilidade e a queda máxima saem menores que no livro, e os retornos, "
+                    "quase iguais. As ações de energia são a carteira de energia do Ken French, porque o "
+                    "XLE só existe desde 1998. Depois de jun/2023 os dividendos do S&P 500 seguem o último "
+                    "rendimento conhecido.")
+    texto = (
+        "Gave parte da carteira permanente de Harry Browne: um quarto em ações (S&P 500), um quarto em "
+        "título de 10 anos do Tesouro, um quarto em ouro e um quarto em caixa (letra de 3 meses), "
+        "rebalanceada para voltar aos 25%%. Depois ele faz duas mudanças.\n\n"
+        "A primeira é nunca ter título e ouro ao mesmo tempo: quando o título está acima da média de 7 "
+        "anos contra o ouro, fica o título; quando está abaixo, fica o ouro. Com isso a carteira passa a "
+        "ter três ativos. A segunda é um bloco de ações de produtoras de energia, porque o S&P 500 de hoje "
+        "tem pouca energia e sofreria numa alta do petróleo. Juntando as duas, ele chega à Browne "
+        "dinâmica: um quarto em ações, um quarto em energia, um quarto em caixa e um quarto em ouro ou "
+        "título.\n\n"
+        "Hoje a regra manda ter %s, desde %s." % (hoje_def, rot_mes(k)))
+    fontes = [dict(id="french", rot="Ken French, carteiras de 12 indústrias (Dartmouth)",
+                   url="https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html")]
+    return dict(titulo="A carteira de Gave", fontes=fontes, figuras=[], texto=texto, graficos=[g, tab])
+
+
 def montar():
     hoje = datetime.date.today()
     corte = "%04d-%02d" % (hoje.year, hoje.month)      # o mês corrente fica de fora
 
-    sp, juro = shiller()
+    sp, juro, divid = shiller()
     fim_shiller = mes_mais(max(sp), -1)                  # o último mês de Yale é o fechamento do dia 1º
     sp = {m: v for m, v in sp.items() if m <= fim_shiller}
     sp_fred = mensal(fred("SP500"))
@@ -386,6 +514,7 @@ def montar():
 
     fontes_livro = [dict(id="livro", rot="Charles Gave, The General Theory of Portfolio Construction (2024)",
                          url=LIVRO)]
+    cart = secao_carteiras(sp, divid, tr, au, r_mo, mm_mo)
     secoes = [
         dict(titulo="Os quatro quadrantes", fontes=fontes_livro, figuras=[], texto=(
             "Gave divide a economia em quatro estados a partir de duas perguntas, respondidas por preços de "
@@ -411,6 +540,7 @@ def montar():
             "No capítulo 6, Gave nota que a maior parte das recessões americanas desde 1950 começou depois "
             "de uma queda desta razão, isto é, com o petróleo subindo mais que o ouro."),
             graficos=[g_ow]),
+        cart,
     ]
     return dict(atualizado=hoje.isoformat(), referencia=ult, formato="artigo",
                 assunto="Os quatro quadrantes de Charles Gave",

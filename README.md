@@ -294,6 +294,15 @@ desde 1960, média anual antes). O retorno total do título é calculado do juro
 fora. A cópia do arquivo de Yale fica em `dados/.cache-gave/` para quando o
 site não responder.
 
+A seção "A carteira de Gave" simula, desde jan/1970 e com rebalanceamento
+mensal, a permanente de Browne (25% em ações, título, ouro e caixa), a de três
+ativos (título ou ouro pela regra), a com energia e a Browne dinâmica. Caixa é
+o TB3MS; ações de energia, a carteira "Enrgy" das 12 indústrias do Ken French
+(o XLE só começa em 1998); dividendos do Shiller até jun/2023 e, depois, o
+último rendimento. Os retornos reais batem com o livro (4,1 / 5,6 / 5,1 / 6,4%
+contra 4,1 / 5,5 / ~5 / 6,1%); volatilidade e queda saem menores porque os
+preços são médias mensais. Out/2025 não tem CPI e é interpolado.
+
 ## A bolsa nas eleições presidenciais
 
 `python3 scripts/eleicoes.py` baixa da API OData aberta do Ipeadata (sem chave)
