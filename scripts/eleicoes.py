@@ -316,13 +316,13 @@ def g_reacao(evs):
         fonte=FONTE,
         variantes=[dict(rot="em %", series=barras("reacao", 2), unidade="%"),
                    dict(rot="em desvios-padrão do ano", series=barras("reacao_dp", 2), unidade="dp")],
-        nota="A eleição é no domingo, então esta é quase sempre a variação de sexta para segunda — "
+        nota="A eleição é no domingo, então esta é quase sempre a variação de sexta para segunda: "
              "o fim de semana concentra a reação, porque o resultado sai com a bolsa fechada. A "
              "exceção é 1994, única eleição numa segunda-feira, e com a bolsa fechada no dia: ali "
              "a conta vai de sexta a terça. O recorte “em desvios-padrão do ano” divide cada "
              "reação pelo desvio-padrão dos retornos diários daquele ano civil. **Desvio-padrão** é "
              "a medida de quanto um número costuma se afastar da média: aqui, de quanto a bolsa "
-             "costuma andar num dia qualquer daquele ano. Serve para comparar épocas — 3% em 1994, "
+             "costuma andar num dia qualquer daquele ano. Serve para comparar épocas: 3% em 1994, "
              "quando a bolsa andava 3,9% por dia, é um dia morno; 3% em 2010, quando andava 1,3%, "
              "é um dia agitado. Sem essa correção os anos 1990 dominariam o gráfico por serem "
              "simplesmente mais voláteis.\n\n" +
@@ -371,7 +371,7 @@ def g_volatilidade(todos):
              "antes: acima de 1 a bolsa ficou mais agitada do que estava; abaixo de 1, mais calma. "
              "Os dois recortes existem porque a medida tem uma armadilha. No primeiro, a janela de "
              "21 pregões antes do **2º** turno inclui o 1º turno, que fica a 13-18 pregões de "
-             "distância — ou seja, compara um “antes” já contaminado pela própria agitação "
+             "distância. Ou seja, compara um “antes” já contaminado pela própria agitação "
              "eleitoral com um “depois” limpo, e por construção faz a volatilidade parecer cair. "
              "O recorte “sem sobreposição” usa, no 2º turno, só os pregões entre as duas votações, "
              "e o mesmo número de pregões depois. A conclusão muda: na janela de 21 a volatilidade "
@@ -403,7 +403,7 @@ def g_caminho(base, evs, cam):
             serie("Votação que foi para 2º turno", VERMELHO, pares("adia"), 3, largura=6, rotulo=True),
         ],
         nota="**Não há ponto no dia da votação, porque não há pregão no domingo.** O eixo conta "
-             "pregões, e o zero é a **véspera** — o último fechamento antes do voto. O primeiro "
+             "pregões, e o zero é a **véspera**, o último fechamento antes do voto. O primeiro "
              "ponto depois dele, o +1, já é a segunda-feira. O fim de semana é o buraco entre os "
              "dois, e é nele que o resultado sai.\n\n"
              "Como ler um ponto qualquer: ele responde “quanto a bolsa oscilou no mês que "
@@ -411,18 +411,18 @@ def g_caminho(base, evs, cam):
              "desvio-padrão dos retornos dos 21 pregões **anteriores** ao ponto, dividido pelo "
              "desvio-padrão do ano inteiro. 1,00 é um mês tão agitado quanto o ano costuma ser; "
              "1,25 é um mês 25% mais agitado que o normal daquele ano. A divisão pelo ano é o que "
-             "torna 1994 comparável a 2026 — sem ela os anos 1990 dominariam tudo, por serem "
+             "torna 1994 comparável a 2026. Sem ela os anos 1990 dominariam tudo, por serem "
              "simplesmente mais voláteis.\n\n"
              "A linha **não é a média**: é a **mediana** das eleições de cada grupo, ou seja, o "
              "valor do meio quando se ordenam os casos. Com 6 e 8 eleições, a média seria "
-             "arrastada por um ano extremo — 1998 teve a crise russa no meio da eleição. "
+             "arrastada por um ano extremo (1998 teve a crise russa no meio da eleição). "
              "60 pregões são cerca de três meses. Como a janela de 21 pregões olha para trás, o "
              "efeito de uma data aparece espalhado nos 21 pregões seguintes a ela, e não de um "
              "dia para o outro: é por isso que a linha vermelha sobe devagar depois da véspera, "
              "em vez de dar um salto. "
              "**Não há um gráfico equivalente para o preço do índice** porque não há o que mostrar: "
              "o retorno acumulado em qualquer janela em torno da eleição cai entre os percentis 46 "
-             "e 58 da distribuição de todas as janelas do mesmo tamanho desde 1993 — ou seja, é "
+             "e 58 da distribuição de todas as janelas do mesmo tamanho desde 1993, ou seja, é "
              "indistinguível de um trecho qualquer da série.\n\n"
              "Os dois turnos de 2026 não entram nestas linhas: elas precisam de 60 pregões de "
              "cada lado da votação.")
@@ -446,13 +446,13 @@ def g_reversao(todos):
         variantes=[dict(rot="cada um na sua régua", series=par("reacao_dp", "pos60_dp", 2), unidade="dp"),
                    dict(rot="em %", series=par("reacao", "pos60", 2), unidade="%")],
         nota="A barra é o primeiro pregão depois do voto; a linha é o que a bolsa fez nos 60 "
-             "pregões seguintes, já sem contar esse primeiro dia — as duas medidas não se "
+             "pregões seguintes, já sem contar esse primeiro dia, e as duas medidas não se "
              "sobrepõem. Elas andam em sentidos opostos em 10 dos 14 turnos.\n\n"
              "Os dois recortes medem a mesma coisa de formas diferentes. “Em %” é o número "
              "cru, e nele a linha esmaga as barras: um dia rende poucos por cento e três meses "
              "rendem dezenas, então o desenho esconde justamente o que se quer comparar. “Cada "
              "um na sua régua” divide cada medida pelo **desvio-padrão** do seu próprio horizonte "
-             "naquele ano — a reação pelo desvio-padrão dos retornos diários, os 60 pregões pelo "
+             "naquele ano: a reação pelo desvio-padrão dos retornos diários, os 60 pregões pelo "
              "dos retornos de 60 pregões. Desvio-padrão é o tamanho típico do desvio em torno da "
              "média; dividir por ele responde “quão fora do comum foi isto, para aquele ano e "
              "aquele prazo?”, e é o que permite pôr os dois no mesmo eixo.\n\n"
@@ -532,16 +532,16 @@ def g_ano(anos):
             dict(rot="do início do ano à véspera", series=barras("ate")),
             dict(rot="da véspera ao fim do ano", series=barras("depois")),
         ],
-        nota="O ano é cortado na **véspera do 1º turno** — o último pregão antes da primeira "
+        nota="O ano é cortado na **véspera do 1º turno**, o último pregão antes da primeira "
              "votação. A primeira metade vai do último pregão do ano anterior até esse corte; a "
              "segunda, do corte até o último pregão do ano, e portanto inclui a reação, o período "
              "entre turnos e o 2º turno.\n\n"
              "A linha pontilhada é a **mediana dos anos sem eleição**, medidos na mesma janela do "
              "calendário: do fim do ano anterior à véspera do 1º domingo de outubro, e daí ao fim "
-             "do ano. Sem ela não há como saber se +6% num trecho é muito ou pouco — é mediana, e "
+             "do ano. Sem ela não há como saber se +6% num trecho é muito ou pouco. É mediana, e "
              "não média, porque alguns anos (1999, 2003) multiplicariam a média sozinhos.\n\n"
              "**1994 não está aqui.** Do fim de 1993 à véspera da eleição o índice subiu 1.360%, o "
-             "que não é o mercado e sim a inflação do ano em que o Real estreou — em termos reais "
+             "que não é o mercado e sim a inflação do ano em que o Real estreou: em termos reais "
              "ele caiu no período. Um número desses não divide eixo com +6%, e qualquer média que "
              "o inclua passa a ser um número sobre 1994. Nos outros gráficos ele continua, porque "
              "lá a medida é de um dia, e a inflação de um fim de semana é irrelevante.\n\n"
@@ -582,7 +582,7 @@ def g_ano_tabela(anos):
               "números são quase os mesmos: %s contra %s até a votação, %s contra %s depois "
               "dela. O ano eleitoral não se distingue dos outros nem antes nem depois do voto, "
               "o que combina com o resto desta análise.\n\n"
-              "**A coluna do ano todo parece contar outra história — e não conta.** A mediana "
+              "**A coluna do ano todo parece contar outra história, e não conta.** A mediana "
               "dos anos de eleição é %s contra %s dos demais, uma distância de %.0f pontos "
               "percentuais que salta aos olhos. Ela não resiste ao teste: embaralhando os anos "
               "ao acaso entre os dois grupos, uma diferença dessas ou maior aparece em **43%%** "
@@ -643,8 +643,8 @@ def g_tabela(evs):
             dict(rot="60 pregões seguintes", num=True),
         ],
         linhas=linhas,
-        nota="**Reação** é a variação do último fechamento antes do voto para o primeiro depois "
-             "— como a votação é no domingo, quase sempre de sexta para segunda. **dp do ano** é "
+        nota="**Reação** é a variação do último fechamento antes do voto para o primeiro depois"
+             ". Como a votação é no domingo, quase sempre de sexta para segunda. **dp do ano** é "
              "essa mesma reação dividida pelo desvio-padrão dos retornos diários daquele ano "
              "civil, que é o que torna 1994 comparável a 2026: um movimento de 3% valia pouco num "
              "ano em que a bolsa andava 3,9% por dia e vale muito num de 1,3%. **Volatilidade "

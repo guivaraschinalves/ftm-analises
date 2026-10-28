@@ -80,6 +80,28 @@
   if (document.body && document.body.getAttribute("data-fontes")) {
     FONTES = document.body.getAttribute("data-fontes").split(/\s*,\s*/);
   }
+  // ---------- os dois endereços e o portão ----------
+  // O mesmo app.js roda em guivaraschinalves.github.io/ftm-analises (aberto) e
+  // em ftm.app.br/interno/analises (assinante). Lá, o index.html traz
+  // data-manifesto="protegido/fontes.json": a lista das análises e os próprios
+  // dados moram em protegido/, que o Caddy só entrega com o token do portão
+  // (o mesmo do Follow the News e do /interno/dados). Este portão é a porta de
+  // entrada; a fechadura é o Caddy. "?gate=1" liga o portão fora do domínio,
+  // para testar.
+  var GATE = {
+    ligado: location.hostname === "ftm.app.br" || /[?&]gate=1(&|$)/.test(location.search),
+    chave: "ftn_access",
+    api: "https://supabase.liberta.com.vc/functions/v1/news-access",
+    checkout: "https://followthemoney.app.br"
+  };
+  var MANIFESTO = document.body && document.body.getAttribute("data-manifesto");
+  function tokenSalvo() {
+    try { return localStorage.getItem(GATE.chave) || null; } catch (e) { return null; }
+  }
+  function esquecerToken() {
+    try { localStorage.removeItem(GATE.chave); } catch (e) {}
+  }
+
   var docs = [], atual = 0;
   var logoSvg = null;   // {viewBox, nos}
 
@@ -1986,7 +2008,7 @@
     var pend = lerLocal(CHAVE_PEND, {})[g._comentarios + "|" + g.titulo];
     if (!pend) return g.comentario || "";
     // o JSON já trouxe a versão gravada, ou passou tempo demais: vale o JSON
-    if ((g.comentario || "") === pend.texto || Date.now() - pend.em > 15 * 60 * 1000) {
+    if ((g.comentario || "") === pend.texto || Date.now() - pend.em > 60 * 60 * 1000) {
       var todos = lerLocal(CHAVE_PEND, {});
       delete todos[g._comentarios + "|" + g.titulo];
       gravarLocal(CHAVE_PEND, todos);
@@ -2498,12 +2520,15 @@
         nos.push(c);
       });
       logoSvg = { viewBox: vb.join(" "), razao: vb[3] / vb[2], nos: nos };
-      var topo = document.getElementById("logo-topo");
-      var s = el("svg", { viewBox: logoSvg.viewBox, "aria-hidden": "true" });
-      var gg = el("g", { fill: "currentColor" });
-      nos.forEach(function (n) { gg.appendChild(n.cloneNode(true)); });
-      s.appendChild(gg);
-      topo.appendChild(s);
+      ["logo-topo", "logo-gate"].forEach(function (id) {
+        var alvo = document.getElementById(id);
+        if (!alvo || alvo.firstChild) return;
+        var s = el("svg", { viewBox: logoSvg.viewBox, "aria-hidden": "true" });
+        var gg = el("g", { fill: "currentColor" });
+        nos.forEach(function (n) { gg.appendChild(n.cloneNode(true)); });
+        s.appendChild(gg);
+        alvo.appendChild(s);
+      });
     }).catch(function () {});
   }
 
@@ -2824,12 +2849,83 @@
     return null;
   }
 
-  function iniciar() {
-    var host = document.getElementById("graficos");
-    var buscas = FONTES.map(function (url) {
-      return fetch(url).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; });
+  // Mostra a porta e espera o e-mail (só no ftm.app.br, sem token guardado ou
+  // com o token recusado pelo servidor). Igual à do /interno/dados.
+  function mostrarGate() {
+    var gate = document.getElementById("gate"), app = document.getElementById("app");
+    var form = document.getElementById("gate-form"), campo = document.getElementById("gate-email");
+    var botao = document.getElementById("gate-botao"), erro = document.getElementById("gate-erro");
+    if (!gate || !form) return carregar();       // index.html sem portão: não trava
+    gate.hidden = false;
+    if (app) app.hidden = true;
+    carregarLogo();
+    campo.focus();
+    function falha(txt) {
+      erro.innerHTML = "";
+      erro.appendChild(html("p", { texto: txt }));
+      var p = html("span", { "class": "assine", texto: "Ainda não assina? " });
+      p.appendChild(html("a", { href: GATE.checkout, target: "_blank", rel: "noopener noreferrer",
+                                texto: "clique aqui para assinar" }));
+      p.appendChild(document.createTextNode("."));
+      erro.appendChild(p);
+      erro.hidden = false;
+    }
+    if (form.dataset.ligado) return;               // chamada de novo (token vencido)
+    form.dataset.ligado = "1";
+    form.addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      var email = (campo.value || "").trim();
+      if (!email) return;
+      erro.hidden = true;
+      botao.disabled = true;
+      botao.textContent = "Verificando…";
+      fetch(GATE.api + "?action=validate", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: email })
+      }).then(function (r) { return r.json(); }).then(function (d) {
+        if (d && d.ok && d.token) {
+          try { localStorage.setItem(GATE.chave, d.token); } catch (e) {}
+          gate.hidden = true;
+          if (app) app.hidden = false;
+          document.documentElement.removeAttribute("data-portao");
+          carregar();
+          return;
+        }
+        // genérica de propósito: não diz se o e-mail existe
+        falha("Não encontramos uma assinatura ativa para este e-mail.");
+      }).catch(function () {
+        falha("Não consegui falar com o servidor. Tente de novo em instantes.");
+      }).then(function () {
+        botao.disabled = false;
+        botao.textContent = "Liberar acesso";
+      });
     });
-    Promise.all(buscas.concat([carregarLogo()])).then(function (r) {
+  }
+
+  function carregar() {
+    document.documentElement.removeAttribute("data-portao");
+    var host = document.getElementById("graficos");
+    var token = GATE.ligado ? tokenSalvo() : null;
+    var opcoes = token ? { headers: { "Authorization": "Bearer " + token } } : undefined;
+    // 401 é o servidor dizendo que o token venceu: apaga e volta à porta
+    var expirou = false;
+    function pegar(url) {
+      return fetch(url, opcoes).then(function (r) {
+        if (r.status === 401) { expirou = true; return null; }
+        return r.ok ? r.json() : null;
+      }).catch(function () { return null; });
+    }
+    // no ftm.app.br a lista das análises vem do manifesto, ao lado dos dados
+    var lista = MANIFESTO
+      ? pegar(MANIFESTO).then(function (m) {
+          var pasta = MANIFESTO.replace(/[^/]*$/, "");
+          return m && m.fontes ? m.fontes.map(function (f) { return pasta + f; }) : [];
+        })
+      : Promise.resolve(FONTES);
+    lista.then(function (fontes) {
+      FONTES = fontes;
+      return Promise.all(fontes.map(pegar).concat([carregarLogo()]));
+    }).then(function (r) {
+      if (expirou) { esquecerToken(); return mostrarGate(); }
       docs = r.slice(0, FONTES.length).filter(Boolean);
       if (!docs.length) throw new Error("nenhum arquivo de dados foi carregado");
       var alvo = location.hash.length > 1 ? assuntoDoHash(location.hash.slice(1)) : null;
@@ -2838,7 +2934,11 @@
       host.innerHTML = "";
       host.appendChild(html("p", { "class": "estado erro", texto: "Não foi possível carregar os dados. " + e.message }));
     });
+  }
 
+  function iniciar() {
+    // a fiação fica aqui e não no carregar, que roda de novo quando o leitor
+    // libera o acesso (ligar duas vezes faria o tema piscar)
     document.getElementById("tema").addEventListener("click", alternarTema);
     telaCheiaDaPagina();
     var espera;
@@ -2849,6 +2949,8 @@
         posicionarNotas(secoesComNotas);
       }, 120);
     });
+    if (GATE.ligado && !tokenSalvo()) return mostrarGate();
+    carregar();
   }
 
   iniciar();
