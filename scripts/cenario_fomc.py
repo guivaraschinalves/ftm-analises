@@ -242,8 +242,9 @@ def graficos_inflacao():
 # componentes; a linha do total sai da aba do CPI cheio, que é a oficial.
 FRBSF_PAGINA = ("https://www.frbsf.org/research-and-insights/data-and-indicators/"
                 "cpi-inflation-contributions-from-goods-and-services/")
-FRBSF_GRUPOS = [("Alimentos", "Food", VERDE), ("Energia", "Energy", AMARELO), ("Bens do núcleo", "Core Goods", AZUL),
-                ("Serviços sem moradia", "Core Services ex. Shelter", LARANJA), ("Moradia", "Shelter", CIANO)]
+# cores e ordem da pilha (de baixo para cima) dos slides dele
+FRBSF_GRUPOS = [("Bens do núcleo", "Core Goods", AZUL), ("Serviços sem moradia", "Core Services ex. Shelter", VERMELHO),
+                ("Moradia", "Shelter", LARANJA), ("Alimentos", "Food", AZUL_ESCURO), ("Energia", "Energy", CIANO)]
 ITENS_NUCLEO = {
     "Alcoholic beverages at home": "Bebidas alcoólicas em casa", "Alcoholic beverages away from home": "Bebidas alcoólicas fora",
     "Appliances": "Eletrodomésticos", "Educational books and supplies": "Livros e material escolar",
@@ -354,12 +355,14 @@ def graficos_frbsf():
 
 FRBSF_PCE = ("https://www.frbsf.org/research-and-insights/data-and-indicators/"
              "pce-inflation-contributions-from-goods-and-services/")
-PCE_GRUPOS = {"Energy": ("Energia", AMARELO), "Food": ("Alimentos", VERDE), "Core Goods": ("Bens do núcleo", AZUL),
-              "Core Services exc. Housing": ("Serviços sem moradia", LARANJA), "Housing": ("Moradia", CIANO),
-              "Health Care": ("Saúde", VERDE), "Financial & Insurance": ("Serviços financeiros e seguros", ROXO),
-              "Financial Services & Insurance": ("Serviços financeiros e seguros", ROXO),
+# mesmas cores e ordem do CPI; o supercore (outros componentes) usa as mesmas cinco cores
+PCE_GRUPOS = {"Core Goods": ("Bens do núcleo", AZUL), "Core Services exc. Housing": ("Serviços sem moradia", VERMELHO),
+              "Housing": ("Moradia", LARANJA), "Food": ("Alimentos", AZUL_ESCURO), "Energy": ("Energia", CIANO),
+              "Health Care": ("Saúde", AZUL), "Financial & Insurance": ("Serviços financeiros e seguros", VERMELHO),
+              "Financial Services & Insurance": ("Serviços financeiros e seguros", VERMELHO),
               "Food Services & Accommodations": ("Restaurantes e hospedagem", LARANJA),
-              "Transportation Services": ("Transporte", AZUL), "Other Services": ("Outros serviços", CINZA)}
+              "Transportation Services": ("Transporte", AZUL_ESCURO), "Other Services": ("Outros serviços", CIANO)}
+PCE_ORDEM = list(PCE_GRUPOS)
 
 
 def graficos_frbsf_pce():
@@ -376,7 +379,7 @@ def graficos_frbsf_pce():
         for quando, nome_aba in (("em 12 meses", a12), ("no mês", am)):
             d = aba(nome_aba)
             total = next(k for k in next(iter(d.values())) if k.startswith("Total"))
-            grupos = [k for k in next(iter(d.values())) if k in PCE_GRUPOS]
+            grupos = sorted((k for k in next(iter(d.values())) if k in PCE_GRUPOS), key=PCE_ORDEM.index)
             series = [serie(PCE_GRUPOS[k][0], PCE_GRUPOS[k][1],
                             {m: r[k] for m, r in d.items() if m >= "1990-01" and r.get(k) is not None}, 2,
                             tipo="barra") for k in grupos]
