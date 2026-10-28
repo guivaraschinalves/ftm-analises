@@ -253,8 +253,10 @@ armadilhas de cada uma estão no cabeçalho do script. As principais:
   ajuste, set/26 dá 4,0% em vez de 3,7%.
 - **ISM** não está mais no FRED: vem do gráfico de eventos do investing.com,
   com a data da divulgação (o mês de referência é o anterior).
-- **TIC**: o arquivo antigo (`s1_globl`) parou em jan/2023; o novo (SLT) tem o
-  fluxo desde 2023.
+- **TIC**: dois arquivos emendados, o antigo (`s1_globl`, de 1977 a jan/2023)
+  e o novo (SLT, de fev/2023 em diante). Bate com o investimento em carteira do
+  balanço de pagamentos (correlação de 0,90 nos totais anuais), menos em 2020,
+  quando a compra foi de T-bills, que são de curto prazo.
 - **Breakeven do payroll** segue o método do St. Louis Fed: crescimento da
   população de 16+ × participação × (1 − desemprego) × razão entre o emprego do
   payroll e o da pesquisa domiciliar. A população é a realizada, sem os meses

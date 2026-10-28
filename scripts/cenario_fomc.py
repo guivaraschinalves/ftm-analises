@@ -37,8 +37,10 @@ AS FONTES E AS ARMADILHAS DE CADA UMA
   - Data centers: planilha de construção privada do Census (privsatime.xlsx),
     em taxa anual com ajuste sazonal. Não inclui servidores nem racks: é o
     prédio e a obra.
-  - TIC: tabela 1 do SLT do Tesouro (desde 2020). O arquivo antigo (s1_globl)
-    parou em jan/2023, quando o formulário mudou.
+  - TIC: dois arquivos do Tesouro emendados, o antigo (s1_globl, de 1977 a
+    jan/2023) e a tabela 1 do SLT (de fev/2023 em diante).    Conferido contra o balanço de pagamentos (BEA, via FMI): correlação de
+    0,90 nos totais anuais; a diferença grande é 2020, quando estrangeiros
+    compraram T-bills, que a TIC de longo prazo não pega.
   - Juros dos bancos centrais: BIS (WS_CBPOL, diário, uma semana de atraso).
     O Fed vem do FRED (teto da faixa, DFEDTARU), que sai no mesmo dia.
 """
@@ -894,32 +896,48 @@ def graficos_datacenters():
 # ================================================================ TIC
 
 def graficos_tic():
-    txt = baixar("https://ticdata.treasury.gov/Publish/slt_table1.txt", headers=NAVEGADOR).decode("latin-1")
-    tipos = [("Treasuries", 7, AZUL), ("Agências (hipotecas)", 10, CIANO), ("Títulos corporativos", 13, LARANJA),
-             ("Ações", 16, VERDE)]
-    dados = {n: {} for n, _, _ in tipos}
-    total = {}
+    """Compras líquidas de títulos americanos de longo prazo por estrangeiros,
+    por mês, desde 1977. Dois arquivos do Tesouro emendados: o antigo
+    (s1_globl, compras brutas menos vendas brutas, de jan/1977 a jan/2023) e o
+    novo (tabela 1 do SLT, de fev/2023 em diante, quando a coleta mudou de
+    formulário). Os dois não se sobrepõem: um acaba onde o outro começa."""
+    tipos = [("Treasuries", AZUL), ("Agências (hipotecas)", CIANO), ("Títulos corporativos", LARANJA), ("Ações", VERDE)]
+    dados = {n: {} for n, _ in tipos}
+
     def num(x):
         x = x.replace(",", "").replace('"', "").strip()
-        return None if x in ("", "n.a.") else float(x)      # "n.a.": o fluxo só existe desde 2023
-    for l in txt.splitlines():
+        return None if x in ("", "n.a.") else float(x)      # "n.a.": fora do período do arquivo
+
+    # antigo: colunas 3 a 6 são as compras brutas dos 4 tipos americanos, 9 a 12 as vendas
+    for l in baixar("https://ticdata.treasury.gov/Publish/s1_globl.txt", headers=NAVEGADOR).decode("latin-1").splitlines():
+        c = l.rstrip("\r").split("\t")
+        if len(c) > 12 and c[1].strip() == "99996" and re.match(r"\d{4}-\d{2}$", c[2].strip()):
+            v = [num(x) for x in c[3:13]]
+            if None in v[:4] or None in v[6:10]:
+                continue
+            for k, (n, _) in enumerate(tipos):
+                dados[n][c[2].strip()] = (v[k] - v[k + 6]) / 1e3
+    fim_antigo = max(dados["Treasuries"])
+    # novo: "net U.S. sales" de cada tipo, que é a compra líquida dos estrangeiros
+    for l in baixar("https://ticdata.treasury.gov/Publish/slt_table1.txt", headers=NAVEGADOR).decode("latin-1").splitlines():
         c = l.split("\t")
         if len(c) > 16 and c[1].strip() == "99996" and re.match(r"\d{4}-\d{2}$", c[2].strip()):
             m = c[2].strip()
-            if num(c[4]) is None:
+            if num(c[4]) is None or m <= fim_antigo:
                 continue
-            for n, k, _ in tipos:
+            for (n, _), k in zip(tipos, (7, 10, 13, 16)):
                 dados[n][m] = (num(c[k]) or 0) / 1e3
-            total[m] = num(c[4]) / 1e3
-    print("  TIC até %s: US$ %.1f bi" % ultimo(total))
+    meses = sorted(set.intersection(*(set(d) for d in dados.values())))
+    total = {m: sum(dados[n][m] for n, _ in tipos) for m in meses}
+    print("  TIC de %s a %s (emenda em %s): US$ %.1f bi no último mês" % (meses[0], meses[-1], fim_antigo, total[meses[-1]]))
     return [dict(id="tic-fluxo", titulo="Compras líquidas de títulos americanos por estrangeiros",
                  subtitulo="Títulos de longo prazo, US$ bilhões; positivo = estrangeiros compram", unidade="usd-bi",
-                 barra=1, fonte="Tesouro (TIC, SLT) e FtM", variantes=[
-                     dict(rot="por mês", series=[serie(n, cor, dados[n], 1, tipo="barra") for n, _, cor in tipos]
-                          + [serie("Total", BRANCO, total, 1, rotulo=True)]),
+                 barra=1, periodoPadrao="10", fonte="Tesouro (TIC: S até jan/23, SLT depois) e FtM", variantes=[
                      dict(rot="soma de 12 meses", series=[serie(n, cor, soma12(dados[n]), 1, tipo="barra")
-                                                         for n, _, cor in tipos]
+                                                         for n, cor in tipos]
                           + [serie("Total", BRANCO, soma12(total), 1, rotulo=True)]),
+                     dict(rot="por mês", series=[serie(n, cor, dados[n], 1, tipo="barra") for n, cor in tipos]
+                          + [serie("Total", BRANCO, total, 1, rotulo=True)]),
                  ])]
 
 
