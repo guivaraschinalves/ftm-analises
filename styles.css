@@ -119,6 +119,12 @@ body::after {
   letter-spacing: .03em; text-transform: uppercase;
 }
 .nav-assunto + .nav-assunto, .nav-secao + .nav-assunto { margin-top: 10px; }
+.nav-grupo {
+  margin: 14px 0 2px; padding: 0 10px; color: var(--accent);
+  font-size: 11.5px; letter-spacing: .12em; text-transform: uppercase;
+}
+.nav-grupo + .nav-assunto { margin-top: 0; }
+.artigo-grupo { margin: 0 0 6px; color: var(--accent); font-size: 12.5px; letter-spacing: .12em; text-transform: uppercase; }
 .nav-assunto:hover { background: var(--accent-wash); color: var(--ink); }
 .nav-assunto.atual { color: var(--ink); }
 .nav-conta { margin-left: auto; font-size: 11.5px; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--ink-2); }

@@ -32,7 +32,8 @@ sys.path.insert(0, os.path.join(RAIZ, "scripts"))
 import texto_assunto as ta                                    # noqa: E402
 
 PARES = [("defasagem-combustiveis.md", "defasagem-combustiveis.json"),
-         ("petroleo.md", "petroleo.json")]
+         ("petroleo.md", "petroleo.json"),
+         ("cenario-2026-10-28-fomc.md", "cenario-2026-10-28-fomc.json")]
 
 
 def aplicar(nome_texto, nome_json):

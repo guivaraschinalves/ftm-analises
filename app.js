@@ -74,7 +74,7 @@
   // A análise vem primeiro: ela é o que se lê de ponta a ponta. Os painéis
   // antigos ficam embaixo, fechados, como acervo.
   var FONTES = ["dados/defasagem-combustiveis.json", "dados/juros-eua.json", "dados/eleicoes.json",
-                "dados/petroleo.json"];
+                "dados/petroleo.json", "dados/cenario-2026-10-28-fomc.json"];
   // Uma página pode pedir outros arquivos: <body data-fontes="dados/x.json">.
   if (document.body && document.body.getAttribute("data-fontes")) {
     FONTES = document.body.getAttribute("data-fontes").split(/\s*,\s*/);
@@ -276,6 +276,11 @@
     // petróleo e derivados em mil barris por dia; contribuição em pontos percentuais
     kbd: { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
            valor: function (v) { return nf(0).format(v) + " mil b/d"; } },
+    // milhares (vagas, pedidos de seguro-desemprego) e horas por semana
+    mil: { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
+           valor: function (v) { return nf(0).format(v) + " mil"; } },
+    h: { eixo: function (v, passo) { return nf(Math.max(1, casasDoPasso(passo))).format(v); },
+         valor: function (v) { return nf(1).format(v) + " h"; } },
     pp: { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
           valor: function (v) { return nf(2).format(v) + " p.p."; } },
     "usd-bbl": { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
@@ -728,6 +733,16 @@
       var teto = b2 === ordem.length - 1 ? L.y1 : ordem[b2 + 1].y - passoRot;
       if (ordem[b2].y > teto) ordem[b2].y = teto;
     }
+
+    // Faixas de fundo ("sombras": [{de, ate}]), como as recessões: um
+    // retângulo translúcido do primeiro ao último período de cada uma, atrás
+    // da grade e das séries. Quem explica o que a faixa é, é o subtítulo.
+    (g.sombras || []).forEach(function (sb) {
+      var ia = Math.max(idxDe(g, sb.de), d0), ib = Math.min(idxDe(g, sb.ate) + 1, d1);
+      if (ib <= ia) return;
+      svg.appendChild(el("rect", { x: X(ia), y: L.y0, width: X(ib) - X(ia), height: ph,
+                                   fill: pal.texto, opacity: tema() === "light" ? 0.09 : 0.14 }));
+    });
 
     // grade e eixo Y (dos dois lados, como nos slides)
     esc.ticks.forEach(function (t) {
@@ -1928,6 +1943,11 @@
   function montarNav(lista, host, atual) {
     host.innerHTML = "";
     lista.forEach(function (dados, i) {
+      // "grupo" junta assuntos da mesma família (as análises de cenário, uma
+      // por data) sob um cabeçalho no índice
+      if (dados.grupo && (i === 0 || lista[i - 1].grupo !== dados.grupo)) {
+        host.appendChild(html("p", { "class": "nav-grupo", texto: dados.grupo }));
+      }
       var total = dados.secoes.reduce(function (n, sec) { return n + sec.graficos.length; }, 0);
       var linha = html("a", {
         "class": "nav-assunto" + (i === atual ? " atual" : ""),
@@ -2070,6 +2090,7 @@
   function montarArtigo(dados, host) {
     var art = html("article", { "class": "artigo", id: idAssunto(dados) });
     ligarRealce(art);
+    if (dados.grupo) art.appendChild(html("p", { "class": "artigo-grupo", texto: dados.grupo }));
     art.appendChild(html("h2", { "class": "artigo-titulo", texto: dados.assunto }));
     paragrafos(dados.apresentacao, "artigo-lede").forEach(function (p) {
       art.appendChild(p);
