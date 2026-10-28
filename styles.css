@@ -183,7 +183,8 @@ details[open] > summary > .seta, details[open] > .nav-rotulo > .seta, details[op
    identidade — marca onde acaba a análise e começa o dado. */
 .artigo-lede, .artigo-texto {
   font-family: Georgia, "Iowan Old Style", "Palatino Linotype", Palatino, serif;
-  max-width: 66ch;
+  /* a largura toda da coluna, alinhada com os gráficos (pedido dele) */
+  max-width: none;
 }
 .artigo-lede { margin: 0 0 18px; color: var(--ink-2); font-size: 19.5px; line-height: 1.62; }
 .artigo-texto { margin: 0 0 20px; color: var(--ink-2); font-size: 18.5px; line-height: 1.72; }
