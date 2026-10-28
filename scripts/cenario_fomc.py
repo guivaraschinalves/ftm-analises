@@ -822,7 +822,31 @@ def graficos_credito():
     return [dict(id="spreads-credito", titulo="Spreads de crédito corporativo nos EUA",
                  subtitulo="Pontos percentuais sobre o Treasury, diário; ICE BofA, ajustado por opções",
                  unidade="pp", diario=True, fonte="ICE BofA (via FRED) e FtM", variantes=[
-                     um("High yield", LARANJA, hy), um("BBB", CIANO, bbb), um("Grau de investimento", BRANCO, ig)])]
+                     um("High yield", LARANJA, hy), um("BBB", CIANO, bbb), um("Grau de investimento", BRANCO, ig)])
+            ] + FIGURAS_CREDITO
+
+
+# Gráficos de terceiros sobre crédito das empresas de IA. Os dados são pagos
+# (Bloomberg, ICE, S&P Global/LSEG), então entram como imagem, com a fonte e o
+# link do post de onde vieram.
+FIGURAS_CREDITO = [
+    dict(id="ia-divida", tipo="figura", imagem="assets/cenario/ia-divida-bloomberg.jpg",
+         titulo="Dívida de longo prazo das empresas de IA",
+         subtitulo="Fluxo de caixa trimestral de dívida de longo prazo de Meta, Amazon, Oracle, Alphabet, "
+                   "SpaceX e CoreWeave, em US$ bilhões",
+         fonte="Bloomberg", link="https://x.com/OnchainIns5699/status/2115435100716335597",
+         rotuloLink="Ver o post (28/10/26)"),
+    dict(id="ia-cds-bloomberg", tipo="figura", imagem="assets/cenario/ia-cds-bloomberg.jpg",
+         titulo="CDS de 5 anos de hyperscalers e fabricantes de chips",
+         subtitulo="Pontos-base; Meta, Amazon, Microsoft, Alphabet, Broadcom, SpaceX, Nvidia, Oracle e AMD",
+         fonte="ICE Data Services, gráfico da Bloomberg",
+         link="https://x.com/OnchainIns5699/status/2115435100716335597", rotuloLink="Ver o post (28/10/26)"),
+    dict(id="ia-cds-reuters", tipo="figura", imagem="assets/cenario/ia-cds-reuters.jpg",
+         titulo="CDS de 5 anos no setor de IA desde novembro de 2025",
+         subtitulo="Variação em pontos-base desde nov/2025; CoreWeave em destaque",
+         fonte="S&P Global Market Intelligence/LSEG, gráfico da Reuters (15/10/2026)",
+         link="https://x.com/GlobalMktObserv/status/2110720850659815582", rotuloLink="Ver o post (15/10/26)"),
+]
 
 
 # ================================================================ data centers

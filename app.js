@@ -1514,7 +1514,9 @@
   // Os cartões que abrem no visor, na ordem da página (tabela não abre: não
   // há desenho para ampliar)
   function navegaveis() {
-    return cartoes.filter(function (c) { return c.grafico.tipo !== "tabela" && c.grafico.tipo !== "comunicados"; });
+    return cartoes.filter(function (c) {
+      return c.grafico.tipo !== "tabela" && c.grafico.tipo !== "comunicados" && c.grafico.tipo !== "figura";
+    });
   }
   // Passa o visor para o gráfico vizinho (dir = −1 ou 1). Não dá a volta: no
   // primeiro e no último a seta daquele lado some.
@@ -1723,7 +1725,15 @@
     ferramentas.appendChild(esquerda);
 
     var acoes = html("div", { "class": "card-acoes" });
-    if (g.tipo === "comunicados") {
+    if (g.tipo === "figura") {
+      // imagem de terceiros (gráfico de outra fonte): o que dá é ir à origem
+      if (g.link) {
+        acoes.appendChild(html("a", { "class": "btn", href: g.link, target: "_blank", rel: "noopener noreferrer",
+                                      texto: g.rotuloLink || "Ver a origem" }));
+      }
+      acoes.appendChild(html("a", { "class": "btn", href: g.imagem, target: "_blank", rel: "noopener noreferrer",
+                                    texto: "Abrir a imagem" }));
+    } else if (g.tipo === "comunicados") {
       // nada a baixar: o texto é o do Fed, e o link de cada um fica no
       // comparador. Zoom e tela cheia levam o comparador (o mesmo, com as
       // escolhas feitas) para uma janela de leitura com letra maior.
@@ -2225,6 +2235,16 @@
       // montado uma vez: as escolhas do leitor ficam no próprio DOM
       cartao.frame.style.aspectRatio = "";
       if (!cartao.frame.firstChild) cartao.frame.appendChild(montarComparador(graficoDe(cartao)));
+      return;
+    }
+    if (graficoDe(cartao).tipo === "figura") {
+      // Gráfico de outra fonte, como imagem: sem dado para redesenhar
+      cartao.frame.style.aspectRatio = "";
+      if (!cartao.frame.firstChild) {
+        var gf = graficoDe(cartao);
+        cartao.frame.appendChild(html("img", { "class": "figura-img", src: gf.imagem, alt: gf.titulo, loading: "lazy" }));
+        if (gf.fonte) cartao.frame.appendChild(html("p", { "class": "cartao-figura-fonte", texto: "Fonte: " + gf.fonte }));
+      }
       return;
     }
     if (graficoDe(cartao).tipo === "tabela") {
