@@ -660,6 +660,53 @@ def g_tabela(evs):
 
 # --------------------------------------------------------------------------
 
+# --------------------------------------------------------------------------
+# Formato de artigo: o que a nota de cada gráfico conclui vira o texto da
+# seção, logo acima dele; na nota fica só a metodologia (definições, como ler,
+# o que ficou de fora e por quê). Cada marca abaixo é onde começa, dentro de
+# um parágrafo da nota, a parte que é argumento; dali até o fim do parágrafo
+# vai para o texto.
+ARGUMENTO = {
+    "eleicoes-reacao": ["**O 2º turno de 2026"],
+    "eleicoes-reversao": ["Elas andam em sentidos", "A **correlação**"],
+    "eleicoes-caminho": ["**Não há um gráfico equivalente"],
+    "eleicoes-volatilidade": ["A conclusão muda"],
+    "eleicoes-ano-tabela": ["As duas últimas linhas", "**A coluna do ano todo"],
+}
+# o texto passa a vir antes do gráfico, e não embaixo dele
+AJUSTES = [
+    ("Os dois turnos de 2026 aparecem só neste gráfico e na tabela",
+     "Os dois turnos de 2026 aparecem só no gráfico abaixo e na tabela do fim"),
+    ("Elas andam em sentidos opostos",
+     "A reação e o que a bolsa fez nos 60 pregões seguintes andam em sentidos opostos"),
+    ("A conclusão muda:", "Conforme a janela, a conclusão muda:"),
+    ("As duas últimas linhas são o que dá sentido às de cima.",
+     "Na tabela abaixo, as duas últimas linhas são o que dá sentido às de cima."),
+]
+
+
+def secao(titulo, g):
+    marcas = ARGUMENTO.get(g["id"], [])
+    metodo, texto = [], []
+    for par in (g.get("nota") or "").split("\n\n"):
+        cortes = [par.find(m) for m in marcas if m in par]
+        if cortes:
+            c = min(cortes)
+            if par[:c].strip():
+                metodo.append(par[:c].strip())
+            texto.append(par[c:].strip())
+        elif par.strip():
+            metodo.append(par.strip())
+    texto = "\n\n".join(texto)
+    for a, b in AJUSTES:
+        texto = texto.replace(a, b)
+    if metodo:
+        g["nota"] = "\n\n".join(metodo)
+    else:
+        g.pop("nota", None)
+    return dict(titulo=titulo, texto=texto, fontes=[], figuras=[], graficos=[g])
+
+
 def main():
     print("Baixando as séries do Ipeadata…")
     fech = baixar(SERIE_FECHAMENTO)
@@ -734,15 +781,15 @@ def main():
                vezes(de_2026(evs)["2T"]["reacao"] / queda_ant(evs)["reacao"]),
                br_pct(queda_ant(evs)["reacao"]),
                "%sº turno de %d" % (queda_ant(evs)["turno"][0], queda_ant(evs)["ano"]))),
+        formato="artigo",
         secoes=[
-            dict(titulo="Os números, turno a turno",
-                 graficos=[g_tabela(evs)]),
-            dict(titulo="O dia seguinte",
-                 graficos=[g_reacao(evs), g_reversao(evs)]),
-            dict(titulo="Antes e depois",
-                 graficos=[g_caminho(base, evs, cam), g_volatilidade(evs)]),
-            dict(titulo="O ano inteiro",
-                 graficos=[g_ano(anos), g_ano_tabela(anos)]),
+            secao("O dia seguinte", g_reacao(evs)),
+            secao("", g_reversao(evs)),
+            secao("Antes e depois", g_caminho(base, evs, cam)),
+            secao("", g_volatilidade(evs)),
+            secao("O ano inteiro", g_ano(anos)),
+            secao("", g_ano_tabela(anos)),
+            secao("Os números, turno a turno", g_tabela(evs)),
         ],
     )
     with open(SAIDA, "w", encoding="utf-8") as f:
