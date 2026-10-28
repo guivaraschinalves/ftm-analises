@@ -1177,12 +1177,70 @@ def balanco_fed():
                     serie("CPI, % em 12 meses", VERDE, cpi, 2, rotulo=True, unidade="pct1")])
 
 
+# ================================================================ Treasuries
+
+TESOURO_CURVA = ("https://home.treasury.gov/resource-center/data-chart-center/interest-rates/"
+                 "daily-treasury-rates.csv/%d/all?type=daily_treasury_yield_curve&field_tdr_date_value=%d&page&_format=csv")
+PRAZOS = [("1 Mo", "1 mês"), ("1.5 Month", "1,5 mês"), ("2 Mo", "2 meses"), ("3 Mo", "3 meses"), ("4 Mo", "4 meses"),
+          ("6 Mo", "6 meses"), ("1 Yr", "1 ano"), ("2 Yr", "2 anos"), ("3 Yr", "3 anos"), ("5 Yr", "5 anos"),
+          ("7 Yr", "7 anos"), ("10 Yr", "10 anos"), ("20 Yr", "20 anos"), ("30 Yr", "30 anos")]
+CURVA_BASE = "2026-09-16"      # a reunião anterior do FOMC: a curva de hoje contra a daquele dia
+
+
+def curva_tesouro(ano):
+    """{"AAAA-MM-DD": {prazo: taxa}} do arquivo diário do Tesouro (sai no mesmo dia, o FRED tem um de atraso)."""
+    txt = baixar(TESOURO_CURVA % (ano, ano)).decode("utf-8-sig")
+    out = {}
+    for l in csv.DictReader(io.StringIO(txt)):
+        m, d, a = l["Date"].split("/")
+        out["%s-%s-%s" % (a, m, d)] = {k: float(v) for k, v in l.items() if k != "Date" and v not in ("", None)}
+    return out
+
+
+def graficos_treasuries():
+    curva = curva_tesouro(int(CURVA_BASE[:4]))
+    hoje = max(curva)
+    if int(hoje[:4]) != int(CURVA_BASE[:4]):
+        curva.update(curva_tesouro(int(hoje[:4])))
+    hoje = max(curva)
+
+    # as três taxas, diárias, do FRED, completadas com os dias que o Tesouro já publicou
+    taxas = []
+    for sid, prazo, nome, cor in (("DGS5", "5 Yr", "5 anos", CIANO), ("DGS10", "10 Yr", "10 anos", BRANCO),
+                                  ("DGS30", "30 Yr", "30 anos", LARANJA)):
+        s = desde(fred(sid, False), "2000-01-01")
+        for d, r in curva.items():
+            if d > max(s) and prazo in r:
+                s[d] = r[prazo]
+        taxas.append(serie(nome, cor, s, 2, rotulo=True))
+    g1 = dict(id="treasuries-5-10-30", titulo="Taxas dos títulos do Tesouro americano de 5, 10 e 30 anos",
+              subtitulo="% ao ano, diário; faixas cinza = recessões (NBER)", unidade="%", diario=True,
+              periodoPadrao="2", sombras=recessoes(True), fonte="Federal Reserve (via FRED), Tesouro dos EUA e FtM",
+              series=taxas)
+
+    a, b = curva[CURVA_BASE], curva[hoje]
+    prazos = [(k, rot) for k, rot in PRAZOS if k in a and k in b]
+    rotulo = lambda d: "%s/%s/%s" % (d[8:], d[5:7], d[:4])                       # noqa: E731
+    pts = lambda r: {i: r[k] for i, (k, _) in enumerate(prazos)}                    # noqa: E731
+    dif = {i: 100 * (b[k] - a[k]) for i, (k, _) in enumerate(prazos)}
+    g2 = dict(id="treasuries-curva", titulo="Curva de juros do Tesouro americano: hoje e na reunião de setembro",
+              subtitulo="Taxa de cada prazo, %% ao ano; %s contra %s" % (rotulo(hoje), rotulo(CURVA_BASE)),
+              categorias=[rot for _, rot in prazos], fonte="Tesouro dos EUA e FtM", variantes=[
+                  dict(rot="as duas curvas", unidade="%", eixo={"zero": False}, series=[
+                      serie(rotulo(CURVA_BASE), CINZA, pts(a), 2, rotulo=True),
+                      serie(rotulo(hoje), BRANCO, pts(b), 2, rotulo=True)]),
+                  dict(rot="diferença em pontos-base", unidade="pb", sinal=True, series=[
+                      serie("Hoje menos %s" % rotulo(CURVA_BASE), AZUL, dif, 0, tipo="barra", legenda=False)])])
+    print("  curva do Tesouro: %s contra %s; 10 anos %.2f -> %.2f" % (hoje, CURVA_BASE, a["10 Yr"], b["10 Yr"]))
+    return [g1, g2]
+
+
 # ================================================================ montagem
 
 SECOES = [("Comunicado do FOMC", comunicados_fomc), ("Inflação", graficos_inflacao), ("Mercado de trabalho", graficos_trabalho),
           ("Atividade", graficos_atividade), ("Moeda", graficos_moeda), ("Contas do governo", graficos_governo),
           ("Crédito", graficos_credito), ("Data centers", graficos_datacenters),
-          ("Fluxo de capital", graficos_tic), ("Juros", graficos_juros)]
+          ("Fluxo de capital", lambda: graficos_tic() + graficos_treasuries()), ("Juros", graficos_juros)]
 
 
 def main():
