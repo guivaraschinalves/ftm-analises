@@ -12,3 +12,6 @@ Indica que inflação não está vindo dos salários, mas isso pesa sobre o cons
 
 ## Pedidos de seguro-desemprego
 Recomendo começar o gráfico em 2023 para visualizar melhor a queda recente nos pedidos.
+
+## Índice de gerentes de compras (PMI) do ISM
+Manufatura em 54,5 e serviços em 54,9, contra 49 e 50 um ano atrás. Na média de 3 meses, são os maiores desde 2022. É a atividade "forte" que o comunicado de hoje cita.
