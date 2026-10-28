@@ -617,3 +617,31 @@ body.visor-aberto { overflow: hidden; }
 .comentario-edicao textarea:focus { outline: 2px solid var(--accent); outline-offset: 0; }
 .comentario-aviso { margin: 8px 0 0; font-size: 12.5px; color: var(--ink-2); }
 .comentario-aviso:empty { display: none; }
+
+/* Comentário na margem direita da página (tela larga, só no assunto que tem
+   comentários): a coluna do conteúdo encosta à esquerda e a direita fica
+   para os balões, ligados ao cartão por um traço, como no Word. */
+@media (min-width: 1340px) {
+  body.com-comentarios .conteudo { max-width: 1388px; padding-right: 324px; }
+  .card.com-margem { position: relative; overflow: visible; }
+  .card.com-margem > summary { border-radius: 14px 14px 0 0; }
+  .card.com-margem > .card-corpo:nth-last-child(2) { border-radius: 0 0 13px 13px; overflow: hidden; }
+  .card.com-margem > .comentario {
+    position: absolute; top: 0; left: calc(100% + 22px); width: 280px;
+    display: block; border: none; background: transparent;
+  }
+  .card.com-margem > .comentario::before {
+    content: ""; position: absolute; left: -22px; top: 21px; width: 22px; height: 1px; background: var(--border);
+  }
+  .card.com-margem > .comentario.aberto::before { background: var(--accent); }
+  .card.com-margem > .comentario .comentario-aba {
+    flex-direction: row; width: auto; gap: 7px; padding: 7px 12px;
+    border: 1px solid var(--border); border-radius: 9px; background: var(--surface);
+  }
+  .card.com-margem > .comentario .comentario-aba span { writing-mode: horizontal-tb; }
+  .card.com-margem > .comentario .comentario-aba svg { width: 16px; height: 16px; }
+  .card.com-margem > .comentario .comentario-painel {
+    width: 100%; background: var(--surface); border: 1px solid var(--border);
+    border-left: 3px solid var(--accent); border-radius: 10px; box-shadow: var(--shadow);
+  }
+}

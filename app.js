@@ -1768,9 +1768,18 @@
     cartao.frame = html("div", { "class": "frame" });
     if (g._comentarios && g.tipo !== "comunicados") {
       var corpo = html("div", { "class": "card-corpo" });
+      var asideC = montarComentario(cartao);
       corpo.appendChild(cartao.frame);
-      corpo.appendChild(montarComentario(cartao));
       raiz.appendChild(corpo);
+      // Tela larga: o comentário sai do cartão e fica na margem direita da
+      // página, como no Word, e o gráfico mantém a largura toda. Tela
+      // estreita: volta para dentro do cartão, ao lado do gráfico.
+      cartao.posicionarComentario = function () {
+        var naMargem = MARGEM_COMENTARIO.matches;
+        raiz.classList.toggle("com-margem", naMargem);
+        (naMargem ? raiz : corpo).appendChild(asideC);
+      };
+      cartao.posicionarComentario();
     } else {
       raiz.appendChild(cartao.frame);
     }
@@ -1911,6 +1920,15 @@
   // o texto" o costura no JSON em cerca de um minuto. Até lá, o navegador de
   // quem escreveu mostra a versão nova (guardada em "pendentes").
   var REPO = "guivaraschinalves/ftm-analises", RAMO = "main";
+  // a partir desta largura o comentário vai para a margem (o mesmo número do CSS)
+  var MARGEM_COMENTARIO = window.matchMedia ? window.matchMedia("(min-width: 1340px)") : { matches: false };
+  if (MARGEM_COMENTARIO.addEventListener) {
+    MARGEM_COMENTARIO.addEventListener("change", function () {
+      cartoes.forEach(function (c) {
+        if (c.posicionarComentario) { c.posicionarComentario(); desenhar(c, true); }
+      });
+    });
+  }
   var CHAVE_GH = "ftm_analises_github", CHAVE_PEND = "ftm_analises_comentarios_pendentes";
   function lerLocal(k, padrao) {
     try { var v = localStorage.getItem(k); return v === null ? padrao : JSON.parse(v); } catch (e) { return padrao; }
@@ -2724,6 +2742,8 @@
     atual = i;
     cartoes.length = 0;
     host.innerHTML = "";
+    // o assunto com comentários abre a coluna da margem direita (ver CSS)
+    document.body.classList.toggle("com-comentarios", !!docs[i].comentarios);
     montarAssunto(docs[i], host);
     montarNav(docs, document.getElementById("nav"), i);
     montarRodape([docs[i]]);
