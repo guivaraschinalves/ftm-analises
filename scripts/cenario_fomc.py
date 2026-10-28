@@ -436,7 +436,9 @@ SETORES = [("Mineração e extração", "USMINE"), ("Construção", "USCONS"), (
            ("Lazer e hospedagem", "USLAH"), ("Outros serviços", "USSERV"),
            ("Governo federal", "CES9091000001"), ("Governo estadual", "CES9092000001"),
            ("Governo local", "CES9093000001")]
-BASE_INI, BASE_FIM = "1990-01", "2019-12"
+# períodos-base da comparação dos setores ("ult" = até o último mês)
+BASES_SETORES = [("1990 a 2019", "1990-01", "2019-12"), ("2008 a 2019", "2008-01", "2019-12"),
+                 ("2022 a 2026", "2022-01", "ult")]
 
 
 def graficos_trabalho():
@@ -451,30 +453,41 @@ def graficos_trabalho():
                      serie("Governo", CINZA, desde(media(dif(gov)), ini), 0, tipo="barra"),
                      serie("Total", BRANCO, desde(media(dif(total)), ini), 0, rotulo=True)])
 
-    # o que está fora do padrão: a variação de 12 meses de cada setor contra a
-    # distribuição das variações de 12 meses dele mesmo, de 1990 a 2019 (antes
-    # da pandemia, que distorce média e desvio)
+    # O que está fora do padrão: a variação de 12 meses de cada setor contra a
+    # distribuição das variações de 12 meses dele mesmo num período-base.
+    # Três bases (BASES_SETORES): duas pré-pandemia, uma longa e uma que é um
+    # ciclo completo (a crise de 2008 e a expansão até 2019), e uma recente,
+    # que começa em 2022. 2020 e 2021 ficam fora de todas: o tombo e o rebote
+    # multiplicam o desvio-padrão (lazer e hospedagem: de 1,5 para 14,8 p.p.)
+    # e qualquer coisa passa a parecer normal.
     ult = max(total)
-    stats = []
-    for nome, sid in SETORES:
-        s = fred(sid)
-        v12 = var(s)
-        hist = [v for m, v in v12.items() if BASE_INI <= m <= BASE_FIM]
-        mu = sum(hist) / len(hist)
-        dp = math.sqrt(sum((x - mu) ** 2 for x in hist) / (len(hist) - 1))
-        x = v12[ult]
-        pctl = 100 * sum(h <= x for h in hist) / len(hist)
-        stats.append(dict(nome=nome, x=x, mil=s[ult] - s[mes_mais(ult, -12)], mu=mu, dp=dp,
-                          z=(x - mu) / dp, pctl=pctl, peso=100 * s[ult] / total[ult],
-                          a3=100 * ((s[ult] / s[mes_mais(ult, -3)]) ** 4 - 1)))
-    stats.sort(key=lambda r: r["z"], reverse=True)
     cor = lambda v: VERDE if v > 0 else VERMELHO                                          # noqa: E731
+    series_setor = {sid: fred(sid) for _, sid in SETORES}
+
+    def estatisticas(ini, fim):
+        stats = []
+        for nome, sid in SETORES:
+            s = series_setor[sid]
+            v12 = var(s)
+            hist = [v for m, v in v12.items() if ini <= m <= fim]
+            mu = sum(hist) / len(hist)
+            dp = math.sqrt(sum((x - mu) ** 2 for x in hist) / (len(hist) - 1))
+            x = v12[ult]
+            stats.append(dict(nome=nome, x=x, mil=s[ult] - s[mes_mais(ult, -12)], mu=mu, dp=dp,
+                              z=(x - mu) / dp, pctl=100 * sum(h <= x for h in hist) / len(hist),
+                              peso=100 * s[ult] / total[ult],
+                              a3=100 * ((s[ult] / s[mes_mais(ult, -3)]) ** 4 - 1)))
+        return sorted(stats, key=lambda r: r["z"], reverse=True)
+
+    bases = [(rot, estatisticas(a, b if b != "ult" else ult)) for rot, a, b in BASES_SETORES]
+    stats = bases[0][1]
     g_atip = dict(id="setores-atipicos", tipo="ranking",
                   titulo="Emprego por setor: o quanto os últimos 12 meses fogem do normal",
                   subtitulo="Variação em 12 meses até %s" % rot_mes(ult), unidade="dp", sinal=True,
                   fonte="BLS (via FRED) e FtM", variantes=[
-                      dict(rot="em desvios-padrão contra a média de 1990 a 2019", unidade="dp",
-                           itens=[[r["nome"], round(r["z"], 2), cor(r["z"])] for r in stats]),
+                      dict(rot="em desvios-padrão contra a média de %s" % rot, unidade="dp",
+                           itens=[[r["nome"], round(r["z"], 2), cor(r["z"])] for r in st])
+                      for rot, st in bases] + [
                       dict(rot="em %", unidade="pct1",
                            itens=[[r["nome"], round(r["x"], 1), cor(r["x"])]
                                   for r in sorted(stats, key=lambda r: -r["x"])]),
@@ -482,25 +495,27 @@ def graficos_trabalho():
                            itens=[[r["nome"], round(r["mil"]), cor(r["mil"])]
                                   for r in sorted(stats, key=lambda r: -r["mil"])]),
                   ])
-    linhas = []
-    for r in stats:
-        fora = abs(r["z"]) >= 1.5
-        linhas.append([{"t": r["nome"], "forte": fora}, {"t": br(r["peso"])},
-                       {"t": br(r["mil"], 0, True)}, {"t": br(r["x"], 1, True) + "%", "cor": cor(r["x"])},
-                       {"t": br(r["a3"], 1, True) + "%", "cor": cor(r["a3"])},
-                       {"t": br(r["mu"], 1, True) + "%"},
-                       {"t": br(r["z"], 2, True), "cor": cor(r["z"]), "forte": fora},
-                       {"t": "%d" % round(r["pctl"])}])
+
+    def tabela(rot, st):
+        linhas = []
+        for r in st:
+            fora = abs(r["z"]) >= 1.5
+            linhas.append([{"t": r["nome"], "forte": fora}, {"t": br(r["peso"])},
+                           {"t": br(r["mil"], 0, True)}, {"t": br(r["x"], 1, True) + "%", "cor": cor(r["x"])},
+                           {"t": br(r["a3"], 1, True) + "%", "cor": cor(r["a3"])},
+                           {"t": br(r["mu"], 1, True) + "%"}, {"t": br(r["dp"], 1)},
+                           {"t": br(r["z"], 2, True), "cor": cor(r["z"]), "forte": fora},
+                           {"t": "%d" % round(r["pctl"])}])
+        return dict(rot="base de %s" % rot, linhas=linhas,
+                    colunas=[{"rot": "Setor"}, {"rot": "% do emprego", "num": True},
+                             {"rot": "12 meses, mil vagas", "num": True}, {"rot": "12 meses", "num": True},
+                             {"rot": "3 meses anualizado", "num": True}, {"rot": "Média da base", "num": True},
+                             {"rot": "Desvio-padrão da base, p.p.", "num": True},
+                             {"rot": "Desvios-padrão", "num": True}, {"rot": "Percentil", "num": True}])
     g_tab = dict(id="setores-estatisticas", tipo="tabela",
                  titulo="Emprego por setor: as estatísticas da comparação",
-                 subtitulo="Até %s; em negrito, os setores a 1,5 desvio-padrão ou mais da média de 1990 a 2019"
-                           % rot_mes(ult),
-                 fonte="BLS (via FRED) e FtM",
-                 colunas=[{"rot": "Setor"}, {"rot": "% do emprego", "num": True},
-                          {"rot": "12 meses, mil vagas", "num": True}, {"rot": "12 meses", "num": True},
-                          {"rot": "3 meses anualizado", "num": True}, {"rot": "Média 1990-2019", "num": True},
-                          {"rot": "Desvios-padrão", "num": True}, {"rot": "Percentil", "num": True}],
-                 linhas=linhas)
+                 subtitulo="Até %s; em negrito, os setores a 1,5 desvio-padrão ou mais da média da base" % rot_mes(ult),
+                 fonte="BLS (via FRED) e FtM", variantes=[tabela(rot, st) for rot, st in bases])
 
     saude = fred("CES6562000001")
     d12 = lambda s: {m: v - s[mes_mais(m, -12)] for m, v in s.items() if mes_mais(m, -12) in s}  # noqa: E731
