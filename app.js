@@ -286,10 +286,15 @@
          valor: function (v) { return nf(1).format(v) + " h"; } },
     pp: { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
           valor: function (v) { return nf(2).format(v) + " p.p."; } },
+    "usd-tri": { eixo: function (v, passo) { return "US$ " + nf(casasDoPasso(passo)).format(v); },
+                 valor: function (v) { return "US$ " + nf(2).format(v) + " tri"; } },
     "usd-bbl": { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
                  valor: function (v) { return "US$ " + nf(2).format(v) + "/barril"; } }
   };
   function unidade(g) { return UNIDADES[g.unidade] || UNIDADES["%"]; }
+  // a série pode ter unidade própria (a que vai no eixo da direita, quando o
+  // gráfico tem "eixoDireita"): vale para o rótulo do último ponto e a caixa
+  function unidadeDe(g, s) { return (s && UNIDADES[s.unidade]) || unidade(g); }
 
   function idxMes(m) { var p = m.split("-"); return (+p[0]) * 12 + (+p[1] - 1); }
   // eixo diário: o índice é o dia corrido (UTC, para não pegar fuso nem horário de verão)
@@ -703,11 +708,15 @@
     g.series.forEach(function (s, k) {
       if (!s.rotulo || !vis[k].length) return;
       var u = vis[k][vis[k].length - 1];
-      rotulos.push({ s: s, p: u, txt: F.valor(u.v) });
+      rotulos.push({ s: s, p: u, txt: unidadeDe(g, s).valor(u.v) });
     });
     var rw = Math.max.apply(null, [0].concat(rotulos.map(function (r) { return largura(r.txt, L.rotulo, "bold"); })));
+    // "eixoDireita": o eixo da direita repete a escala com outra unidade
+    // (ativos em US$ tri à esquerda, juros em % à direita, um para um)
+    var F2 = g.eixoDireita ? UNIDADES[g.eixoDireita] : F, duplo = L.eixoDuplo || !!g.eixoDireita;
+    var tw2 = Math.max.apply(null, esc.ticks.map(function (t) { return largura(F2.eixo(t, esc.passo), L.tick); }));
     L.x0 = 26 + tw + 14;
-    L.x1 = L.W - (22 + Math.max(L.eixoDuplo ? tw + 14 : 0, rw + L.rotuloX + 10));
+    L.x1 = L.W - (22 + Math.max(duplo ? tw2 + 14 : 0, rw + L.rotuloX + 10));
     L.y0 = y0;
     var pw = L.x1 - L.x0, ph = L.y1 - L.y0;
     var X = function (i) { return L.x0 + (i - d0) / (d1 - d0) * pw; };
@@ -756,8 +765,8 @@
       }));
       var at = { y: y, "font-size": L.tick, fill: pal.eixo, "dominant-baseline": "central" };
       svg.appendChild(texto(F.eixo(t, esc.passo), Object.assign({ x: L.x0 - 14, "text-anchor": "end" }, at)));
-      if (L.eixoDuplo && ordem.every(function (o) { return Math.abs(o.y - y) > L.rotulo * 0.9; })) {
-        svg.appendChild(texto(F.eixo(t, esc.passo), Object.assign({ x: L.x1 + 14, "text-anchor": "start" }, at)));
+      if (duplo && ordem.every(function (o) { return Math.abs(o.y - y) > L.rotulo * 0.9; })) {
+        svg.appendChild(texto(F2.eixo(t, esc.passo), Object.assign({ x: L.x1 + 14, "text-anchor": "start" }, at)));
       }
     });
     // eixo X: linha de base (zero, se estiver no gráfico; senão a base)
@@ -1021,7 +1030,10 @@
 
     function limpar() { while (camada.firstChild) camada.removeChild(camada.firstChild); }
     // a faixa mostra os dois extremos
-    function valorTip(v) { return Array.isArray(v) ? F.valor(v[0]) + " a " + F.valor(v[1]) : F.valor(v); }
+    function valorTip(v, s) {
+      var Fs = unidadeDe(g, s);
+      return Array.isArray(v) ? Fs.valor(v[0]) + " a " + Fs.valor(v[1]) : Fs.valor(v);
+    }
     function mover(ev) {
       var pt = svg.createSVGPoint();
       pt.x = ev.clientX; pt.y = ev.clientY;
@@ -1051,7 +1063,7 @@
       }));
       var titulo = rotuloX(g, i, true);
       var w = Math.max(largura(titulo, fs, "bold"), Math.max.apply(null, linhas.map(function (l) {
-        return largura(l.s.nome + "  " + valorTip(l.v), fs) + fs * 1.1;
+        return largura(l.s.nome + "  " + valorTip(l.v, l.s), fs) + fs * 1.1;
       }))) + pad * 2;
       var h = (linhas.length + 1) * fs * 1.3 + pad;
       var bx = x + 22; if (bx + w > L.x1) bx = x - 22 - w;
@@ -1062,7 +1074,7 @@
         var ty = by + pad + fs * 0.8 + (k + 1) * fs * 1.3;
         camada.appendChild(el("rect", { x: bx + pad, y: ty - fs * 0.62, width: fs * 0.7, height: fs * 0.7, rx: 2, fill: corNoTema(l.s.cor, pal) }));
         camada.appendChild(texto(l.s.nome, { x: bx + pad + fs * 1.1, y: ty, "font-size": fs, fill: pal.suave }));
-        camada.appendChild(texto(valorTip(l.v), { x: bx + w - pad, y: ty, "font-size": fs, "font-weight": "bold", fill: pal.texto, "text-anchor": "end" }));
+        camada.appendChild(texto(valorTip(l.v, l.s), { x: bx + w - pad, y: ty, "font-size": fs, "font-weight": "bold", fill: pal.texto, "text-anchor": "end" }));
         if (desenho.vis[g.series.indexOf(l.s)] && l.s.tipo !== "barra") {
           camada.appendChild(el("circle", { cx: x, cy: desenho.Y(l.v), r: 6, fill: corNoTema(l.s.cor, pal), stroke: pal.bg, "stroke-width": 2 }));
         }

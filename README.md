@@ -267,6 +267,10 @@ armadilhas de cada uma estão no cabeçalho do script. As principais:
 
 Duas opções novas no `app.js` vieram com ele: `sombras` (faixas de fundo,
 `[{de, ate}]`, usadas para as recessões do NBER) e as unidades `mil`, `h` e `pb` (pontos-base).
+Depois veio `eixoDireita` (uma chave de unidade): o eixo da direita repete a
+mesma escala com outra unidade, um para um. É o gráfico dos ativos do Fed, com US$
+trilhões à esquerda e % à direita. A série que usa a unidade da direita leva
+`unidade` própria, que vale para o rótulo do último ponto e para a caixa do mouse.
 
 ## A bolsa nas eleições presidenciais
 

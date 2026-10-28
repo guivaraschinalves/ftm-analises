@@ -1074,7 +1074,34 @@ def comunicados_fomc():
     return [dict(id="fomc-comunicados", tipo="comunicados", titulo="Comparador dos comunicados do FOMC",
                  subtitulo="Escolha dois comunicados: o que saiu do texto aparece riscado em vermelho, o que entrou, "
                            "em verde",
-                 fonte="Federal Reserve", comunicados=out)]
+                 fonte="Federal Reserve", comunicados=out), balanco_fed()]
+
+
+def fim_de_mes(s):
+    """Série semanal ("AAAA-MM-DD") para mensal: a última leitura de cada mês."""
+    out = {}
+    for k in sorted(s):
+        out[k[:7]] = s[k]
+    return out
+
+
+def balanco_fed():
+    tesouro = fim_de_mes(fred("WSHOTSL", mensal=False))
+    mbs = fim_de_mes(fred("WSHOMCB", mensal=False))
+    ini = "2003-01"
+    tri = lambda s: {m: v / 1e6 for m, v in s.items() if m >= ini}       # noqa: E731  (milhões -> trilhões)
+    juros, cpi = desde(fred("FEDFUNDS"), ini), desde(var(fred("CPIAUCSL")), ini)
+    print("  ativos do Fed até %s: Tesouro US$ %.2f tri, MBS US$ %.2f tri" % (max(tesouro), tesouro[max(tesouro)] / 1e6,
+                                                                            mbs[max(mbs)] / 1e6))
+    return dict(id="fed-ativos-juros-cpi", titulo="Ativos do Fed, fed funds e CPI",
+                subtitulo="títulos na carteira do Fed no fim do mês, em US$ trilhões (eixo esquerdo); "
+                          "juros e inflação em % (eixo direito)",
+                unidade="usd-tri", eixoDireita="pct1", barra=1,
+                fonte="Federal Reserve e BLS (via FRED) e FtM", series=[
+                    serie("Títulos lastreados em hipotecas", "#34507F", tri(mbs), 3, tipo="barra"),
+                    serie("Títulos do Tesouro", "#31849B", tri(tesouro), 3, tipo="barra"),
+                    serie("Fed funds efetiva", BRANCO, juros, 2, rotulo=True, unidade="pct1"),
+                    serie("CPI, % em 12 meses", VERDE, cpi, 2, rotulo=True, unidade="pct1")])
 
 
 # ================================================================ montagem
