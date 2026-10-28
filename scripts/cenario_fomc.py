@@ -18,7 +18,7 @@ AS FONTES E AS ARMADILHAS DE CADA UMA
     padrão do urllib responde em menos de um segundo. Uma série por pedido:
     num lote, um id inexistente derruba o lote inteiro com 404.
     As séries de spread da ICE BofA no FRED só têm os últimos 3 anos (é a
-    licença); a de prazo longo é a Baa da Moody's contra o Treasury de 10 anos.
+    licença).
   - CPI em 12 meses usa o índice SEM ajuste sazonal (CPIAUCNS, CPILFENS), que
     é o número oficial. Com ajuste, o 12 meses de set/26 sai 4,0% em vez de
     3,7%: o fator sazonal é revisto e a conta não fecha com o divulgado. Mês a
@@ -527,16 +527,12 @@ def graficos_trabalho():
                       serie("Total", BRANCO, desde(t12, ini12), 0, rotulo=True)])
 
     g_des = dict(id="desemprego-participacao", titulo="Desemprego e participação na força de trabalho",
-                 subtitulo="%% da população; %s" % SUB_RECESSAO, unidade="%", sombras=rec,
+                 subtitulo="Faixas cinza = recessões (NBER)", unidade="%", sombras=rec,
                  fonte="BLS, NBER (via FRED) e FtM", variantes=[
-                     dict(rot="Taxa de desemprego", series=[
-                         serie("Desemprego", BRANCO, fred("UNRATE"), 1, rotulo=True),
-                         serie("U-6 (inclui subocupados e desalentados)", LARANJA, fred("U6RATE"), 1, rotulo=True)]),
-                     dict(rot="Taxa de participação, 16 anos ou mais", series=[
+                     dict(rot="Taxa de desemprego, % da força de trabalho", series=[
+                         serie("Desemprego", BRANCO, fred("UNRATE"), 1, rotulo=True, legenda=False)]),
+                     dict(rot="Taxa de participação, % da população de 16 anos ou mais", series=[
                          serie("Participação", BRANCO, fred("CIVPART"), 1, rotulo=True, legenda=False)]),
-                     dict(rot="Emprego sobre população, 25 a 54 anos", series=[
-                         serie("Emprego/população, 25 a 54 anos", BRANCO, fred("LNS12300060"), 1,
-                               rotulo=True, legenda=False)]),
                  ])
 
     # Breakeven, pelo método do St. Louis Fed ("Breakeven employment growth:
@@ -566,8 +562,7 @@ def graficos_trabalho():
     # baixo de imigração da AEI-Brookings, 87 mil no do CBO
     faixa_stl = {m: (15, 87) for m in sorted(be) if m >= "2026-01"}
     g_be = dict(id="payroll-breakeven", titulo="Payroll e o breakeven do mercado de trabalho",
-                subtitulo="Mil vagas por mês; breakeven = crescimento da população de 16 anos ou mais × participação "
-                          "× (1 − desemprego) × razão payroll/pesquisa domiciliar, o método do St. Louis Fed",
+                subtitulo="Mil vagas por mês; breakeven = vagas que mantêm o desemprego estável (método do St. Louis Fed)",
                 unidade="mil", fonte="BLS (via FRED), St. Louis Fed e FtM", series=[
                     dict(nome="Faixa do St. Louis Fed para 2026 (cenários de imigração)", cor=CINZA, tipo="faixa",
                          dados=[[m, a, b] for m, (a, b) in faixa_stl.items()]),
@@ -596,7 +591,7 @@ def graficos_trabalho():
     g_jolts = dict(id="jolts", titulo="Contratações, demissões e vagas abertas (JOLTS)",
                    subtitulo="Faixas cinza = recessões (NBER)", unidade="%", sombras=rec, fonte="BLS, NBER (via FRED) e FtM",
                    variantes=[
-                       dict(rot="% do emprego, por mês", series=[
+                       dict(rot="Contratações e demissões", series=[
                            serie("Contratações", BRANCO, fred("JTSHIR"), 1, rotulo=True),
                            serie("Demissões voluntárias (quits)", CIANO, fred("JTSQUR"), 1, rotulo=True),
                            serie("Demissões", VERMELHO, fred("JTSLDR"), 1, rotulo=True)]),
@@ -678,9 +673,10 @@ def graficos_moeda():
     m2, base = fred("M2SL"), fred("BOGMBASE")
     g1 = dict(id="m2-base", titulo="Agregados monetários: M2 e base monetária",
               subtitulo="%% em 12 meses; %s" % SUB_RECESSAO, unidade="%", sombras=rec,
-              fonte="Federal Reserve, NBER (via FRED) e FtM", series=[
-                  serie("M2", BRANCO, var(m2), 1, rotulo=True),
-                  serie("Base monetária", CIANO, var(base), 1, rotulo=True)])
+              fonte="Federal Reserve, NBER (via FRED) e FtM", variantes=[
+                  dict(rot="M2", series=[serie("M2", BRANCO, var(m2), 1, rotulo=True, legenda=False)]),
+                  dict(rot="Base monetária", series=[serie("Base monetária", CIANO, var(base), 1, rotulo=True,
+                                                           legenda=False)])])
 
     # Em mai/2020 o Fed passou a poupança para o M1 e juntou poupança e
     # "outros depósitos à vista" (OCD) em "outros depósitos líquidos". Antes
@@ -816,23 +812,13 @@ def graficos_governo():
 # ================================================================ crédito
 
 def graficos_credito():
-    rec_d = recessoes(True)
-    hy, ig, bbb, ccc = (fred(i, False) for i in ("BAMLH0A0HYM2", "BAMLC0A0CM", "BAMLC0A4CBBB", "BAMLH0A3HYC"))
-    baa = fred("BAA10Y", False)
+    hy, ig, bbb = (fred(i, False) for i in ("BAMLH0A0HYM2", "BAMLC0A0CM", "BAMLC0A4CBBB"))
     print("  spreads até %s: HY %.2f, IG %.2f" % (max(hy), hy[max(hy)], ig[max(ig)]))
+    um = lambda rot, cor, s: dict(rot=rot, series=[serie(rot, cor, s, rotulo=True, legenda=False)])  # noqa: E731
     return [dict(id="spreads-credito", titulo="Spreads de crédito corporativo nos EUA",
-                 subtitulo="Pontos percentuais sobre o Treasury, diário", unidade="pp", diario=True,
-                 fonte="ICE BofA, Moody's, NBER (via FRED) e FtM", variantes=[
-                     dict(rot="Grau de investimento e high yield (ICE BofA, ajustado por opções)", series=[
-                         serie("High yield", LARANJA, hy, rotulo=True),
-                         serie("BBB", CIANO, bbb, rotulo=True),
-                         serie("Grau de investimento", BRANCO, ig, rotulo=True)]),
-                     dict(rot="CCC e abaixo (ICE BofA)", series=[
-                         serie("CCC e abaixo", VERMELHO, ccc, rotulo=True, legenda=False)]),
-                     dict(rot="Baa (Moody's) menos Treasury de 10 anos, desde 1986; %s" % SUB_RECESSAO,
-                          sombras=rec_d, series=[
-                              serie("Baa menos 10 anos", BRANCO, baa, rotulo=True, legenda=False)]),
-                 ])]
+                 subtitulo="Pontos percentuais sobre o Treasury, diário; ICE BofA, ajustado por opções",
+                 unidade="pp", diario=True, fonte="ICE BofA (via FRED) e FtM", variantes=[
+                     um("High yield", LARANJA, hy), um("BBB", CIANO, bbb), um("Grau de investimento", BRANCO, ig)])]
 
 
 # ================================================================ data centers
