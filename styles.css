@@ -619,15 +619,16 @@ body.visor-aberto { overflow: hidden; }
 .comentario-aviso:empty { display: none; }
 
 /* Comentário na margem direita da página (tela larga, só no assunto que tem
-   comentários): a coluna do conteúdo encosta à esquerda e a direita fica
-   para os balões, ligados ao cartão por um traço, como no Word. */
+   comentários): os balões ficam à direita do cartão, ligados por um traço,
+   como no Word. */
 @media (min-width: 1340px) {
-  body.com-comentarios .conteudo { max-width: 1388px; padding-right: 324px; }
+  /* centralizado como sempre; só estreita o que faltar para o balão (220px + traço) caber à direita */
+  body.com-comentarios .conteudo { max-width: min(1088px, calc(100vw - 488px)); }
   .card.com-margem { position: relative; overflow: visible; }
   .card.com-margem > summary { border-radius: 14px 14px 0 0; }
   .card.com-margem > .card-corpo:nth-last-child(2) { border-radius: 0 0 13px 13px; overflow: hidden; }
   .card.com-margem > .comentario {
-    position: absolute; top: 0; left: calc(100% + 22px); width: 280px;
+    position: absolute; top: 0; left: calc(100% + 22px); width: 220px;
     display: block; border: none; background: transparent;
   }
   .card.com-margem > .comentario::before {
