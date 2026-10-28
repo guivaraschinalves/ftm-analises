@@ -1129,15 +1129,15 @@ def dissidentes_fomc():
         ult = max(ult, data)
     print("  dissidentes: planilha até %s; última reunião %s" % (max(vistas), ult))
     return dict(id="fomc-dissidentes", titulo="Votos dissidentes no FOMC",
-                subtitulo="votos contra a decisão em cada reunião; acima de zero, por aumento do juro; "
-                          "abaixo, por redução",
+                subtitulo="votos contra a decisão em cada reunião; acima de zero, por juro mais alto que o decidido; "
+                          "abaixo, por juro mais baixo",
                 unidade="votos", periodoPadrao="20", fonte="Federal Reserve Bank of St. Louis, Federal Reserve e FtM",
                 eventos=[dict(em=m, rot=n) for m, n in chefes[1:]],
                 nota="Até os anos 1970 o comitê se reunia mais de uma vez em alguns meses; nesses, a barra soma as "
                      "reuniões do mês. Os nomes no alto marcam a troca de presidente do Fed.",
-                series=[serie("Por aumento", VERMELHO, dura, 0, tipo="barra"),
+                series=[serie("Por juro mais alto", VERMELHO, dura, 0, tipo="barra"),
                         serie("Por outro motivo", CINZA, outro, 0, tipo="barra"),
-                        serie("Por redução", AZUL, frouxa, 0, tipo="barra")])
+                        serie("Por juro mais baixo", AZUL, frouxa, 0, tipo="barra")])
 
 
 def balanco_fed():
