@@ -1720,7 +1720,20 @@
 
     var acoes = html("div", { "class": "card-acoes" });
     if (g.tipo === "comunicados") {
-      // nada a baixar: o texto é o do Fed, e o link de cada um fica no comparador
+      // nada a baixar: o texto é o do Fed, e o link de cada um fica no
+      // comparador. Zoom e tela cheia levam o comparador (o mesmo, com as
+      // escolhas feitas) para uma janela de leitura com letra maior.
+      var btnZoomC = html("button", { type: "button", "class": "btn", title: "Ampliar o comparador na janela" });
+      btnZoomC.appendChild(icone(ICO_ZOOM));
+      btnZoomC.appendChild(html("span", { texto: "Zoom" }));
+      btnZoomC.addEventListener("click", function () { abrirLeitor(cartao, false, btnZoomC); });
+      var btnFsC = html("button", { type: "button", "class": "btn", title: "Ver o comparador em tela cheia" });
+      btnFsC.appendChild(icone(ICO_ENTRAR));
+      btnFsC.appendChild(html("span", { texto: "Tela cheia" }));
+      btnFsC.addEventListener("click", function () { abrirLeitor(cartao, true, btnFsC); });
+      if (!fullscreenSuportado(document.documentElement)) btnFsC.hidden = true;
+      acoes.appendChild(btnZoomC);
+      acoes.appendChild(btnFsC);
     } else if (g.tipo === "tabela") {
       // nada de tela cheia nem de PNG: não há desenho para ampliar nem para
       // rasterizar. O dado, esse sai em CSV como o de qualquer cartão.
@@ -1815,6 +1828,70 @@
     return ops;
   }
   function dataBR(iso) { var p = iso.split("-"); return p[2] + "/" + p[1] + "/" + p[0]; }
+
+  // ---------- leitor: o comparador ampliado ----------
+  // O visor dos gráficos pinta num canvas; o comparador é texto e tem
+  // seletores, então o zoom dele é outro: o próprio nó sai do cartão para uma
+  // janela por cima da página e volta ao fechar, com as escolhas intactas.
+  var leitor = null;
+  function abrirLeitor(cartao, comTelaCheia, origem) {
+    if (!leitor) {
+      var box = html("div", { "class": "leitor", role: "dialog", "aria-modal": "true", hidden: "" });
+      var barra = html("div", { "class": "leitor-barra" });
+      var titulo = html("h2", { "class": "leitor-titulo" });
+      var btnSair = html("button", { type: "button", "class": "btn", texto: "Sair do Zoom" });
+      btnSair.addEventListener("click", function () { fecharLeitor(); });
+      var btnFs = html("button", { type: "button", "class": "btn", texto: "Tela cheia" });
+      btnFs.hidden = !fullscreenSuportado(box);
+      btnFs.addEventListener("click", function () {
+        if (elFullscreen() === box) sairFullscreen(); else entrarFullscreen(box);
+      });
+      barra.appendChild(titulo);
+      barra.appendChild(btnSair);
+      barra.appendChild(btnFs);
+      var corpo = html("div", { "class": "leitor-corpo" });
+      box.appendChild(barra);
+      box.appendChild(corpo);
+      document.body.appendChild(box);
+      document.addEventListener("keydown", function (ev) {
+        if (ev.key === "Escape" && !box.hidden && elFullscreen() !== box) fecharLeitor();
+      });
+      // saiu da tela cheia (pelo Esc do navegador) tendo entrado direto nela:
+      // volta à página, como no visor
+      ["fullscreenchange", "webkitfullscreenchange"].forEach(function (t) {
+        document.addEventListener(t, function () {
+          var ativo = elFullscreen() === box;
+          btnFs.textContent = ativo ? "Sair da tela cheia" : "Tela cheia";
+          if (!ativo && leitor.soTelaCheia && !box.hidden) fecharLeitor();
+          if (ativo) leitor.entrou = true;
+        });
+      });
+      leitor = { box: box, titulo: titulo, corpo: corpo, sair: btnSair };
+    }
+    var no = cartao.frame.querySelector(".comparador");
+    if (!no) return;
+    leitor.cartao = cartao;
+    leitor.origem = origem;
+    leitor.soTelaCheia = comTelaCheia;
+    leitor.sair.hidden = comTelaCheia;
+    leitor.titulo.textContent = cartao.grafico.titulo;
+    leitor.box.setAttribute("aria-label", cartao.grafico.titulo);
+    leitor.corpo.appendChild(no);
+    leitor.box.hidden = false;
+    document.body.classList.add("visor-aberto");
+    if (comTelaCheia && fullscreenSuportado(leitor.box)) entrarFullscreen(leitor.box);
+    (comTelaCheia ? no.querySelector("select") : leitor.sair).focus();
+  }
+  function fecharLeitor() {
+    if (!leitor || leitor.box.hidden) return;
+    if (elFullscreen() === leitor.box) sairFullscreen();
+    var no = leitor.corpo.querySelector(".comparador");
+    if (no && leitor.cartao) leitor.cartao.frame.appendChild(no);
+    leitor.box.hidden = true;
+    document.body.classList.remove("visor-aberto");
+    if (leitor.origem) leitor.origem.focus({ preventScroll: true });
+    leitor.cartao = null;
+  }
 
   function montarComparador(g) {
     var lista = g.comunicados || [];

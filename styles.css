@@ -547,3 +547,26 @@ body.visor-aberto { overflow: hidden; }
 :root[data-theme="light"] .comparador ins { color: #2f6b12; background: rgba(155, 187, 89, .22); }
 .comparador-links { font-size: 13px; color: var(--ink-2); margin: 4px 0 10px; }
 .comparador-links a { color: var(--accent); }
+
+/* Zoom do comparador: o mesmo nó, numa janela que cobre a página, com letra
+   maior e a largura de leitura limitada */
+.leitor {
+  position: fixed; inset: 0; z-index: 100; background: var(--bg); overflow-y: auto;
+  padding: 20px 24px 40px;
+}
+.leitor[hidden] { display: none; }
+.leitor-barra {
+  max-width: 1080px; margin: 0 auto 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+}
+.leitor-titulo { flex: 1 1 auto; margin: 0; font-size: 22px; color: var(--ink); }
+.leitor-corpo { max-width: 1080px; margin: 0 auto; }
+.leitor .comparador { padding: 8px 0; }
+.leitor .comparador select { font-size: 16px; }
+.leitor .comparador-resumo { font-size: 15px; }
+.leitor .comparador-texto p { font-size: 20px; line-height: 1.7; }
+.leitor:fullscreen { padding-top: 28px; }
+@media (max-width: 700px) {
+  .leitor { padding: 14px 16px 32px; }
+  .leitor-titulo { font-size: 18px; flex-basis: 100%; }
+  .leitor .comparador-texto p { font-size: 17px; }
+}
