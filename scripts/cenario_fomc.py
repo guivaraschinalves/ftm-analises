@@ -46,6 +46,7 @@ AS FONTES E AS ARMADILHAS DE CADA UMA
 """
 import csv
 import datetime
+import html as html_mod
 import io
 import json
 import math
@@ -1016,9 +1017,69 @@ def rotulo_dia(d):
     return "%s/%s/%s" % (d[8:], d[5:7], d[:4])
 
 
+# ================================================================ comunicados do FOMC
+
+FED = "https://www.federalreserve.gov"
+
+
+def comunicados_fomc():
+    """Os comunicados do FOMC desde 2021, para o comparador do topo da página.
+    A lista sai do calendário do Fed (fomccalendars.htm), que tem os links
+    "monetaryAAAAMMDDa.htm" dos últimos anos. Nem todo link "a" é comunicado
+    (22/08/2025 é a revisão da estratégia): vale só a página cujo título diz
+    "FOMC statement". Do texto saem a linha de imprensa e a nota de
+    implementação.
+
+    Comunicado não muda depois de publicado: os que já estão no JSON anterior
+    não são baixados de novo, só os novos (o de hoje, quando sair às 14h de
+    Nova York)."""
+    ja = {}
+    try:
+        with open(SAIDA, encoding="utf-8") as f:
+            for sec in json.load(f)["secoes"]:
+                for g in sec["graficos"]:
+                    if g.get("tipo") == "comunicados":
+                        ja = {c["data"]: c for c in g["comunicados"]}
+    except (OSError, ValueError, KeyError):
+        pass
+    cal = baixar(FED + "/monetarypolicy/fomccalendars.htm", headers=NAVEGADOR).decode("utf-8", "replace")
+    datas = sorted(set(re.findall(r"monetary(20\d{6})a\.htm", cal)))
+    hoje = datetime.date.today().strftime("%Y%m%d")
+    if hoje not in datas and datetime.date.today().weekday() == 2:
+        datas.append(hoje)                                   # a reunião de hoje, se o link ainda não estiver lá
+    out = []
+    for d in datas:
+        iso = "%s-%s-%s" % (d[:4], d[4:6], d[6:])
+        if iso in ja:
+            out.append(ja[iso])
+            continue
+        try:
+            pag = baixar(FED + "/newsevents/pressreleases/monetary%sa.htm" % d, headers=NAVEGADOR, tentativas=2)
+        except RuntimeError:
+            continue                                         # ainda não publicado
+        pag = pag.decode("utf-8", "replace")
+        titulo = re.search(r"<title>(.*?)</title>", pag, re.S)
+        if not titulo or "FOMC statement" not in titulo.group(1):
+            continue
+        corpo = re.search(r'<div class="col-xs-12 col-sm-8 col-md-8">(.*?)</div>', pag, re.S)
+        paragrafos = []
+        for p_ in re.findall(r"<p[^>]*>(.*?)</p>", corpo.group(1) if corpo else "", re.S):
+            t = re.sub(r"\s+", " ", html_mod.unescape(re.sub(r"<[^>]+>", "", p_))).strip()
+            if t and not t.startswith(("For media inquiries", "Implementation Note")):
+                paragrafos.append(t)
+        if paragrafos:
+            out.append(dict(data=iso, url=FED + "/newsevents/pressreleases/monetary%sa.htm" % d,
+                            paragrafos=paragrafos))
+    print("  FOMC: %d comunicados, de %s a %s" % (len(out), out[0]["data"], out[-1]["data"]))
+    return [dict(id="fomc-comunicados", tipo="comunicados", titulo="Comparador dos comunicados do FOMC",
+                 subtitulo="Escolha dois comunicados: o que saiu do texto aparece riscado em vermelho, o que entrou, "
+                           "em verde",
+                 fonte="Federal Reserve", comunicados=out)]
+
+
 # ================================================================ montagem
 
-SECOES = [("Inflação", graficos_inflacao), ("Mercado de trabalho", graficos_trabalho),
+SECOES = [("Comunicado do FOMC", comunicados_fomc), ("Inflação", graficos_inflacao), ("Mercado de trabalho", graficos_trabalho),
           ("Atividade", graficos_atividade), ("Moeda", graficos_moeda), ("Contas do governo", graficos_governo),
           ("Crédito", graficos_credito), ("Data centers", graficos_datacenters),
           ("Fluxo de capital", graficos_tic), ("Juros", graficos_juros)]

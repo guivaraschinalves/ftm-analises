@@ -528,3 +528,22 @@ body.visor-aberto { overflow: hidden; }
   .card-acoes { gap: 6px; }
   .card-acoes .btn { white-space: nowrap; padding: 0 9px; }
 }
+
+/* comparador de comunicados do FOMC: o texto do Fed com o que saiu riscado
+   e o que entrou marcado */
+.comparador { padding: 16px 20px 6px; }
+.comparador-escolhas { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: flex-end; margin-bottom: 16px; }
+.comparador-escolhas label { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--ink-2); }
+.comparador select {
+  font: inherit; font-size: 14px; color: var(--ink); background: transparent; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 7px; padding: 6px 10px;
+}
+.comparador select option { color: #000; background: #fff; }
+.comparador-resumo { font-size: 13.5px; color: var(--ink-2); padding-bottom: 7px; }
+.comparador-texto p { margin: 0 0 12px; font-size: 16px; line-height: 1.65; color: var(--ink); }
+.comparador del { color: #ff8d7a; background: rgba(192, 80, 77, .16); text-decoration: line-through; border-radius: 3px; padding: 0 2px; }
+.comparador ins { color: #a9dc7a; background: rgba(155, 187, 89, .18); text-decoration: none; border-radius: 3px; padding: 0 2px; }
+:root[data-theme="light"] .comparador del { color: #a8322d; background: rgba(192, 80, 77, .12); }
+:root[data-theme="light"] .comparador ins { color: #2f6b12; background: rgba(155, 187, 89, .22); }
+.comparador-links { font-size: 13px; color: var(--ink-2); margin: 4px 0 10px; }
+.comparador-links a { color: var(--accent); }

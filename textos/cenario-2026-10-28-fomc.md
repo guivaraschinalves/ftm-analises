@@ -1,5 +1,7 @@
 # 28/10/26 - Decisão do FOMC
 
+## Comunicado do FOMC
+
 ## Inflação
 
 ## Mercado de trabalho

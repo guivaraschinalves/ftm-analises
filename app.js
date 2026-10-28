@@ -1498,7 +1498,7 @@
   // Os cartões que abrem no visor, na ordem da página (tabela não abre: não
   // há desenho para ampliar)
   function navegaveis() {
-    return cartoes.filter(function (c) { return c.grafico.tipo !== "tabela"; });
+    return cartoes.filter(function (c) { return c.grafico.tipo !== "tabela" && c.grafico.tipo !== "comunicados"; });
   }
   // Passa o visor para o gráfico vizinho (dir = −1 ou 1). Não dá a volta: no
   // primeiro e no último a seta daquele lado some.
@@ -1648,8 +1648,8 @@
       grupo.innerHTML = "";
       // com mouse o controle vale em todo gráfico de tempo (o ranking não tem
       // eixo de tempo); sem mouse, só quando há mais de um recorte
-      var deTempo = !efetivo.categorias && efetivo.tipo !== "ranking" && efetivo.tipo !== "mapa" &&
-                    efetivo.tipo !== "tabela";
+      var deTempo = !!efetivo.series && !efetivo.categorias && efetivo.tipo !== "ranking" &&
+                    efetivo.tipo !== "mapa" && efetivo.tipo !== "tabela";
       grupo.hidden = mouseFino() ? !deTempo : periodos.length < 2;
       if (grupo.hidden) {
         cartao.periodo = "tudo";
@@ -1707,7 +1707,9 @@
     ferramentas.appendChild(esquerda);
 
     var acoes = html("div", { "class": "card-acoes" });
-    if (g.tipo === "tabela") {
+    if (g.tipo === "comunicados") {
+      // nada a baixar: o texto é o do Fed, e o link de cada um fica no comparador
+    } else if (g.tipo === "tabela") {
       // nada de tela cheia nem de PNG: não há desenho para ampliar nem para
       // rasterizar. O dado, esse sai em CSV como o de qualquer cartão.
       var btnCsv = html("button", { type: "button", "class": "btn", texto: "Baixar CSV" });
@@ -1767,6 +1769,113 @@
   // Formato: `colunas` é a lista de cabeçalhos ({rot, num} — "num" alinha à
   // direita e usa fonte tabular, para as casas decimais ficarem em coluna), e
   // `linhas` é uma lista de listas. Cada célula é texto ou {t, cor, forte}.
+  // ---------- comparador de comunicados ----------
+  // Dois comunicados lado a lado num texto só: o que saiu do anterior vem
+  // riscado, o que entrou no novo vem marcado. A comparação é palavra a
+  // palavra (a maior subsequência comum, que é o que um "diff" faz); com
+  // comunicados de algumas centenas de palavras a tabela da conta tem uns
+  // 300 mil números e sai na hora.
+  function palavrasDe(c) {
+    var t = [];
+    c.paragrafos.forEach(function (p, i) {
+      if (i) t.push("\n");
+      p.split(/\s+/).forEach(function (w) { if (w) t.push(w); });
+    });
+    return t;
+  }
+  function diffPalavras(a, b) {
+    var n = a.length, m = b.length, L = [], i, j;
+    for (i = 0; i <= n; i++) L.push(new Uint16Array(m + 1));
+    for (i = n - 1; i >= 0; i--) {
+      for (j = m - 1; j >= 0; j--) {
+        L[i][j] = a[i] === b[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+      }
+    }
+    var ops = [];
+    i = 0; j = 0;
+    while (i < n && j < m) {
+      if (a[i] === b[j]) { ops.push(["=", a[i]]); i++; j++; }
+      else if (L[i + 1][j] >= L[i][j + 1]) { ops.push(["-", a[i]]); i++; }
+      else { ops.push(["+", b[j]]); j++; }
+    }
+    while (i < n) ops.push(["-", a[i++]]);
+    while (j < m) ops.push(["+", b[j++]]);
+    return ops;
+  }
+  function dataBR(iso) { var p = iso.split("-"); return p[2] + "/" + p[1] + "/" + p[0]; }
+
+  function montarComparador(g) {
+    var lista = g.comunicados || [];
+    var raiz = html("div", { "class": "comparador" });
+    var escolhas = html("div", { "class": "comparador-escolhas" });
+    function seletor(rotulo, padrao) {
+      var sel = html("select", { "aria-label": rotulo });
+      lista.slice().reverse().forEach(function (c) {
+        var o = html("option", { value: c.data, texto: dataBR(c.data) });
+        if (c.data === padrao) o.selected = true;
+        sel.appendChild(o);
+      });
+      var rot = html("label", {});
+      rot.appendChild(html("span", { texto: rotulo }));
+      rot.appendChild(sel);
+      escolhas.appendChild(rot);
+      return sel;
+    }
+    var n = lista.length;
+    var selA = seletor("Comunicado anterior", n > 1 ? lista[n - 2].data : (lista[0] || {}).data);
+    var selB = seletor("Comunicado novo", n ? lista[n - 1].data : null);
+    var resumo = html("span", { "class": "comparador-resumo" });
+    escolhas.appendChild(resumo);
+    var texto = html("div", { "class": "comparador-texto" });
+    var links = html("p", { "class": "comparador-links" });
+    raiz.appendChild(escolhas);
+    raiz.appendChild(texto);
+    raiz.appendChild(links);
+
+    function achar(d) { return lista.filter(function (c) { return c.data === d; })[0]; }
+    function comparar() {
+      var a = achar(selA.value), b = achar(selB.value);
+      texto.innerHTML = "";
+      links.innerHTML = "";
+      if (!a || !b) return;
+      var ops = diffPalavras(palavrasDe(a), palavrasDe(b));
+      var p = html("p", {}), tirou = 0, pos = 0, atual = null, tipo = null;
+      texto.appendChild(p);
+      ops.forEach(function (op) {
+        if (op[1] === "\n") {
+          // fim de parágrafo do texto novo (ou dos dois); o fim de um
+          // parágrafo que só existia no anterior não quebra a linha
+          if (op[0] !== "-") { p = html("p", {}); texto.appendChild(p); atual = null; tipo = null; }
+          return;
+        }
+        if (op[0] === "-") tirou++;
+        if (op[0] === "+") pos++;
+        if (op[0] !== tipo || !atual) {
+          atual = op[0] === "=" ? html("span", {}) : html(op[0] === "-" ? "del" : "ins", {});
+          p.appendChild(atual);
+          tipo = op[0];
+          if (atual.previousSibling) p.insertBefore(document.createTextNode(" "), atual);
+        } else {
+          atual.appendChild(document.createTextNode(" "));
+        }
+        atual.appendChild(document.createTextNode(op[1]));
+      });
+      [].slice.call(texto.querySelectorAll("p")).forEach(function (x) { if (!x.textContent) texto.removeChild(x); });
+      resumo.textContent = a === b ? "É o mesmo comunicado"
+        : tirou + (tirou === 1 ? " palavra saiu" : " palavras saíram") + ", " +
+          pos + (pos === 1 ? " entrou" : " entraram");
+      [[a, "anterior"], [b, "novo"]].forEach(function (x, k) {
+        if (k) links.appendChild(document.createTextNode(" · "));
+        links.appendChild(html("a", { href: x[0].url, target: "_blank", rel: "noopener noreferrer",
+          texto: "Comunicado de " + dataBR(x[0].data) + " no site do Fed" }));
+      });
+    }
+    selA.addEventListener("change", comparar);
+    selB.addEventListener("change", comparar);
+    comparar();
+    return raiz;
+  }
+
   function montarTabela(g) {
     var tab = html("table", { "class": "tabela" });
     var thead = html("thead", {});
@@ -1800,6 +1909,12 @@
     var chave = nomeLayout + "|" + tema() + "|" + cartao.periodo + "|" + cartao.inicioIdx + "|" + cartao.fimIdx + "|" + cartao.variante;
     if (!forcar && cartao.chave === chave) return;
     cartao.chave = chave;
+    if (graficoDe(cartao).tipo === "comunicados") {
+      // montado uma vez: as escolhas do leitor ficam no próprio DOM
+      cartao.frame.style.aspectRatio = "";
+      if (!cartao.frame.firstChild) cartao.frame.appendChild(montarComparador(graficoDe(cartao)));
+      return;
+    }
     if (graficoDe(cartao).tipo === "tabela") {
       // sem proporção fixa: a tabela tem a altura que o conteúdo pedir
       cartao.frame.style.aspectRatio = "";
