@@ -2119,8 +2119,8 @@
       else if (!atual) { editar(false); abrir(false); }
     });
     mostrar();
-    // com comentário e largura sobrando, nasce aberto; sem, só a aba
-    var nasceAberto = !!atual && window.innerWidth >= 1100;
+    // nasce recolhido: fica só a aba (pedido dele); abre no clique
+    var nasceAberto = false;
     aside.classList.toggle("aberto", nasceAberto);
     aba.setAttribute("aria-expanded", String(nasceAberto));
     return aside;
