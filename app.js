@@ -1147,6 +1147,7 @@
       "aria-hidden": "true" }, [el("path", { d: d })]);
   }
   var ICO_ENTRAR = "M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6";
+  var ICO_ZOOM = "M11 4a7 7 0 1 0 0 14a7 7 0 0 0 0-14zM20 20l-4.2-4.2M11 8v6M8 11h6";
 
   // ---------- tela cheia (API do navegador, com o prefixo do Safari) ----------
   // requestFullscreen devolve Promise nos navegadores atuais e undefined nos
@@ -1252,9 +1253,14 @@
 
     var btnFs = html("button", { type: "button", "class": "visor-btn", texto: "Tela cheia", "aria-pressed": "false" });
     btnFs.hidden = !fullscreenSuportado(box);
+    // a tela cheia é a do visor: se a página inteira estiver em tela cheia,
+    // o botão leva o gráfico para a tela cheia, em vez de tirar a página dela
     btnFs.addEventListener("click", function () {
-      if (elFullscreen()) sairFullscreen(); else entrarFullscreen(box);
+      if (elFullscreen() === box) sairFullscreen(); else entrarFullscreen(box);
     });
+    // no Zoom, a saída tem nome: volta à página
+    var btnSairZoom = html("button", { type: "button", "class": "visor-btn", texto: "Sair do Zoom" });
+    btnSairZoom.addEventListener("click", function () { fecharVisor(); });
 
     var desenhando = false;
     function alternarDesenho(ligar) {
@@ -1263,9 +1269,7 @@
       btnDesenho.setAttribute("aria-pressed", String(desenhando));
       btnDesenho.textContent = desenhando ? "Parar de desenhar" : "Desenhar";
       itemDesenho.textContent = btnDesenho.textContent;
-      dica.textContent = desenhando
-        ? "Arraste sobre o gráfico para anotar"
-        : "Ligue “Desenhar” para anotar — com ele desligado, o gráfico mostra os valores do mês";
+      dica.textContent = desenhando ? "Arraste sobre o gráfico para anotar" : "";
     }
     var btnDesenho = html("button", { type: "button", "class": "visor-btn", "aria-pressed": "false", texto: "Desenhar" });
     btnDesenho.addEventListener("click", function () { alternarDesenho(); });
@@ -1274,6 +1278,11 @@
     var btnLimpar = html("button", { type: "button", "class": "visor-btn", texto: "Limpar anotações" });
     btnLimpar.addEventListener("click", function () { anot.limpar(); });
 
+    // Recortes do gráfico: ficam fora de "inline", que em tela cheia vira o
+    // hambúrguer, para dar para trocar sem sair dela
+    var recortes = html("div", { "class": "visor-recortes", role: "group", "aria-label": "Recorte do gráfico" });
+    barra.appendChild(recortes);
+    inline.appendChild(btnSairZoom);
     inline.appendChild(btnFs);
     inline.appendChild(btnDesenho);
     inline.appendChild(btnDesfazer);
@@ -1378,9 +1387,17 @@
     }
     window.addEventListener("resize", posicionarChrome);
 
+    // "Tela cheia" e "Zoom" são dois modos do visor. Sair da tela cheia (pelo
+    // Esc ou pelo botão) volta à página, não ao Zoom: quem quis tela cheia não
+    // pediu o zoom. Exceção: quem abriu o Zoom e de lá foi à tela cheia, ao
+    // sair dela volta ao Zoom (visor.doZoom), que é de onde veio.
+    var emTelaCheia = false;
     function sincronizarFs() {
-      var ativo = !!elFullscreen();
+      var ativo = elFullscreen() === box;
+      if (!ativo && emTelaCheia && !box.hidden && !visor.doZoom) { emTelaCheia = false; fecharVisor(); return; }
+      emTelaCheia = ativo;
       btnFs.textContent = ativo ? "Sair da tela cheia" : "Tela cheia";
+      btnSairZoom.hidden = ativo;
       btnFs.setAttribute("aria-pressed", String(ativo));
       if (!ativo) fecharMenu();   // o hambúrguer nem aparece fora da tela cheia
       mostrarChrome(ativo);
@@ -1395,10 +1412,30 @@
     box.addEventListener("click", function (ev) { if (ev.target === box) fecharVisor(); });
     document.addEventListener("keydown", function (ev) {
       if (ev.key !== "Escape" || box.hidden) return;
-      // Em tela cheia, Escape quer dizer "sair da tela cheia" — fechar o visor
-      // junto tiraria o gráfico da tela num passo só.
-      if (elFullscreen()) { sairFullscreen(); return; }
+      // Esc fecha o visor nos dois modos e volta à página (de tela cheia, o
+      // navegador costuma sair sozinho e quem fecha é o sincronizarFs)
       fecharVisor();
+    });
+
+    // setas para o gráfico anterior e o seguinte, na ordem da página
+    function seta(dir) {
+      var b = html("button", { type: "button", "class": "visor-seta visor-seta-" + (dir < 0 ? "ant" : "prox"),
+        "aria-label": dir < 0 ? "Gráfico anterior" : "Próximo gráfico" });
+      b.appendChild(el("svg", { viewBox: "0 0 24 24", width: "22", height: "22", "aria-hidden": "true" }, [
+        el("path", { d: dir < 0 ? "M15 5l-7 7 7 7" : "M9 5l7 7-7 7", fill: "none", stroke: "currentColor",
+          "stroke-width": "2.4", "stroke-linecap": "round", "stroke-linejoin": "round" })
+      ]));
+      b.addEventListener("click", function (ev) { ev.stopPropagation(); irNoVisor(dir); });
+      box.appendChild(b);
+      return b;
+    }
+    var setaAnt = seta(-1), setaProx = seta(1);
+    // ← e → do teclado fazem o mesmo (menos desenhando ou com modificador)
+    document.addEventListener("keydown", function (ev) {
+      if (box.hidden || desenhando || ev.altKey || ev.ctrlKey || ev.metaKey) return;
+      if (ev.key !== "ArrowLeft" && ev.key !== "ArrowRight") return;
+      ev.preventDefault();
+      irNoVisor(ev.key === "ArrowLeft" ? -1 : 1);
     });
 
     box.appendChild(btnFechar);
@@ -1407,7 +1444,8 @@
     box.appendChild(btnBaixar);
     document.body.appendChild(box);
 
-    visor = { box: box, palco: palco, tela: tela, anot: anot, fechar: btnFechar,
+    visor = { box: box, palco: palco, tela: tela, anot: anot, fechar: btnFechar, recortes: recortes,
+              setaAnt: setaAnt, setaProx: setaProx,
               mostrarChrome: mostrarChrome, fecharMenu: fecharMenu, desenho: alternarDesenho,
               cartao: null, tamanho: TAMANHOS[0], layout: "wide" };
     alternarDesenho(false);
@@ -1424,9 +1462,73 @@
     visor.palco.style.setProperty("--ar", L.W / L.H);
   }
 
+  // Os recortes do cartão, também no visor (em tela cheia não há outro jeito
+  // de trocar). trocarVariante repinta o cartão e o visor.
+  function montarRecortesDoVisor() {
+    var box = visor.recortes, c = visor.cartao, vs = c.grafico.variantes;
+    box.innerHTML = "";
+    box.hidden = !vs;
+    if (!vs) return;
+    // muitos recortes, ou de nome comprido, quebrariam a barra em duas linhas
+    // por cima do título: aí vira uma lista suspensa
+    var texto = vs.reduce(function (n, v) { return n + v.rot.length; }, 0);
+    if (vs.length > 3 || texto > 70) {
+      var sel = html("select", { "class": "visor-btn visor-select", "aria-label": "Recorte do gráfico" });
+      vs.forEach(function (v, k) {
+        var o = html("option", { value: String(k), texto: v.rot });
+        if (k === (c.variante || 0)) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.addEventListener("click", function (ev) { ev.stopPropagation(); });
+      sel.addEventListener("change", function () { c.trocarVariante(+sel.value); });
+      box.appendChild(sel);
+      return;
+    }
+    vs.forEach(function (v, k) {
+      var b = html("button", { type: "button", "class": "visor-btn", texto: v.rot, "aria-pressed": String(k === (c.variante || 0)) });
+      b.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        c.trocarVariante(k);
+        Array.prototype.forEach.call(box.children, function (x, j) { x.setAttribute("aria-pressed", String(j === k)); });
+      });
+      box.appendChild(b);
+    });
+  }
+
+  // Os cartões que abrem no visor, na ordem da página (tabela não abre: não
+  // há desenho para ampliar)
+  function navegaveis() {
+    return cartoes.filter(function (c) { return c.grafico.tipo !== "tabela"; });
+  }
+  // Passa o visor para o gráfico vizinho (dir = −1 ou 1). Não dá a volta: no
+  // primeiro e no último a seta daquele lado some.
+  function irNoVisor(dir) {
+    if (!visor || !visor.cartao) return;
+    var lista = navegaveis(), j = lista.indexOf(visor.cartao) + dir;
+    if (j < 0 || j >= lista.length) return;
+    visor.cartao = lista[j];
+    montarRecortesDoVisor();
+    visor.anot.limpar();
+    visor.desenho(false);
+    pintarVisor();
+    atualizarSetas();
+    visor.mostrarChrome(true);
+  }
+  function atualizarSetas() {
+    var lista = navegaveis(), i = lista.indexOf(visor.cartao);
+    [[visor.setaAnt, lista[i - 1], "Anterior: "], [visor.setaProx, lista[i + 1], "Próximo: "]].forEach(function (x) {
+      x[0].hidden = !x[1];
+      if (x[1]) x[0].title = x[2] + x[1].grafico.titulo;
+    });
+  }
+
   function abrirVisor(cartao, comTelaCheia) {
     if (!visor) montarVisor();
     visor.cartao = cartao;
+    visor.abertoEm = cartao;
+    visor.doZoom = !comTelaCheia;
+    montarRecortesDoVisor();
+    atualizarSetas();
     visor.layout = window.innerWidth < 700 ? "narrow" : "wide";
     visor.tamanho = visor.layout === "wide" ? TAMANHOS[0] : TAMANHOS[1];
     pintarVisor();
@@ -1445,8 +1547,9 @@
   function fecharVisor() {
     if (!visor || visor.box.hidden) return;
     // sem isto, fechar pelo ✕ estando em tela cheia deixaria o navegador em
-    // tela cheia exibindo um elemento já escondido — tela preta
-    sairFullscreen();
+    // tela cheia exibindo um elemento já escondido (tela preta). Só a tela
+    // cheia do visor: a da página inteira, se estiver ligada, continua.
+    if (elFullscreen() === visor.box) sairFullscreen();
     visor.mostrarChrome(false);
     visor.fecharMenu();
     visor.box.hidden = true;
@@ -1456,7 +1559,15 @@
     document.body.classList.remove("visor-aberto");
     var volta = visor.cartao;
     visor.cartao = null;
-    if (volta && volta.botaoTelaCheia) volta.botaoTelaCheia.focus();
+    // andou pelas setas: a página vai até o último gráfico visto (abrindo o
+    // que estiver fechado no caminho), em vez de voltar ao de partida
+    if (volta && volta !== visor.abertoEm) {
+      // depois de a tela cheia terminar de sair, senão a rolagem se perde
+      setTimeout(function () {
+        irPara(volta.grafico.id);
+        if (volta.botaoTelaCheia) volta.botaoTelaCheia.focus({ preventScroll: true });
+      }, 150);
+    } else if (volta && volta.botaoTelaCheia) volta.botaoTelaCheia.focus({ preventScroll: true });
   }
 
   // ---------- cartão ----------
@@ -1602,11 +1713,20 @@
       btnCsv.addEventListener("click", function () { baixarCSV(cartao); });
       acoes.appendChild(btnCsv);
     } else {
+      // Zoom: o gráfico ampliado dentro da janela. Tela cheia: ocupa a tela
+      // toda, e o Esc volta direto à página.
+      var btnZoom = html("button", { type: "button", "class": "btn", title: "Ampliar este gráfico na janela, com anotação à mão" });
+      btnZoom.appendChild(icone(ICO_ZOOM));
+      btnZoom.appendChild(html("span", { texto: "Zoom" }));
+      btnZoom.addEventListener("click", function () { cartao.botaoTelaCheia = btnZoom; abrirVisor(cartao, false); });
       var btnFs = html("button", { type: "button", "class": "btn", title: "Ver só este gráfico, em tela cheia, com anotação à mão" });
       btnFs.appendChild(icone(ICO_ENTRAR));
       btnFs.appendChild(html("span", { texto: "Tela cheia" }));
-      btnFs.addEventListener("click", function () { abrirVisor(cartao, true); });
+      btnFs.addEventListener("click", function () { cartao.botaoTelaCheia = btnFs; abrirVisor(cartao, true); });
       cartao.botaoTelaCheia = btnFs;
+      // sem a API (o Safari do iPhone, por exemplo), fica só o Zoom
+      if (!fullscreenSuportado(document.documentElement)) btnFs.hidden = true;
+      acoes.appendChild(btnZoom);
       acoes.appendChild(btnFs);
       acoes.appendChild(menuBaixar(cartao));
     }
