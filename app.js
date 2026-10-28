@@ -276,6 +276,9 @@
     // petróleo e derivados em mil barris por dia; contribuição em pontos percentuais
     kbd: { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
            valor: function (v) { return nf(0).format(v) + " mil b/d"; } },
+    // pontos-base (contribuição de um item pequeno, onde 0,03 p.p. não diz nada)
+    pb: { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
+          valor: function (v) { return nf(1).format(v) + " pb"; } },
     // milhares (vagas, pedidos de seguro-desemprego) e horas por semana
     mil: { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
            valor: function (v) { return nf(0).format(v) + " mil"; } },

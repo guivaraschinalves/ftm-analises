@@ -29,6 +29,9 @@ AS FONTES E AS ARMADILHAS DE CADA UMA
     do investing.com (manufatura desde 1970, serviços desde 1997). A data ali
     é a da divulgação, no 1º dia útil do mês seguinte: o mês de referência é
     o anterior.
+  - CPI por componente: Excel do Fed de San Francisco ("CPI inflation
+    contributions from goods and services"). O link muda a cada atualização;
+    o script o acha na página.
   - Contas do governo: MTS do Tesouro (FRED para a série mensal; a API Fiscal
     Data, tabela 9, para receita por fonte e despesa por função).
   - Data centers: planilha de construção privada do Census (privsatime.xlsx),
@@ -211,27 +214,7 @@ def graficos_inflacao():
               series=[serie("CPI cheio", BRANCO, desde(cheio, "1958-01"), rotulo=True),
                       serie("Núcleo", LARANJA, desde(nucleo, "1958-01"), rotulo=True)])
 
-    comp = [("Energia", "CPIENGSL", AMARELO), ("Alimentos", "CPIUFDSL", VERDE),
-            ("Bens sem alimentos e energia", "CUSR0000SACL1E", AZUL),
-            ("Serviços sem energia", "CUSR0000SASLE", LARANJA)]
-    serv = [("Moradia", "CUSR0000SAH1", AZUL), ("Aluguel imputado (OER)", "CUSR0000SEHC01", CIANO),
-            ("Serviços sem moradia", "CUSR0000SASL2RS", LARANJA), ("Saúde", "CPIMEDSL", VERDE)]
     ini = "2015-01"
-    g2 = dict(id="cpi-componentes", titulo="Inflação ao consumidor (CPI) por componente",
-              subtitulo="Índices com ajuste sazonal", unidade="%", fonte="BLS (via FRED) e FtM",
-              periodoPadrao="5",
-              nota="Não há CPI de out/25: o BLS não coletou preços durante a paralisação do governo americano.",
-              variantes=[
-                  dict(rot="Grandes grupos, % em 12 meses",
-                       series=[serie(n, c, desde(var(fred(i)), ini), rotulo=True) for n, i, c in comp]),
-                  dict(rot="Grandes grupos, % em 3 meses anualizado",
-                       series=[serie(n, c, desde(anualizado(fred(i)), ini), rotulo=True) for n, i, c in comp]),
-                  dict(rot="Serviços, % em 12 meses",
-                       series=[serie(n, c, desde(var(fred(i)), ini), rotulo=True) for n, i, c in serv]),
-                  dict(rot="Serviços, % em 3 meses anualizado",
-                       series=[serie(n, c, desde(anualizado(fred(i)), ini), rotulo=True) for n, i, c in serv]),
-              ])
-
     pce = [("PCE cheio", "PCEPI", BRANCO), ("Núcleo", "PCEPILFE", LARANJA), ("Bens", "DGDSRG3M086SBEA", AZUL),
            ("Serviços", "DSERRG3M086SBEA", VERDE), ("Serviços sem energia e moradia", "IA001260M", CIANO)]
     pce_ext = [("Energia", "DNRGRG3M086SBEA", AMARELO), ("Alimentos", "DFXARG3M086SBEA", VERDE)]
@@ -257,7 +240,119 @@ def graficos_inflacao():
                   dict(rot="Diferença, CPI menos PCE, p.p.", unidade="pp", series=[
                       serie("CPI menos PCE", AZUL, desde(comum, "1960-01"), tipo="barra", legenda=False)]),
               ])
-    return [g1, g2, g3, g4, tabela_ppi()]
+    return [g1] + graficos_frbsf() + [g3, g4, tabela_ppi()]
+
+
+# ---- contribuições por componente: Fed de San Francisco
+#
+# A página "CPI inflation contributions from goods and services" publica um
+# Excel com a contribuição de cada grupo para o CPI (12 meses sem ajuste
+# sazonal; mês com ajuste) e de cada um dos 68 itens do núcleo para o núcleo
+# no mês. O link do Excel muda o "?data" a cada atualização: o script o acha
+# na própria página. O total do último mês às vezes vem "NA" antes dos
+# componentes; a linha do total sai da aba do CPI cheio, que é a oficial.
+FRBSF_PAGINA = ("https://www.frbsf.org/research-and-insights/data-and-indicators/"
+                "cpi-inflation-contributions-from-goods-and-services/")
+FRBSF_GRUPOS = [("Alimentos", "Food", VERDE), ("Energia", "Energy", AMARELO), ("Bens do núcleo", "Core Goods", AZUL),
+                ("Serviços sem moradia", "Core Services ex. Shelter", LARANJA), ("Moradia", "Shelter", CIANO)]
+ITENS_NUCLEO = {
+    "Alcoholic beverages at home": "Bebidas alcoólicas em casa", "Alcoholic beverages away from home": "Bebidas alcoólicas fora",
+    "Appliances": "Eletrodomésticos", "Educational books and supplies": "Livros e material escolar",
+    "Footwear": "Calçados", "Furniture and bedding": "Móveis e cama", "Housekeeping supplies": "Produtos de limpeza",
+    "Infants and toddlers apparel": "Roupa infantil", "IT commodities": "Informática",
+    "Jewelry and watches": "Joias e relógios", "Medical equipment and supplies": "Equipamento médico",
+    "Mens and boys apparel": "Roupa masculina", "Misc. personal goods": "Outros bens pessoais",
+    "Motor vehicle parts and equipment": "Peças de veículos", "New vehicles": "Carros novos",
+    "Nonprescription drugs": "Remédios sem receita", "Other HH equipment and furnishings": "Outros itens do lar",
+    "Other recreational goods": "Outros bens de lazer", "Personal care products": "Higiene pessoal",
+    "Pets and pet products": "Animais e produtos pet", "Photographic equipment and supplies": "Equipamento fotográfico",
+    "Prescription drugs": "Remédios com receita", "Recreational reading materials": "Livros e revistas",
+    "Sporting goods": "Artigos esportivos", "Tobacco and smoking products": "Cigarros e fumo",
+    "Tools, hardware, outdoor equipment": "Ferramentas e jardim", "Used cars and trucks": "Carros usados",
+    "Video and audio products": "Áudio e vídeo", "Window and floor coverings": "Cortinas e pisos",
+    "Womens and girls apparel": "Roupa feminina", "Housing at school, excluding board": "Moradia estudantil",
+    "Other lodging, incl. hotels": "Hotéis e hospedagem", "Owners equivalent rent of residences": "Aluguel imputado (OER)",
+    "Rent of primary residence": "Aluguel", "Tenants and household insurance": "Seguro residencial",
+    "Airline fares": "Passagens aéreas", "Cable, satellite, other TV service": "TV por assinatura",
+    "Car and truck rental": "Aluguel de carros", "Care of invalids and elderly at home": "Cuidador em casa",
+    "College tuition and fees": "Mensalidade universitária", "Day care and preschool": "Creche e pré-escola",
+    "Dental services": "Dentista", "Elementary and high school tuition": "Mensalidade escolar",
+    "Eyeglasses and eye care": "Óculos e oftalmologia", "Garbage and trash collection": "Coleta de lixo",
+    "Health insurance": "Plano de saúde", "Hospital services": "Hospital", "Internet services": "Internet",
+    "Intracity transportation": "Transporte urbano", "Misc. personal services": "Outros serviços pessoais",
+    "Motor vehicle fees": "Taxas de veículos", "Motor vehicle insurance": "Seguro de carro",
+    "Motor vehicle maintenance and repair": "Manutenção de carro", "Nursing homes and adult day services": "Casas de repouso",
+    "Other intercity transportation": "Transporte intermunicipal", "Other recreation services": "Outros serviços de lazer",
+    "Personal care services": "Cabeleireiro e estética", "Pet services including veterinary": "Veterinário",
+    "Photos and photo processing": "Revelação de fotos", "Physicians services": "Consultas médicas",
+    "Postage and delivery services": "Correio e entregas", "Residential telephone services": "Telefone fixo",
+    "Services by other medical professionals": "Outros profissionais de saúde",
+    "Technical & bus. school tuition": "Cursos técnicos", "Video rentals/subscriptions": "Streaming e locação de vídeo",
+    "Water and sewerage maintenance": "Água e esgoto", "Wireless telephone services": "Celular"}
+
+
+def data_excel(v):
+    return (datetime.date(1899, 12, 30) + datetime.timedelta(days=int(float(v)))).isoformat()[:7]
+
+
+def numero(v):
+    try:
+        return float(str(v).strip())
+    except (TypeError, ValueError):
+        return None                                      # "NA" e vazio
+
+
+def graficos_frbsf():
+    pagina = baixar(FRBSF_PAGINA, headers=NAVEGADOR).decode("utf-8", "replace")
+    url = re.search(r'href="([^"]*cpi-contributors-data\.xlsx[^"]*)"', pagina).group(1).replace("&amp;", "&")
+    conteudo = baixar(url, headers=NAVEGADOR)
+
+    def aba(nome, col_data="A"):
+        linhas = xlsx_aba(conteudo, nome)
+        cab = min(linhas)
+        nomes = {c: str(v).strip() for c, v in linhas[cab].items()}
+        out = {}
+        for r in sorted(linhas):
+            if r == cab or col_data not in linhas[r]:
+                continue
+            m = data_excel(linhas[r][col_data])
+            out[m] = {nomes[c]: numero(v) for c, v in linhas[r].items() if c in nomes and c != col_data}
+        return out
+    a12, am = aba("chart2_headlineCPI_contr_YoY"), aba("chart4_headlineCPI_contr_MoM")
+    t12, tm = aba("chart1_CPI_YoY"), aba("chart3_CPI_MoM")
+
+    def variante(rot, contr, total, chave_total, ini):
+        series = [serie(n, cor, {m: r[k] for m, r in contr.items() if m >= ini and r.get(k) is not None}, 2, tipo="barra")
+                  for n, k, cor in FRBSF_GRUPOS]
+        series.append(serie("CPI cheio", BRANCO, {m: r[chave_total] for m, r in total.items()
+                                                    if m >= ini and r.get(chave_total) is not None}, 2, rotulo=True))
+        return dict(rot=rot, series=series)
+    ult = max(m for m, r in a12.items() if r.get("Energy") is not None)
+    g = dict(id="cpi-componentes", titulo="Contribuição de cada componente para a inflação ao consumidor (CPI)",
+             subtitulo="Barras = contribuição em p.p.; linha = CPI cheio, %; núcleo = sem alimentos e energia",
+             unidade="%", barra=1, periodoPadrao="5",
+             fonte="Federal Reserve Bank of San Francisco, BLS e FtM",
+             nota="Não há CPI de out/25: o BLS não coletou preços durante a paralisação do governo americano.",
+             variantes=[variante("em 12 meses, sem ajuste sazonal", a12, t12, "Headline CPI, YoY", "1999-01"),
+                        variante("no mês, com ajuste sazonal", am, tm, "Headline CPI, MoM", "1999-01")])
+
+    itens = aba("chart5_coreCPI_granularCont_MoM", "B")
+    m = max(k for k, r in itens.items() if sum(v is not None for v in r.values()) > 30)
+    r = {k.split(": ", 1)[1]: v for k, v in itens[m].items() if ": " in k and not k.startswith("Total") and v is not None}
+    falta = [k for k in r if k not in ITENS_NUCLEO]
+    if falta:
+        raise RuntimeError("itens do núcleo sem tradução: %s" % falta)
+    ordem = sorted(r.items(), key=lambda kv: -kv[1])
+    escolha = ordem[:10] + ordem[-5:]
+    total = tm[m]["Core CPI, MoM"]
+    g_itens = dict(id="cpi-nucleo-itens", tipo="ranking", sinal=True, unidade="pb",
+                   titulo="Os itens que mais pesaram no núcleo do CPI em %s" % rot_mes(m),
+                   subtitulo="Contribuição para a variação do núcleo no mês, em pontos-base; núcleo %s%% no mês; "
+                             "os 10 maiores e os 5 menores de 68 itens" % br(total, 2, True),
+                   fonte="Federal Reserve Bank of San Francisco, BLS e FtM",
+                   itens=[[ITENS_NUCLEO[k], round(100 * v, 1), VERMELHO if v > 0 else AZUL] for k, v in escolha])
+    print("  FRBSF: contribuições até %s, itens do núcleo até %s" % (ult, m))
+    return [g, g_itens]
 
 
 PPI = [("FD4", "Demanda final", True), ("FD41", "Bens", False), ("FD411", "Alimentos", False),
@@ -876,7 +971,7 @@ def main():
         secoes.append(dict(titulo=titulo, texto="", fontes=[], figuras=[], graficos=f()))
     cpi = fred("CPIAUCNS")
     doc = dict(atualizado=datetime.date.today().isoformat(), referencia=max(cpi), formato="artigo",
-               grupo=GRUPO, assunto=ASSUNTO, fonte="FRED, BLS, BEA, Tesouro, Census, ISM, BIS e FtM",
+               grupo=GRUPO, assunto=ASSUNTO, fonte="FRED, BLS, BEA, Fed de San Francisco, Tesouro, Census, ISM, BIS e FtM",
                secoes=secoes)
     with open(SAIDA, "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False, separators=(",", ":"), allow_nan=False)

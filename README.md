@@ -11,7 +11,7 @@ No ar: <https://guivaraschinalves.github.io/ftm-analises/>
 |---|---|---|
 | **Taxa de 10 anos dos EUA** | `dados/juros-eua.json` | Baixados **sozinhos** todo dia do FRED (St. Louis Fed), séries `DGS10` e `GS10`, e do investing.com (intradiário) |
 | **A bolsa nas eleições presidenciais** | `dados/eleicoes.json` | Baixados da API aberta do Ipeadata (Ibovespa diário desde 1993); `scripts/eleicoes.py`, rodado à mão |
-| **Análise de Cenário: 28/10/26 - Decisão do FOMC** | `dados/cenario-2026-10-28-fomc.json` | FRED, BLS, ISM (investing.com), Tesouro (MTS e TIC), Census e BIS; `scripts/cenario_fomc.py`, rodado à mão |
+| **Análise de Cenário: 28/10/26 - Decisão do FOMC** | `dados/cenario-2026-10-28-fomc.json` | FRED, BLS, Fed de San Francisco, ISM (investing.com), Tesouro (MTS e TIC), Census e BIS; `scripts/cenario_fomc.py`, rodado à mão |
 | **A defasagem dos combustíveis** | `dados/defasagem-combustiveis.json` | Montados a partir das planilhas de [`planilhas/`](planilhas/); `scripts/defasagem_combustiveis.py`, rodado à mão |
 
 O assunto **Petróleo, derivados e comércio exterior** junta, ainda sem texto,
@@ -249,6 +249,7 @@ armadilhas de cada uma estão no cabeçalho do script. As principais:
 
 - **FRED sem User-Agent, uma série por pedido.** Num lote, um id que não existe
   derruba o lote inteiro com 404.
+- **CPI por componente vem do Fed de San Francisco** (o Excel da página "CPI inflation contributions"), com a contribuição de cada grupo e de cada item do núcleo.
 - **CPI em 12 meses pelo índice sem ajuste sazonal**, que é o oficial. Com
   ajuste, set/26 dá 4,0% em vez de 3,7%.
 - **ISM** não está mais no FRED: vem do gráfico de eventos do investing.com,
@@ -259,7 +260,7 @@ armadilhas de cada uma estão no cabeçalho do script. As principais:
   janeiro, que trazem o ajuste anual de população do Census.
 
 Duas opções novas no `app.js` vieram com ele: `sombras` (faixas de fundo,
-`[{de, ate}]`, usadas para as recessões do NBER) e as unidades `mil` e `h`.
+`[{de, ate}]`, usadas para as recessões do NBER) e as unidades `mil`, `h` e `pb` (pontos-base).
 
 ## A bolsa nas eleições presidenciais
 
