@@ -1181,10 +1181,14 @@ def balanco_fed():
 
 TESOURO_CURVA = ("https://home.treasury.gov/resource-center/data-chart-center/interest-rates/"
                  "daily-treasury-rates.csv/%d/all?type=daily_treasury_yield_curve&field_tdr_date_value=%d&page&_format=csv")
-PRAZOS = [("1 Mo", "1 mês"), ("1.5 Month", "1,5 mês"), ("2 Mo", "2 meses"), ("3 Mo", "3 meses"), ("4 Mo", "4 meses"),
-          ("6 Mo", "6 meses"), ("1 Yr", "1 ano"), ("2 Yr", "2 anos"), ("3 Yr", "3 anos"), ("5 Yr", "5 anos"),
-          ("7 Yr", "7 anos"), ("10 Yr", "10 anos"), ("20 Yr", "20 anos"), ("30 Yr", "30 anos")]
-CURVA_BASE = "2026-09-16"      # a reunião anterior do FOMC: a curva de hoje contra a daquele dia
+# (coluna do Tesouro, prazo em meses, rótulo no eixo; "" = ponto sem rótulo, para não amontoar)
+PRAZOS = [("1 Mo", 1, ""), ("1.5 Month", 1.5, ""), ("2 Mo", 2, ""), ("3 Mo", 3, ""), ("4 Mo", 4, ""),
+          ("6 Mo", 6, ""), ("1 Yr", 12, "1"), ("2 Yr", 24, "2"), ("3 Yr", 36, "3"), ("5 Yr", 60, "5"),
+          ("7 Yr", 84, "7"), ("10 Yr", 120, "10"), ("20 Yr", 240, "20"), ("30 Yr", 360, "30")]
+NOMES_PRAZO = {1: "1 mês", 1.5: "1,5 mês", 2: "2 meses", 3: "3 meses", 4: "4 meses", 6: "6 meses", 12: "1 ano",
+               24: "2 anos", 36: "3 anos", 60: "5 anos", 84: "7 anos", 120: "10 anos", 240: "20 anos", 360: "30 anos"}
+CURVA_BASE = "2026-06-17"      # a primeira reunião do FOMC presidida por Warsh
+CASAS_EIXO = 720               # posições do eixo de prazos: meio mês cada, de 0 a 30 anos
 
 
 def curva_tesouro(ano):
@@ -1219,19 +1223,32 @@ def graficos_treasuries():
               series=taxas)
 
     a, b = curva[CURVA_BASE], curva[hoje]
-    prazos = [(k, rot) for k, rot in PRAZOS if k in a and k in b]
+    prazos = [p for p in PRAZOS if p[0] in a and p[0] in b]
     rotulo = lambda d: "%s/%s/%s" % (d[8:], d[5:7], d[:4])                       # noqa: E731
-    pts = lambda r: {i: r[k] for i, (k, _) in enumerate(prazos)}                    # noqa: E731
-    dif = {i: 100 * (b[k] - a[k]) for i, (k, _) in enumerate(prazos)}
-    g2 = dict(id="treasuries-curva", titulo="Curva de juros do Tesouro americano: hoje e na reunião de setembro",
-              subtitulo="Taxa de cada prazo, %% ao ano; %s contra %s" % (rotulo(hoje), rotulo(CURVA_BASE)),
-              categorias=[rot for _, rot in prazos], fonte="Tesouro dos EUA e FtM", variantes=[
+    # Eixo em escala de prazo: cada prazo cai na posição proporcional ao
+    # vencimento (30 anos fica 10 vezes mais longe que 3). As posições sem
+    # prazo ficam vazias; os prazos de menos de 1 ano, amontoados no começo,
+    # não levam rótulo no eixo, e a caixa do mouse diz o prazo por extenso.
+    pos = lambda m: round(CASAS_EIXO * m / 360)                                  # noqa: E731
+    cats = [""] * (CASAS_EIXO + 1)
+    longos = [""] * (CASAS_EIXO + 1)
+    for _, m, rot in prazos:
+        cats[pos(m)] = rot
+        longos[pos(m)] = NOMES_PRAZO[m]
+    pts = lambda r: {pos(m): r[k] for k, m, _ in prazos}                         # noqa: E731
+    dif = {pos(m): 100 * (b[k] - a[k]) for k, m, _ in prazos}
+    g2 = dict(id="treasuries-curva", titulo="Curva de juros do Tesouro americano: hoje e na primeira reunião de Warsh",
+              subtitulo="Taxa de cada prazo, %% ao ano; eixo: prazo em anos; %s contra %s"
+                        % (rotulo(hoje), rotulo(CURVA_BASE)),
+              categorias=cats, categoriasLongas=longos, esparso=True, buracoMax=CASAS_EIXO, barra=4,
+              fonte="Tesouro dos EUA e FtM", variantes=[
                   dict(rot="as duas curvas", unidade="%", eixo={"zero": False}, series=[
-                      serie(rotulo(CURVA_BASE), CINZA, pts(a), 2, rotulo=True),
+                      serie(rotulo(CURVA_BASE) + " (1ª reunião de Warsh)", CINZA, pts(a), 2, rotulo=True),
                       serie(rotulo(hoje), BRANCO, pts(b), 2, rotulo=True)]),
-                  dict(rot="diferença em pontos-base", unidade="pb", sinal=True, series=[
+                  dict(rot="diferença em pontos-base", unidade="pb", series=[
                       serie("Hoje menos %s" % rotulo(CURVA_BASE), AZUL, dif, 0, tipo="barra", legenda=False)])])
-    print("  curva do Tesouro: %s contra %s; 10 anos %.2f -> %.2f" % (hoje, CURVA_BASE, a["10 Yr"], b["10 Yr"]))
+    print("  curva do Tesouro: %s contra %s; 10 anos %.2f -> %.2f; 2 anos %.2f -> %.2f"
+          % (hoje, CURVA_BASE, a["10 Yr"], b["10 Yr"], a["2 Yr"], b["2 Yr"]))
     return [g1, g2]
 
 

@@ -325,7 +325,8 @@
     return g.categorias ? +chave : g.intradiario ? idxIntra(chave) : g.diario ? idxDia(chave) : idxMes(chave);
   }
   function rotuloX(g, i, longo) {
-    if (g.categorias) return g.categorias[i] || "";
+    // categoriasLongas: o rótulo por extenso da caixa do mouse (o eixo usa o curto)
+    if (g.categorias) return (longo && g.categoriasLongas ? g.categoriasLongas[i] : g.categorias[i]) || "";
     if (g.intradiario) {
       var t = dataDeIdxIntra(i), dia = t.getUTCDate(), mes = t.getUTCMonth();
       if (!longo) return dia + "/" + ("0" + (mes + 1)).slice(-2);
@@ -1042,6 +1043,16 @@
       pt.x = ev.clientX; pt.y = ev.clientY;
       var p = pt.matrixTransform(svg.getScreenCTM().inverse());
       var i = Math.floor(desenho.d0 + (p.x - L.x0) / (L.x1 - L.x0) * (desenho.d1 - desenho.d0));
+      if (g.esparso) {
+        // eixo de prazos em escala logarítmica: os pontos ficam espaçados, e
+        // o mouse vale pelo prazo mais próximo
+        for (var dist = 0; dist < 200; dist++) {
+          var perto = [i - dist, i + dist].filter(function (j) {
+            return porSerie.some(function (m) { return m[j] !== undefined; });
+          })[0];
+          if (perto !== undefined) { i = perto; break; }
+        }
+      }
       if (g.diario || g.intradiario) {
         // fim de semana e feriado não têm pregão: vale a última cotação antes
         var limite = g.intradiario ? 9 : 7;
