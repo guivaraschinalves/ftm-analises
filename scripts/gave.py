@@ -325,13 +325,17 @@ def secao_carteiras(sp, divid, tr, au, r_mo, mm_mo):
         an_r = 100 * ((v * base_cpi / cpi[fim]) ** (1 / anos) - 1)
         med = sum(rets) / len(rets)
         vol = 100 * math.sqrt(sum((x - med) ** 2 for x in rets) / (len(rets) - 1) * 12)
-        print("  %-24s %5.1f%% nominal, %4.1f%% real, vol %4.1f%%, queda máx. real %5.1f%%"
-              % (nome, an_n, an_r, vol, 100 * queda))
+        # Sharpe: retorno acima do caixa (letra de 3 meses) sobre a volatilidade, anualizados
+        exc = [r - ret["caixa"][m] for r, m in zip(rets, meses)]
+        med_e = sum(exc) / len(exc)
+        sharpe = med_e * 12 / math.sqrt(sum((x - med_e) ** 2 for x in exc) / (len(exc) - 1) * 12)
+        print("  %-24s %5.1f%% nominal, %4.1f%% real, vol %4.1f%%, Sharpe %.2f, queda máx. real %5.1f%%"
+              % (nome, an_n, an_r, vol, sharpe, 100 * queda))
         nominal.append(serie(nome, cor, serie_n, 3, rotulo=True))
         real.append(serie(nome, cor, serie_r, 3, rotulo=True))
         linhas.append([{"t": nome, "forte": nome == "Browne dinâmica"}, {"t": br(an_n, 1) + "%"},
                        {"t": br(an_r, 1) + "%"}, {"t": livro}, {"t": br(vol, 1) + "%"},
-                       {"t": br(100 * queda, 1) + "%", "cor": VERMELHO}])
+                       {"t": br(sharpe, 2)}, {"t": br(100 * queda, 1) + "%", "cor": VERMELHO}])
     hoje_def = "ouro" if defesa[fim] == "ouro" else "título de 10 anos"
     k = fim
     while mes_mais(k, -1) in defesa and defesa[mes_mais(k, -1)] == defesa[fim]:
@@ -343,15 +347,16 @@ def secao_carteiras(sp, divid, tr, au, r_mo, mm_mo):
              variantes=[dict(rot="descontada a inflação (CPI)", series=real),
                         dict(rot="em dólares correntes", series=nominal)])
     tab = dict(id="gave-carteiras-tabela", tipo="tabela", titulo="As carteiras lado a lado",
-               subtitulo="%s; retornos ao ano; queda máxima descontada a inflação" % periodo,
+               subtitulo="%s; retornos ao ano; Sharpe sobre a letra de 3 meses; queda máxima descontada a inflação" % periodo,
                fonte="Shiller (Yale), FRED, Banco Mundial, Ken French (Dartmouth), Charles Gave e FtM",
                colunas=[{"rot": "Carteira"}, {"rot": "Retorno nominal", "num": True},
                         {"rot": "Retorno real", "num": True}, {"rot": "Real, no livro", "num": True},
-                        {"rot": "Volatilidade", "num": True}, {"rot": "Queda máxima", "num": True}],
+                        {"rot": "Volatilidade", "num": True}, {"rot": "Sharpe", "num": True},
+                        {"rot": "Queda máxima", "num": True}],
                linhas=linhas,
                nota="Os preços são a média de cada mês (é o que a série do Shiller tem), o que alisa os "
-                    "movimentos: a volatilidade e a queda máxima saem menores que no livro, e os retornos, "
-                    "quase iguais. As ações de energia são a carteira de energia do Ken French, porque o "
+                    "movimentos: a volatilidade e a queda máxima saem menores que no livro (e o Sharpe, um "
+                    "pouco maior), e os retornos, quase iguais. As ações de energia são a carteira de energia do Ken French, porque o "
                     "XLE só existe desde 1998. Depois de jun/2023 os dividendos do S&P 500 seguem o último "
                     "rendimento conhecido.")
     texto = (
