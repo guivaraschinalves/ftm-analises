@@ -502,19 +502,15 @@ def graficos_trabalho():
             fora = abs(r["z"]) >= 1.5
             linhas.append([{"t": r["nome"], "forte": fora}, {"t": br(r["peso"])},
                            {"t": br(r["mil"], 0, True)}, {"t": br(r["x"], 1, True) + "%", "cor": cor(r["x"])},
-                           {"t": br(r["a3"], 1, True) + "%", "cor": cor(r["a3"])},
-                           {"t": br(r["mu"], 1, True) + "%"}, {"t": br(r["dp"], 1)},
-                           {"t": br(r["z"], 2, True), "cor": cor(r["z"]), "forte": fora},
-                           {"t": "%d" % round(r["pctl"])}])
+                           {"t": br(r["a3"], 1, True) + "%", "cor": cor(r["a3"])}])
         return dict(rot="base de %s" % rot, linhas=linhas,
                     colunas=[{"rot": "Setor"}, {"rot": "% do emprego", "num": True},
                              {"rot": "12 meses, mil vagas", "num": True}, {"rot": "12 meses", "num": True},
-                             {"rot": "3 meses anualizado", "num": True}, {"rot": "Média da base", "num": True},
-                             {"rot": "Desvio-padrão da base, p.p.", "num": True},
-                             {"rot": "Desvios-padrão", "num": True}, {"rot": "Percentil", "num": True}])
+                             {"rot": "3 meses anualizado", "num": True}])
     g_tab = dict(id="setores-estatisticas", tipo="tabela",
                  titulo="Emprego por setor: as estatísticas da comparação",
-                 subtitulo="Até %s; em negrito, os setores a 1,5 desvio-padrão ou mais da média da base" % rot_mes(ult),
+                 subtitulo="Até %s; na ordem do ranking acima; em negrito, os setores a 1,5 desvio-padrão ou mais "
+                           "da média da base" % rot_mes(ult),
                  fonte="BLS (via FRED) e FtM", variantes=[tabela(rot, st) for rot, st in bases])
 
     saude = fred("CES6562000001")

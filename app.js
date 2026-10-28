@@ -1648,7 +1648,8 @@
       grupo.innerHTML = "";
       // com mouse o controle vale em todo gráfico de tempo (o ranking não tem
       // eixo de tempo); sem mouse, só quando há mais de um recorte
-      var deTempo = !efetivo.categorias && efetivo.tipo !== "ranking" && efetivo.tipo !== "mapa";
+      var deTempo = !efetivo.categorias && efetivo.tipo !== "ranking" && efetivo.tipo !== "mapa" &&
+                    efetivo.tipo !== "tabela";
       grupo.hidden = mouseFino() ? !deTempo : periodos.length < 2;
       if (grupo.hidden) {
         cartao.periodo = "tudo";
