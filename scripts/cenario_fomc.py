@@ -592,17 +592,11 @@ def graficos_trabalho():
 
     jol = fred("JTSJOL")
     des = fred("UNEMPLOY")
-    g_jolts = dict(id="jolts", titulo="Contratações, demissões e vagas abertas (JOLTS)",
-                   subtitulo="Faixas cinza = recessões (NBER)", unidade="%", sombras=rec, fonte="BLS, NBER (via FRED) e FtM",
-                   variantes=[
-                       dict(rot="Contratações e demissões", series=[
-                           serie("Contratações", BRANCO, fred("JTSHIR"), 1, rotulo=True),
-                           serie("Demissões voluntárias (quits)", CIANO, fred("JTSQUR"), 1, rotulo=True),
-                           serie("Demissões", VERMELHO, fred("JTSLDR"), 1, rotulo=True)]),
-                       dict(rot="Vagas abertas por desempregado", unidade="x", series=[
-                           serie("Vagas por desempregado", BRANCO, {m: v / des[m] for m, v in jol.items() if m in des},
-                                 2, rotulo=True, legenda=False)]),
-                   ])
+    g_jolts = dict(id="jolts", titulo="Vagas abertas por desempregado (JOLTS)",
+                   subtitulo="Vagas abertas divididas pelo número de desempregados; faixas cinza = recessões (NBER)",
+                   unidade="x", sombras=rec, fonte="BLS, NBER (via FRED) e FtM",
+                   series=[serie("Vagas por desempregado", BRANCO, {m: v / des[m] for m, v in jol.items() if m in des},
+                                 2, rotulo=True, legenda=False)])
 
     ic, cc = fred("ICSA", False), fred("CCSA", False)
     forca = fred("CLF16OV")
