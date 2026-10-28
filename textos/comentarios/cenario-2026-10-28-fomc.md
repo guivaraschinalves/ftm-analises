@@ -9,3 +9,6 @@ Com menos imigração, a economia só precisa de cerca de 68 mil vagas por mês 
 
 ## Salário por hora e horas trabalhadas
 Indica que inflação não está vindo dos salários, mas isso pesa sobre o consumo
+
+## Pedidos de seguro-desemprego
+Recomendo começar o gráfico em 2023 para visualizar melhor a queda recente nos pedidos.
