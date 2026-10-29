@@ -520,6 +520,35 @@ def montar():
     fontes_livro = [dict(id="livro", rot="Charles Gave, The General Theory of Portfolio Construction (2024)",
                          url=LIVRO)]
     cart = secao_carteiras(sp, divid, tr, au, r_mo, mm_mo)
+
+    # ---------- o que vai bem e mal em cada quadrante (capítulos 2 e 7 do livro)
+    def celula(q, t):
+        return {"t": t, "forte": q == quad[ult]}
+    linhas_ativos = []
+    for q, bem, mal in (
+        ((1, 1), "ações de crescimento e empresas inovadoras com poder de preço; títulos do governo e de "
+                 "empresas; imóveis; qualquer ativo de longa duração", "ações de valor; empresas com pouco "
+                 "poder de preço; ouro"),
+        ((1, -1), "ouro e outras reservas de valor; commodities; imóveis; produtoras cíclicas de custo fixo "
+                  "alto; ações de valor e de mercados emergentes", "títulos longos; o caixa rende pouco"),
+        ((-1, -1), "caixa na moeda mais segura; energia, porque a contração costuma vir de uma alta do "
+                   "petróleo; ouro", "ativos financeiros, sobretudo os de longa duração: ações e até títulos"),
+        ((-1, 1), "títulos longos do governo; caixa", "todo o resto: as ações apanham e o ouro fica parado"),
+    ):
+        nome = QUADRANTES[q] + (" (hoje)" if q == quad[ult] else "")
+        linhas_ativos.append([celula(q, nome), celula(q, placar(q)), {"t": bem}, {"t": mal}])
+    tab_ativos = dict(id="gave-ativos", tipo="tabela", titulo="O que vai bem e o que vai mal em cada quadrante",
+                      subtitulo="o que Gave manda comprar e vender em cada estado da economia",
+                      fonte="Charles Gave, The General Theory of Portfolio Construction (2024)",
+                      colunas=[{"rot": "Quadrante"}, {"rot": "Placar"}, {"rot": "Vai bem"}, {"rot": "Vai mal"}],
+                      linhas=linhas_ativos)
+    sec_ativos = dict(titulo="O que vai bem em cada quadrante", fontes=[], figuras=[], texto=(
+        "Para cada quadrante, Gave aponta o que comprar e o que vender. A regra geral: nas duas contrações "
+        "vale ter contratos, como caixa e títulos do governo, e nas duas expansões vale ter ativos reais, "
+        "como ações, imóveis e ouro. Cada ativo tem o seu quadrante, e os de quadrantes opostos raramente "
+        "sobem juntos: o título vai bem na contração deflacionária e o ouro, na expansão inflacionária; as "
+        "ações vão bem na expansão deflacionária e o caixa, na contração inflacionária. É daí que sai a "
+        "carteira da seção seguinte."), graficos=[tab_ativos])
     secoes = [
         dict(titulo="Os quatro quadrantes", fontes=fontes_livro, figuras=[], texto=(
             "Gave divide a economia em quatro estados a partir de duas perguntas, respondidas por preços de "
@@ -545,6 +574,7 @@ def montar():
             "No capítulo 6, Gave nota que a maior parte das recessões americanas desde 1950 começou depois "
             "de uma queda desta razão, isto é, com o petróleo subindo mais que o ouro."),
             graficos=[g_ow]),
+        sec_ativos,
         cart,
     ]
     return dict(atualizado=hoje.isoformat(), referencia=ult, formato="artigo",
