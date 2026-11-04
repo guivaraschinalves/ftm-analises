@@ -702,6 +702,8 @@
     var cor = it.cor, at;
     if (cor === "vazio") at = { fill: "none", stroke: pal.suave, "stroke-width": 2 };
     else if (cor === "nenhuma") at = { fill: pal.suave, "fill-opacity": 0.16 };
+    else if (cor === "pendente") at = { fill: pal.suave, "fill-opacity": 0.5 };
+    else if (cor === "borda") at = { fill: "none", stroke: pal.texto, "stroke-width": 3 };
     else at = { fill: corNoTema(cor, pal), "fill-opacity": it.apagado ? 0.32 : (it.opacidade || 1),
                 stroke: it.apagado ? corNoTema(cor, pal) : null, "stroke-width": it.apagado ? 2 : null };
     return redonda
@@ -757,13 +759,14 @@
     var porUf = {};
     (g.estados || []).forEach(function (e) { porUf[e.uf] = e; });
     function corDe(e) {
+      if (e.cor === "pendente") return { fill: pal.suave, "fill-opacity": 0.5 };
       if (e.cor) return { fill: corNoTema(e.cor, pal), "fill-opacity": 1 };
       if (e.int !== undefined) return { fill: corNoTema(g.cor, pal), "fill-opacity": preenchimento(e.int) };
       return { fill: pal.suave, "fill-opacity": 0.16 };
     }
     // escuro sobre cor forte, a do texto sobre o resto
     function corRotulo(e) {
-      var forte = e.cor || (e.int !== undefined && preenchimento(e.int) > 0.55);
+      var forte = (e.cor && e.cor !== "pendente") || (e.int !== undefined && preenchimento(e.int) > 0.55);
       return forte ? "#ffffff" : pal.texto;
     }
     Object.keys(formas).forEach(function (uf) {
@@ -776,6 +779,15 @@
       camada.appendChild(p);
     });
     svg.appendChild(camada);
+    // "destaque": contorno grosso, numa camada por cima, para não ficar
+    // escondido sob a divisa do vizinho
+    var contornos = el("g", { transform: camada.getAttribute("transform"), "pointer-events": "none" });
+    (g.estados || []).forEach(function (e) {
+      if (!e.destaque || !formas[e.uf]) return;
+      contornos.appendChild(el("path", { d: formas[e.uf].d, fill: "none", stroke: pal.texto, "stroke-width": 3,
+                                         "vector-effect": "non-scaling-stroke", "stroke-linejoin": "round" }));
+    });
+    svg.appendChild(contornos);
     var rotulos = el("g", { "pointer-events": "none" });
     Object.keys(formas).forEach(function (uf) {
       var e = porUf[uf];
@@ -870,7 +882,9 @@
         "font-size": L.tick * 0.85, fill: pal.texto, "text-anchor": "middle" }));
     }
     if (g.centro) {
-      svg.appendChild(texto(g.centro[0], { x: cx, y: cy - rIn * 0.42, "font-size": rIn * 0.5, "font-weight": "bold",
+      // o número grande encolhe até caber no vão do meio ("54 x 44" é largo)
+      svg.appendChild(texto(g.centro[0], { x: cx, y: cy - rIn * 0.42, "font-weight": "bold",
+                                           "font-size": corpoQueCabe(g.centro[0], rIn * 0.5, rIn * 1.45, "bold"),
                                            fill: pal.texto, "text-anchor": "middle" }));
       svg.appendChild(texto(g.centro[1], { x: cx, y: cy - rIn * 0.08, "font-size": Math.min(rIn * 0.2, L.tick * 1.1),
                                            fill: pal.texto, "text-anchor": "middle" }));

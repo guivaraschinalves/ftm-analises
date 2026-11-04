@@ -47,6 +47,7 @@ import urllib.request
 from pathlib import Path
 
 import midterms_motivos
+import midterms_resultados
 
 RAIZ = Path(__file__).resolve().parent.parent
 SAIDA = RAIZ / "dados" / "midterms-2026.json"
@@ -381,8 +382,9 @@ APRESENTACAO = (
     "Em 3 de novembro de 2026, no meio do mandato de Donald Trump, os americanos elegeram a Câmara "
     "inteira, 35 das 100 cadeiras do Senado e os governadores de 36 dos 50 estados. É a eleição de meio "
     "de mandato, a **midterm**: o presidente não está na cédula, mas é ela que decide se ele governa os "
-    "dois anos seguintes com o Congresso a favor ou contra. Os gráficos mostram a composição de antes da "
-    "votação, em azul os democratas e em vermelho os republicanos."
+    "dois anos seguintes com o Congresso a favor ou contra. A explicação usa a composição de antes da "
+    "votação; depois dela vêm os resultados e os motivos da virada. Em azul, os democratas; em vermelho, os "
+    "republicanos."
 )
 
 SECOES = [
@@ -566,7 +568,7 @@ def main():
         "apresentacao": APRESENTACAO,
         "formato": "artigo",
         "formas": formas(),
-        "secoes": [dict(fontes=[], figuras=[], **s) for s in SECOES + midterms_motivos.secoes()],
+        "secoes": [dict(fontes=[], figuras=[], **s) for s in SECOES + midterms_resultados.secoes(NOME) + midterms_motivos.secoes()],
     }
     SAIDA.write_text(json.dumps(dados, ensure_ascii=False, separators=(",", ":")))
     print("gravado %s (%.0f KB)" % (SAIDA.relative_to(RAIZ), SAIDA.stat().st_size / 1024))
