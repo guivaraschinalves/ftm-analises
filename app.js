@@ -75,7 +75,8 @@
   // antigos ficam embaixo, fechados, como acervo.
   // a ordem é a do índice; assuntos do mesmo "grupo" ficam juntos
   var FONTES = ["dados/gave.json", "dados/cenario-2026-10-28-fomc.json",
-                "dados/defasagem-combustiveis.json", "dados/eleicoes.json", "dados/petroleo.json"];
+                "dados/defasagem-combustiveis.json", "dados/eleicoes.json", "dados/midterms-2026.json",
+                "dados/petroleo.json"];
   // Uma página pode pedir outros arquivos: <body data-fontes="dados/x.json">.
   if (document.body && document.body.getAttribute("data-fontes")) {
     FONTES = document.body.getAttribute("data-fontes").split(/\s*,\s*/);
@@ -268,6 +269,8 @@
     return 2;
   }
   var UNIDADES = {
+    // contagem (cadeiras, eleições): número inteiro, sem unidade
+    n: { eixo: function (v) { return nf(0).format(v); }, valor: function (v) { return nf(0).format(v); } },
     "%": { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v) + "%"; },
            valor: function (v) { return pct(v, 2); } },
     // variação de uma casa (rankings de alta e queda)
@@ -646,10 +649,322 @@
     return { svg: svg, L: L, pal: pal, ranking: true };
   }
 
+  // ---------- desenhos sem eixo: mapa por estado, hemiciclo, distritos ----------
+  // Os três usam a mesma moldura dos outros gráficos (título, subtítulo,
+  // fonte, logo) e uma legenda simples em linha. Como o ranking, saem sem a
+  // caixa do mouse do eixo de tempo: cada peça traz a sua dica (<title>).
+  function svgNovo(g, L) {
+    return el("svg", {
+      xmlns: NS, viewBox: "0 0 " + L.W + " " + L.H, width: L.W, height: L.H,
+      role: "img", "aria-label": g.titulo + (g.subtitulo ? ": " + g.subtitulo : "")
+    });
+  }
+  // devolve a altura onde termina o subtítulo
+  function moldura(svg, g, L, pal) {
+    svg.appendChild(texto(g.titulo, {
+      x: L.titulo.x, y: L.titulo.y, "font-weight": "bold", fill: pal.texto,
+      "font-size": corpoQueCabe(g.titulo, L.titulo.fs, L.titulo.max, "bold")
+    }));
+    var fim = L.titulo.y;
+    if (g.subtitulo) {
+      // o que não cabe numa linha quebra no "; ", como nos outros gráficos
+      var linhas = [g.subtitulo];
+      if (largura(g.subtitulo, L.sub.fs, "italic") > L.sub.max) {
+        var partes = g.subtitulo.split("; ");
+        if (partes.length > 1) linhas = [partes[0] + ";", partes.slice(1).join("; ")];
+      }
+      linhas.forEach(function (t, k) {
+        var y = L.sub.y + k * L.sub.fs * 1.2;
+        svg.appendChild(texto(t, { x: L.sub.x, y: y, "font-style": "italic", fill: pal.texto,
+                                   "font-size": corpoQueCabe(t, L.sub.fs, L.sub.max, "italic") }));
+        fim = y;
+      });
+    }
+    svg.appendChild(texto("Fonte: " + g.fonte + ".", {
+      x: L.fonte.x, y: L.fonte.y, "font-size": L.fonte.fs, fill: pal.texto, "text-anchor": "end"
+    }));
+    if (logoSvg) {
+      var gl = el("svg", { x: L.logo.x, y: L.logo.y, width: L.logo.w, height: L.logo.w * logoSvg.razao,
+                           viewBox: logoSvg.viewBox });
+      var gg = el("g", { fill: pal.logo });
+      logoSvg.nos.forEach(function (n) { gg.appendChild(n.cloneNode(true)); });
+      gl.appendChild(gg);
+      svg.appendChild(gl);
+    }
+    return fim;
+  }
+  // amostra de cor: "nenhuma" é o cinza de quem fica de fora, "vazio" é só o
+  // contorno (vaga), apagado é a cor fraca com contorno cheio
+  function amostra(it, x, y, t, pal, redonda) {
+    var cor = it.cor, at;
+    if (cor === "vazio") at = { fill: "none", stroke: pal.suave, "stroke-width": 2 };
+    else if (cor === "nenhuma") at = { fill: pal.suave, "fill-opacity": 0.16 };
+    else at = { fill: corNoTema(cor, pal), "fill-opacity": it.apagado ? 0.32 : (it.opacidade || 1),
+                stroke: it.apagado ? corNoTema(cor, pal) : null, "stroke-width": it.apagado ? 2 : null };
+    return redonda
+      ? el("circle", Object.assign({ cx: x + t / 2, cy: y, r: t / 2 - 1 }, at))
+      : el("rect", Object.assign({ x: x, y: y - t / 2, width: t, height: t, rx: 4 }, at));
+  }
+  // legenda em linha, centrada; quebra em quantas linhas precisar. Devolve o
+  // y de baixo.
+  function legendaLinha(svg, itens, y, L, pal, redonda) {
+    var fs = L.legenda.fs, t = fs * 0.9, gap = 10, entre = 36, max = L.W - 2 * L.titulo.x;
+    var larg = itens.map(function (it) { return t + gap + largura(it.rot, fs); });
+    var linhas = [[]], soma = 0;
+    larg.forEach(function (w, k) {
+      if (soma && soma + entre + w > max) { linhas.push([]); soma = 0; }
+      soma += (soma ? entre : 0) + w;
+      linhas[linhas.length - 1].push(k);
+    });
+    linhas.forEach(function (ks, n) {
+      var total = ks.reduce(function (a, k) { return a + larg[k]; }, 0) + entre * (ks.length - 1);
+      var x = (L.W - total) / 2, yl = y + n * L.legenda.passo;
+      ks.forEach(function (k) {
+        svg.appendChild(amostra(itens[k], x, yl, t, pal, redonda));
+        svg.appendChild(texto(itens[k].rot, { x: x + t + gap, y: yl, "font-size": fs, fill: pal.texto,
+                                              "dominant-baseline": "central" }));
+        x += larg[k] + entre;
+      });
+    });
+    return y + (linhas.length - 1) * L.legenda.passo + fs / 2;
+  }
+
+  // Mapa dos EUA pintado por estado. As formas vêm uma vez só, no topo do
+  // arquivo ("formas": {UF: {d, c}}, na tela de 975 x 610 do us-atlas, com o
+  // centroide em c); cada estado do cartão diz a cor ("cor"), ou a
+  // intensidade de uma cor só ("int", de 0 a 1, na "cor" do cartão), o
+  // rótulo e a dica. Estado sem cor fica no cinza de "fora da disputa". Os
+  // pequenos demais ("foraDoMapa") têm o rótulo numa coluna à direita.
+  function construirEstados(cartao, L0, nomeTema) {
+    var g = graficoDe(cartao), pal = PALETAS[nomeTema], L = Object.assign({}, L0);
+    var svg = svgNovo(g, L), formas = g.formas || {};
+    var yLeg = legendaLinha(svg, (g.legenda || []).map(function (it) {
+      var m = /^escala:([\d.]+)$/.exec(it.cor);
+      return m ? { rot: it.rot, cor: g.cor, opacidade: preenchimento(+m[1]) } : it;
+    }), moldura(svg, g, L, pal) + L.legenda.fs * 2.2, L, pal);
+    function preenchimento(v) { return 0.12 + 0.88 * v; }
+    var fs = Math.round(L.tick * 0.72), fora = g.foraDoMapa || [];
+    var colW = fora.length ? largura("WW 88", fs) + fs * 2.6 : 0;
+    var ax0 = L.titulo.x, ax1 = L.W - L.titulo.x - colW, ay0 = yLeg + L.legenda.fs * 1.4,
+        ay1 = L.fonte.y - L.fonte.fs * 2.4;
+    var v = g.vista || [0, 0, 975, 610], esc = Math.min((ax1 - ax0) / (v[2] - v[0]), (ay1 - ay0) / (v[3] - v[1]));
+    var tx = ax0 + ((ax1 - ax0) - (v[2] - v[0]) * esc) / 2, ty = ay0 + ((ay1 - ay0) - (v[3] - v[1]) * esc) / 2;
+    var X = function (x) { return tx + (x - v[0]) * esc; }, Y = function (y) { return ty + (y - v[1]) * esc; };
+    var camada = el("g", { transform: "translate(" + tx + " " + ty + ") scale(" + esc + ") translate(" + (-v[0]) + " " + (-v[1]) + ")" });
+    var porUf = {};
+    (g.estados || []).forEach(function (e) { porUf[e.uf] = e; });
+    function corDe(e) {
+      if (e.cor) return { fill: corNoTema(e.cor, pal), "fill-opacity": 1 };
+      if (e.int !== undefined) return { fill: corNoTema(g.cor, pal), "fill-opacity": preenchimento(e.int) };
+      return { fill: pal.suave, "fill-opacity": 0.16 };
+    }
+    // escuro sobre cor forte, a do texto sobre o resto
+    function corRotulo(e) {
+      var forte = e.cor || (e.int !== undefined && preenchimento(e.int) > 0.55);
+      return forte ? "#ffffff" : pal.texto;
+    }
+    Object.keys(formas).forEach(function (uf) {
+      var e = porUf[uf] || { uf: uf };
+      var p = el("path", Object.assign({ d: formas[uf].d, stroke: pal.bg, "stroke-width": 1.4,
+                                         "vector-effect": "non-scaling-stroke", "stroke-linejoin": "round" }, corDe(e)));
+      if (e.dica) { var t = el("title", {}); t.textContent = e.dica; p.appendChild(t); }
+      p.addEventListener("mouseenter", function () { p.setAttribute("stroke", pal.texto); p.setAttribute("stroke-width", 2.6); camada.appendChild(p); });
+      p.addEventListener("mouseleave", function () { p.setAttribute("stroke", pal.bg); p.setAttribute("stroke-width", 1.4); });
+      camada.appendChild(p);
+    });
+    svg.appendChild(camada);
+    var rotulos = el("g", { "pointer-events": "none" });
+    Object.keys(formas).forEach(function (uf) {
+      var e = porUf[uf];
+      if (!e || !e.rot || fora.indexOf(uf) >= 0) return;
+      var c = formas[uf].c;
+      rotulos.appendChild(texto(e.rot, { x: X(c[0]), y: Y(c[1]), "font-size": fs, "font-weight": "bold",
+                                         fill: corRotulo(e), "text-anchor": "middle", "dominant-baseline": "central" }));
+    });
+    // coluna dos pequenos: em ordem de altura, afastados o bastante para não
+    // se encostarem, com um traço até o estado
+    var col = fora.filter(function (uf) { return formas[uf] && porUf[uf]; })
+      .map(function (uf) { return { uf: uf, ay: Y(formas[uf].c[1]), ax: X(formas[uf].c[0]) }; })
+      .sort(function (a, b) { return a.ay - b.ay; });
+    var passo = fs * 1.75;
+    col.forEach(function (o, k) { o.y = Math.max(o.ay, k ? col[k - 1].y + passo : -Infinity); });
+    var excesso = col.length ? col[col.length - 1].y - (ay1 - fs) : 0;
+    if (excesso > 0) col.forEach(function (o) { o.y -= excesso; });
+    var xc = ax1 + fs * 1.6;
+    col.forEach(function (o) {
+      var e = porUf[o.uf], t = fs * 0.95;
+      rotulos.appendChild(el("polyline", { points: o.ax + "," + o.ay + " " + (xc - fs * 0.9) + "," + o.y + " " + (xc - 4) + "," + o.y,
+                                           fill: "none", stroke: pal.suave, "stroke-width": 1.2, opacity: 0.7 }));
+      rotulos.appendChild(el("circle", { cx: o.ax, cy: o.ay, r: 2.5, fill: pal.texto, opacity: 0.8 }));
+      rotulos.appendChild(amostra({ cor: e.cor || (e.int !== undefined ? g.cor : "nenhuma"),
+                                    opacidade: e.int !== undefined ? preenchimento(e.int) : 1 }, xc, o.y, t, pal));
+      var rot = e.rot && e.rot !== o.uf && e.rot.indexOf(o.uf) !== 0 ? o.uf + " " + e.rot : (e.rot || o.uf);
+      rotulos.appendChild(texto(rot, { x: xc + t + 8, y: o.y, "font-size": fs, fill: pal.texto,
+                                       "dominant-baseline": "central" }));
+    });
+    svg.appendChild(rotulos);
+    return { svg: svg, L: L, pal: pal, ranking: true };
+  }
+
+  // Hemiciclo: uma bolinha por cadeira, em fileiras de meia-lua, os grupos em
+  // fatias da esquerda para a direita na ordem do arquivo ("grupos": [{nome,
+  // n, cor, apagado}]). A linha do meio marca a metade da Casa.
+  function construirHemiciclo(cartao, L0, nomeTema) {
+    var g = graficoDe(cartao), pal = PALETAS[nomeTema], L = Object.assign({}, L0);
+    var svg = svgNovo(g, L), grupos = g.grupos || [];
+    var N = grupos.reduce(function (a, gr) { return a + gr.n; }, 0);
+    var yLeg = legendaLinha(svg, grupos.map(function (gr) {
+      return { rot: gr.nome + ": " + gr.n, cor: gr.cor, apagado: gr.apagado };
+    }), moldura(svg, g, L, pal) + L.legenda.fs * 2.2, L, pal, true);
+    // a conta é feita num hemiciclo de raio 1 e depois levada à tela: assim
+    // a bolinha de fora e o rótulo da maioria entram na medida do espaço
+    var nr, s, cap, rIn = 0.36;
+    for (nr = 2; nr < 40; nr++) {
+      s = (1 - rIn) / (nr - 1);
+      cap = [];
+      for (var i = 0; i < nr; i++) cap.push(Math.floor(Math.PI * (rIn + i * s) / s) + 1);
+      if (cap.reduce(function (a, b) { return a + b; }, 0) >= N) break;
+    }
+    var topoRot = g.maioria ? L.tick * 2.2 : 0;
+    var ay0 = yLeg + L.legenda.fs * 1.4 + topoRot, ay1 = L.fonte.y - L.fonte.fs * 3;
+    var Rout = Math.min((L.W - 2 * L.titulo.x) / 2 / (1 + 0.45 * s), (ay1 - ay0) / (1 + 0.9 * s));
+    rIn *= Rout; s *= Rout;
+    var cx = L.W / 2, cy = ay0 + Rout + 0.45 * s;
+    // distribui as N cadeiras pelas fileiras na proporção da capacidade
+    var totalCap = cap.reduce(function (a, b) { return a + b; }, 0);
+    var k = cap.map(function (c) { return Math.floor(N * c / totalCap); });
+    var resto = N - k.reduce(function (a, b) { return a + b; }, 0);
+    for (var j = nr - 1; resto > 0; j = (j - 1 + nr) % nr) { if (k[j] < cap[j]) { k[j]++; resto--; } }
+    var lugares = [];
+    k.forEach(function (n, i) {
+      var r = rIn + i * s;
+      for (var m = 0; m < n; m++) lugares.push({ th: n > 1 ? Math.PI * (1 - m / (n - 1)) : Math.PI / 2, r: r });
+    });
+    lugares.sort(function (a, b) { return b.th - a.th || b.r - a.r; });
+    var raio = s * 0.4, p = 0;
+    var bolas = el("g", {});
+    grupos.forEach(function (gr) {
+      var dica = gr.nome + ": " + gr.n + (gr.n === 1 ? " cadeira" : " cadeiras");
+      var cg = el("g", {});
+      for (var m = 0; m < gr.n; m++, p++) {
+        var lu = lugares[p], x = cx + lu.r * Math.cos(lu.th), y = cy - lu.r * Math.sin(lu.th), at;
+        if (gr.cor === "vazio") at = { fill: "none", stroke: pal.suave, "stroke-width": 2 };
+        else at = { fill: corNoTema(gr.cor, pal), "fill-opacity": gr.apagado ? 0.3 : 1,
+                    stroke: gr.apagado ? corNoTema(gr.cor, pal) : null, "stroke-width": gr.apagado ? 1.8 : null };
+        cg.appendChild(el("circle", Object.assign({ cx: x, cy: y, r: gr.cor === "vazio" ? raio - 1 : raio }, at)));
+      }
+      var t = el("title", {}); t.textContent = dica; cg.appendChild(t);
+      cg.addEventListener("mouseenter", function () { cg.setAttribute("opacity", 0.75); });
+      cg.addEventListener("mouseleave", function () { cg.removeAttribute("opacity"); });
+      bolas.appendChild(cg);
+    });
+    // a metade: um traço vertical no meio, acima das cadeiras
+    svg.appendChild(el("line", { x1: cx, x2: cx, y1: cy - rIn + raio * 2, y2: cy - Rout - raio * 2.2, stroke: pal.texto,
+                                 "stroke-width": 1.5, "stroke-dasharray": "5 5", opacity: 0.55 }));
+    svg.appendChild(bolas);
+    if (g.maioria) {
+      svg.appendChild(texto("maioria: " + g.maioria, { x: cx, y: cy - Rout - raio * 2.2 - L.tick * 0.5,
+        "font-size": L.tick * 0.85, fill: pal.texto, "text-anchor": "middle" }));
+    }
+    if (g.centro) {
+      svg.appendChild(texto(g.centro[0], { x: cx, y: cy - rIn * 0.42, "font-size": rIn * 0.5, "font-weight": "bold",
+                                           fill: pal.texto, "text-anchor": "middle" }));
+      svg.appendChild(texto(g.centro[1], { x: cx, y: cy - rIn * 0.08, "font-size": Math.min(rIn * 0.2, L.tick * 1.1),
+                                           fill: pal.texto, "text-anchor": "middle" }));
+    }
+    return { svg: svg, L: L, pal: pal, ranking: true };
+  }
+
+  // Distritos: a mesma grade de eleitores ("eleitores": linhas de letras, uma
+  // por eleitor, e "partidos": {letra: {nome, cor}}) partida em distritos de
+  // jeitos diferentes, um quadro por "painel" ({rot, distritos: linhas com o
+  // número do distrito de cada eleitor}). O fundo do distrito tem a cor de
+  // quem ganha nele; a linha grossa é a divisa.
+  function contarDistritos(g, pn) {
+    var cont = {};
+    g.eleitores.forEach(function (lin, i) {
+      lin.split("").forEach(function (e, j) {
+        var d = pn.distritos[i][j];
+        cont[d] = cont[d] || {};
+        cont[d][e] = (cont[d][e] || 0) + 1;
+      });
+    });
+    var venc = {};
+    Object.keys(cont).forEach(function (d) {
+      venc[d] = Object.keys(cont[d]).sort(function (a, b) { return cont[d][b] - cont[d][a]; })[0];
+    });
+    return { cont: cont, venc: venc };
+  }
+  function construirDistritos(cartao, L0, nomeTema) {
+    var g = graficoDe(cartao), pal = PALETAS[nomeTema], L = Object.assign({}, L0);
+    var svg = svgNovo(g, L), letras = Object.keys(g.partidos);
+    var yLeg = legendaLinha(svg, letras.map(function (a) {
+      return { rot: "Eleitor " + g.partidos[a].nome.toLowerCase(), cor: g.partidos[a].cor };
+    }), moldura(svg, g, L, pal) + L.legenda.fs * 2.2, L, pal, true);
+    var nl = g.eleitores.length, nc = g.eleitores[0].length, P = g.paineis.length;
+    var fs = L.tick, rotH = fs * 2.1, resH = fs * 2.3;
+    var ax0 = L.titulo.x, ax1 = L.W - L.titulo.x, ay0 = yLeg + L.legenda.fs * 1.2, ay1 = L.fonte.y - L.fonte.fs * 2;
+    var lado = L.W > 1500, gapP = lado ? 70 : fs * 0.8, cel;
+    if (lado) cel = Math.min(((ax1 - ax0) - gapP * (P - 1)) / P / nc, (ay1 - ay0 - rotH - resH) / nl);
+    else cel = Math.min((ax1 - ax0) / nc, (ay1 - ay0 - P * (rotH + resH) - gapP * (P - 1)) / (P * nl));
+    var gw = cel * nc, gh = cel * nl;
+    var totalW = lado ? gw * P + gapP * (P - 1) : gw, totalH = lado ? rotH + gh + resH : P * (rotH + gh + resH) + gapP * (P - 1);
+    var x0 = (L.W - totalW) / 2, y0 = ay0 + (ay1 - ay0 - totalH) / 2;
+    g.paineis.forEach(function (pn, k) {
+      var px = lado ? x0 + k * (gw + gapP) : x0, py = lado ? y0 : y0 + k * (rotH + gh + resH + gapP);
+      var gy = py + rotH, r = contarDistritos(g, pn);
+      svg.appendChild(texto(pn.rot, { x: px + gw / 2, y: py + rotH * 0.45, "font-size": corpoQueCabe(pn.rot, fs, gw, "bold"),
+                                      "font-weight": "bold", fill: pal.texto, "text-anchor": "middle" }));
+      // fundo por célula, agrupado por distrito para a dica
+      var grupos = {};
+      Object.keys(r.cont).sort().forEach(function (d, n) {
+        var c = r.cont[d], p = g.partidos[r.venc[d]];
+        var gd = el("g", {}), t = el("title", {});
+        t.textContent = "Distrito " + (n + 1) + ": " + letras.map(function (a) {
+          return (c[a] || 0) + " " + g.partidos[a].nome.toLowerCase();
+        }).join(", ") + "; vence o " + p.nome.toLowerCase();
+        gd.appendChild(t);
+        grupos[d] = { g: gd, cor: corNoTema(p.cor, pal) };
+        svg.appendChild(gd);
+      });
+      for (var i = 0; i < nl; i++) {
+        for (var j = 0; j < nc; j++) {
+          var d = pn.distritos[i][j], gr = grupos[d], x = px + j * cel, y = gy + i * cel;
+          gr.g.appendChild(el("rect", { x: x, y: y, width: cel, height: cel, fill: gr.cor, "fill-opacity": 0.4 }));
+          gr.g.appendChild(el("circle", { cx: x + cel / 2, cy: y + cel / 2, r: cel * 0.3,
+                                          fill: corNoTema(g.partidos[g.eleitores[i][j]].cor, pal) }));
+        }
+      }
+      // divisas: cada lado de célula que encosta em outro distrito ou na borda
+      var tr = [];
+      for (i = 0; i < nl; i++) {
+        for (j = 0; j < nc; j++) {
+          var dd = pn.distritos[i][j], xx = px + j * cel, yy = gy + i * cel;
+          if (i === 0 || pn.distritos[i - 1][j] !== dd) tr.push("M" + xx + "," + yy + "h" + cel);
+          if (i === nl - 1 || pn.distritos[i + 1][j] !== dd) tr.push("M" + xx + "," + (yy + cel) + "h" + cel);
+          if (j === 0 || pn.distritos[i][j - 1] !== dd) tr.push("M" + xx + "," + yy + "v" + cel);
+          if (j === nc - 1 || pn.distritos[i][j + 1] !== dd) tr.push("M" + (xx + cel) + "," + yy + "v" + cel);
+        }
+      }
+      svg.appendChild(el("path", { d: tr.join(""), stroke: pal.texto, "stroke-width": Math.max(3, cel * 0.07),
+                                   "stroke-linecap": "round", fill: "none", "pointer-events": "none" }));
+      var placar = letras.map(function (a) {
+        var n = Object.keys(r.venc).filter(function (d) { return r.venc[d] === a; }).length;
+        return g.partidos[a].nome + " " + n;
+      }).join("  x  ");
+      svg.appendChild(texto("Deputados: " + placar, { x: px + gw / 2, y: gy + gh + resH * 0.62, "font-size": fs * 1.05,
+                                                      fill: pal.texto, "text-anchor": "middle", "font-weight": "bold" }));
+    });
+    return { svg: svg, L: L, pal: pal, ranking: true };
+  }
+
   function construir(cartao, L0, nomeTema) {
     var g = graficoDe(cartao), pal = PALETAS[nomeTema], F = unidade(g);
     if (g.tipo === "ranking") return construirRanking(cartao, L0, nomeTema);
     if (g.tipo === "mapa") return construirMapa(cartao, L0, nomeTema);
+    if (g.tipo === "estados") return construirEstados(cartao, L0, nomeTema);
+    if (g.tipo === "hemiciclo") return construirHemiciclo(cartao, L0, nomeTema);
+    if (g.tipo === "distritos") return construirDistritos(cartao, L0, nomeTema);
     var L = Object.assign({}, L0);
 
     // subtítulo que não cabe numa linha quebra em duas (versão estreita)
@@ -2459,6 +2774,28 @@
         return b.nome.replace(/;/g, ",") + ";" + String(b.pct).replace(".", ",") + ";" + b.kbd;
       })).join("\r\n")], { type: "text/csv;charset=utf-8" }), nomeArquivo(cartao, "csv"));
     }
+    if (g.tipo === "estados") {
+      return salvar(new Blob(["\ufeff" + ["uf;rotulo;descricao"].concat((g.estados || []).map(function (e) {
+        return [e.uf, e.rot || "", e.dica || ""].map(function (x) { return String(x).replace(/;/g, ","); }).join(";");
+      })).join("\r\n")], { type: "text/csv;charset=utf-8" }), nomeArquivo(cartao, "csv"));
+    }
+    if (g.tipo === "hemiciclo") {
+      return salvar(new Blob(["\ufeff" + ["grupo;cadeiras"].concat((g.grupos || []).map(function (gr) {
+        return gr.nome.replace(/;/g, ",") + ";" + gr.n;
+      })).join("\r\n")], { type: "text/csv;charset=utf-8" }), nomeArquivo(cartao, "csv"));
+    }
+    if (g.tipo === "distritos") {
+      var letras = Object.keys(g.partidos), lin = [["mapa", "distrito"].concat(letras.map(function (a) {
+        return g.partidos[a].nome; })).concat(["vencedor"]).join(";")];
+      g.paineis.forEach(function (pn) {
+        var r = contarDistritos(g, pn);
+        Object.keys(r.cont).sort().forEach(function (d, n) {
+          lin.push([pn.rot, n + 1].concat(letras.map(function (a) { return r.cont[d][a] || 0; }))
+                   .concat([g.partidos[r.venc[d]].nome]).join(";"));
+        });
+      });
+      return salvar(new Blob(["\ufeff" + lin.join("\r\n")], { type: "text/csv;charset=utf-8" }), nomeArquivo(cartao, "csv"));
+    }
     if (g.tipo === "ranking") {
       return salvar(new Blob(["\ufeff" + ["item;valor"].concat((g.itens || []).map(function (it) {
         return it[0].replace(/;/g, ",") + ";" + String(it[1]).replace(".", ",");
@@ -2731,6 +3068,8 @@
       });
       sec.graficos.forEach(function (g) {
         g.fonte = g.fonte || dados.fonte;
+        // o mapa dos estados vem uma vez só, no topo do arquivo
+        if (g.tipo === "estados" && !g.formas) g.formas = dados.formas;
         g._comentarios = dados.comentarios || null;
         var c = criarCartao(g);
         c.raiz.open = true;
@@ -2795,6 +3134,8 @@
       var daSecao = [];
       sec.graficos.forEach(function (g) {
         g.fonte = g.fonte || dados.fonte;
+        // o mapa dos estados vem uma vez só, no topo do arquivo
+        if (g.tipo === "estados" && !g.formas) g.formas = dados.formas;
         g._comentarios = dados.comentarios || null;
         var c = criarCartao(g);
         c.raiz.open = true;

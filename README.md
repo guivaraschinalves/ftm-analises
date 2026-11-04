@@ -9,6 +9,7 @@ No ar: <https://guivaraschinalves.github.io/ftm-analises/>
 
 | Assunto | Dados | De onde vêm |
 |---|---|---|
+| **Midterms de 2026 nos EUA** | `dados/midterms-2026.json` | Digitados de House Press Gallery, Senado e NGA (composição de antes da votação de 03/11/2026); mapa do us-atlas (Census Bureau); `scripts/midterms.py`, rodado à mão |
 | **A bolsa nas eleições presidenciais** | `dados/eleicoes.json` | Baixados da API aberta do Ipeadata (Ibovespa diário desde 1993); `scripts/eleicoes.py`, rodado à mão |
 | **Os quatro quadrantes de Charles Gave** | `dados/gave.json` | Shiller (Yale), FRED, Banco Mundial e Ken French; `scripts/gave.py`, **sozinho** todo dia |
 | **Análise de Cenário: 28/10/26 - Decisão do FOMC** | `dados/cenario-2026-10-28-fomc.json` | FRED, BLS, Fed de San Francisco, ISM (investing.com), Tesouro (MTS e TIC), Census e BIS; `scripts/cenario_fomc.py`, rodado à mão |
@@ -154,6 +155,25 @@ A **nota** passou a aceitar duas marcações, e só duas: linha em branco separa
 parágrafo e `**assim**` fica em negrito. É o bastante para definir um termo
 técnico no meio da explicação sem o texto virar um bloco só, e de propósito não
 é Markdown — não quero abrir a porta a HTML vindo do arquivo de dados.
+
+### Mapa por estado, hemiciclo e distritos
+
+Três desenhos sem eixo, nascidos com as midterms, todos com a moldura de
+sempre e a dica de cada peça no `<title>`:
+
+- `tipo: "estados"`: mapa dos EUA pintado por estado. As formas vão **uma vez
+  só**, em `formas` no topo do arquivo de dados (`{UF: {d, c}}`, na tela de
+  975 x 610 do us-atlas, `c` é onde vai o rótulo); o cartão lista `estados`
+  com `uf`, `cor` (ou `int`, de 0 a 1, na `cor` do cartão), `rot` e `dica`.
+  Estado sem cor fica no cinza de "fora". Os de `foraDoMapa` têm o rótulo numa
+  coluna à direita.
+- `tipo: "hemiciclo"`: uma bolinha por cadeira; `grupos` = `[{nome, n, cor,
+  apagado}]`, da esquerda para a direita; `cor: "vazio"` é vaga (só contorno);
+  `maioria` e `centro` (dois textos) são opcionais.
+- `tipo: "distritos"`: a mesma grade de `eleitores` (uma letra por eleitor,
+  `partidos` diz nome e cor de cada letra) partida em `paineis`, cada um com
+  o número do distrito de cada eleitor. O fundo do distrito tem a cor de quem
+  vence nele.
 
 ## Análise de Cenário
 
