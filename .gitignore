@@ -31,3 +31,7 @@ dados/.cache-comex/bruto/
 # ANP (produção e refino) e JODI (zip de 58 MB): baixados a cada rodada.
 dados/.cache-anp/
 dados/.cache-jodi/
+
+# Midterms: Michigan, boca de urna da CNN e UCSB, baixados por
+# scripts/midterms_motivos.py (--atualizar baixa de novo).
+dados/.cache-midterms/

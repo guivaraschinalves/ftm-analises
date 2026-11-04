@@ -5,7 +5,11 @@ explicação de como funcionam as eleições de meio de mandato, com a composiç
 da Câmara e do Senado de antes da votação de 03/11/2026.
 
 Uso:
-    python3 scripts/midterms.py
+    python3 scripts/midterms.py               (usa o que já foi baixado)
+    python3 scripts/midterms.py --atualizar   (baixa de novo Michigan, CNN e UCSB)
+
+A seção "Os motivos da virada" vem de scripts/midterms_motivos.py, que baixa
+os dados dela; o resto deste arquivo é digitado.
 
 Só usa a biblioteca padrão. Rodado à mão: os números abaixo são digitados.
 
@@ -41,6 +45,8 @@ import json
 import math
 import urllib.request
 from pathlib import Path
+
+import midterms_motivos
 
 RAIZ = Path(__file__).resolve().parent.parent
 SAIDA = RAIZ / "dados" / "midterms-2026.json"
@@ -554,13 +560,13 @@ def main():
     dados = {
         "atualizado": "2026-11-04",
         "referencia": "2026-11-02",
-        "fonte": "House Press Gallery, Senado dos EUA e Census Bureau",
+        "fonte": "House Press Gallery, Senado dos EUA, Census Bureau, Universidade de Michigan, Edison Research/CNN e UCSB",
         "assunto": "Midterms de 2026 nos EUA",
         "grupo": "Análises Variadas",
         "apresentacao": APRESENTACAO,
         "formato": "artigo",
         "formas": formas(),
-        "secoes": [dict(fontes=[], figuras=[], **s) for s in SECOES],
+        "secoes": [dict(fontes=[], figuras=[], **s) for s in SECOES + midterms_motivos.secoes()],
     }
     SAIDA.write_text(json.dumps(dados, ensure_ascii=False, separators=(",", ":")))
     print("gravado %s (%.0f KB)" % (SAIDA.relative_to(RAIZ), SAIDA.stat().st_size / 1024))

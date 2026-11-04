@@ -269,6 +269,9 @@
     return 2;
   }
   var UNIDADES = {
+    // diferença entre dois partidos em pontos percentuais, com sinal
+    margem: { eixo: function (v) { return nf(0).format(v); },
+              valor: function (v) { return (v > 0 ? "+" : "") + nf(0).format(v); } },
     // contagem (cadeiras, eleições): número inteiro, sem unidade
     n: { eixo: function (v) { return nf(0).format(v); }, valor: function (v) { return nf(0).format(v); } },
     "%": { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v) + "%"; },
@@ -994,7 +997,10 @@
     var mn = Infinity, mx = -Infinity, pilhaPos = {}, pilhaNeg = {};
     g.series.forEach(function (s, k) {
       vis[k].forEach(function (p) {
-        if (s.tipo === "barra") {
+        if (s.tipo === "barra" && g.agrupadas) {
+          // lado a lado: cada barra vale por si, e o zero entra na escala
+          mn = Math.min(mn, p.v, 0); mx = Math.max(mx, p.v, 0);
+        } else if (s.tipo === "barra") {
           if (p.v >= 0) pilhaPos[p.i] = (pilhaPos[p.i] || 0) + p.v;
           else pilhaNeg[p.i] = (pilhaNeg[p.i] || 0) + p.v;
         } else {
@@ -1232,8 +1238,27 @@
     // e a pilha fica com cara de área empilhada
     var fBarra = g.barra || 0.86;
     var baseP = {}, baseN = {}, bw = Math.max(2, pxMes * fBarra + (fBarra >= 1 ? 1 : 0));
+    // "agrupadas": as séries de barra ficam lado a lado dentro da categoria,
+    // em vez de empilhadas; "valores" escreve o número na ponta de cada uma
+    var barrasAg = g.agrupadas ? g.series.filter(function (s) { return s.tipo === "barra"; }) : [];
+    if (barrasAg.length) {
+      var wb = bw / barrasAg.length, fsV = Math.round(L.xlab * 0.85);
+      barrasAg.forEach(function (s, kb) {
+        var cor = corNoTema(s.cor, pal), k = g.series.indexOf(s);
+        vis[k].forEach(function (p) {
+          var y0b = Y(0), y1b = Y(p.v), xb0 = X(p.i + 0.5) - bw / 2 + kb * wb;
+          area.appendChild(el("rect", { x: xb0 + 1, y: Math.min(y0b, y1b), width: Math.max(1, wb - 2),
+                                        height: Math.max(0.6, Math.abs(y1b - y0b)), fill: cor, rx: 3 }));
+          if (g.valores) {
+            svg.appendChild(texto((p.v > 0 && g.sinal ? "+" : "") + F.valor(p.v), {
+              x: xb0 + wb / 2, y: p.v >= 0 ? y1b - fsV * 0.45 : y1b + fsV * 1.05, "font-size": fsV,
+              fill: pal.texto, "text-anchor": "middle" }));
+          }
+        });
+      });
+    }
     g.series.forEach(function (s, k) {
-      if (s.tipo !== "barra") return;
+      if (s.tipo !== "barra" || g.agrupadas) return;
       var cor = corNoTema(s.cor, pal);
       vis[k].forEach(function (p) {
         if (!p.v) return;
