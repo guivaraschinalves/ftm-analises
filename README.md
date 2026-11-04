@@ -9,7 +9,7 @@ No ar: <https://guivaraschinalves.github.io/ftm-analises/>
 
 | Assunto | Dados | De onde vêm |
 |---|---|---|
-| **Midterms de 2026 nos EUA** | `dados/midterms-2026.json` | Digitados de House Press Gallery, Senado e NGA (composição de antes da votação de 03/11/2026); mapa do us-atlas (Census Bureau); "Os resultados" lê a apuração da CNN (`scripts/midterms_resultados.py`); "O custo de vida" baixa FRED (sem User-Agent), BLS e o Wage Growth Tracker do Fed de Atlanta (`scripts/midterms_economia.py`); "Os motivos da virada" baixa Michigan (tabelas 2 e 5b), a boca de urna da CNN e a aprovação da UCSB (`scripts/midterms_motivos.py`); `scripts/midterms.py [--atualizar]`, rodado à mão |
+| **Midterms de 2026 nos EUA** | `dados/midterms-2026.json` | Digitados de House Press Gallery, Senado e NGA (composição de antes da votação de 03/11/2026); mapa do us-atlas (Census Bureau); "Os resultados" lê a apuração da CNN (`scripts/midterms_resultados.py`); "As midterms de outros presidentes" lê as tabelas de midterms e de vetos da UCSB (`scripts/midterms_historia.py`); "O custo de vida" baixa FRED (sem User-Agent), BLS e o Wage Growth Tracker do Fed de Atlanta (`scripts/midterms_economia.py`); "Os motivos da virada" baixa Michigan (tabelas 2 e 5b), a boca de urna da CNN e a aprovação da UCSB (`scripts/midterms_motivos.py`); `scripts/midterms.py [--atualizar]`, rodado à mão |
 | **A bolsa nas eleições presidenciais** | `dados/eleicoes.json` | Baixados da API aberta do Ipeadata (Ibovespa diário desde 1993); `scripts/eleicoes.py`, rodado à mão |
 | **Os quatro quadrantes de Charles Gave** | `dados/gave.json` | Shiller (Yale), FRED, Banco Mundial e Ken French; `scripts/gave.py`, **sozinho** todo dia |
 | **Análise de Cenário: 28/10/26 - Decisão do FOMC** | `dados/cenario-2026-10-28-fomc.json` | FRED, BLS, Fed de San Francisco, ISM (investing.com), Tesouro (MTS e TIC), Census e BIS; `scripts/cenario_fomc.py`, rodado à mão |
@@ -170,6 +170,9 @@ sempre e a dica de cada peça no `<title>`:
 - `tipo: "hemiciclo"`: uma bolinha por cadeira; `grupos` = `[{nome, n, cor,
   apagado}]`, da esquerda para a direita; `cor: "vazio"` é vaga (só contorno);
   `maioria` e `centro` (dois textos) são opcionais.
+- `tipo: "dispersao"`: `pontos` = `[{x, y, ate, rot, cor, destaque, nota, dica}]`,
+  `eixoX`/`eixoY` com `rot` e `unidade`, e `reta` (`{a, b, de, ate}`) para a
+  tendência. Os rótulos procuram um lado livre; quem não couber fica só na dica.
 - Barras com `agrupadas: true` ficam lado a lado na categoria em vez de
   empilhadas; `valores: true` escreve o número na ponta de cada uma.
 - `tipo: "distritos"`: a mesma grade de `eleitores` (uma letra por eleitor,

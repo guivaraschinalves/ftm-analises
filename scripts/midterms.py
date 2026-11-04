@@ -49,6 +49,7 @@ from pathlib import Path
 import midterms_motivos
 import midterms_resultados
 import midterms_economia
+import midterms_historia
 
 RAIZ = Path(__file__).resolve().parent.parent
 SAIDA = RAIZ / "dados" / "midterms-2026.json"
@@ -570,7 +571,8 @@ def main():
         "apresentacao": APRESENTACAO,
         "formato": "artigo",
         "formas": formas(),
-        "secoes": [dict(fontes=[], figuras=[], **s) for s in SECOES + midterms_resultados.secoes(NOME) + midterms_motivos.secoes() + midterms_economia.secoes()],
+        "secoes": [dict(fontes=[], figuras=[], **s) for s in SECOES + midterms_resultados.secoes(NOME)
+                   + midterms_historia.secoes(set(SENADO_R) | set(SENADO_ESPECIAL)) + midterms_motivos.secoes() + midterms_economia.secoes()],
     }
     SAIDA.write_text(json.dumps(dados, ensure_ascii=False, separators=(",", ":")))
     print("gravado %s (%.0f KB)" % (SAIDA.relative_to(RAIZ), SAIDA.stat().st_size / 1024))

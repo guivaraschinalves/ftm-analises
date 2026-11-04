@@ -728,7 +728,10 @@
       var total = ks.reduce(function (a, k) { return a + larg[k]; }, 0) + entre * (ks.length - 1);
       var x = (L.W - total) / 2, yl = y + n * L.legenda.passo;
       ks.forEach(function (k) {
-        svg.appendChild(amostra(itens[k], x, yl, t, pal, redonda));
+        if (itens[k].linha) {
+          svg.appendChild(el("line", { x1: x, x2: x + t, y1: yl, y2: yl, stroke: corNoTema(itens[k].linha, pal),
+                                       "stroke-width": 2.5, "stroke-dasharray": "3 5", "stroke-linecap": "round" }));
+        } else svg.appendChild(amostra(itens[k], x, yl, t, pal, redonda));
         svg.appendChild(texto(itens[k].rot, { x: x + t + gap, y: yl, "font-size": fs, fill: pal.texto,
                                               "dominant-baseline": "central" }));
         x += larg[k] + entre;
@@ -978,6 +981,120 @@
     return { svg: svg, L: L, pal: pal, ranking: true };
   }
 
+  // Dispersão: um ponto por item ("pontos": [{x, y, ate, rot, cor, destaque,
+  // dica}]), eixos numéricos com rótulo ("eixoX"/"eixoY": {rot, min, max,
+  // zero}) e, se houver, a reta de tendência ("reta": {a, b, de, ate, rot}:
+  // y = a + b·x entre x = de e x = ate). "ate" num ponto desenha um traço
+  // vertical de y até ate (o resultado parcial e o que falta apurar). O ponto
+  // com "destaque" sai maior, com o rótulo em negrito e a "nota" ao lado.
+  function construirDispersao(cartao, L0, nomeTema) {
+    var g = graficoDe(cartao), pal = PALETAS[nomeTema], L = Object.assign({}, L0);
+    var Fx = UNIDADES[(g.eixoX || {}).unidade] || UNIDADES.n, Fy = UNIDADES[(g.eixoY || {}).unidade] || UNIDADES.n;
+    var svg = svgNovo(g, L), pts = g.pontos || [];
+    var itensLeg = (g.legenda || []).map(function (it) {
+      return it.cor && it.cor.indexOf("linha:") === 0 ? { rot: it.rot, cor: "nenhuma", linha: it.cor.slice(6) } : it;
+    });
+    var yLeg = legendaLinha(svg, itensLeg, moldura(svg, g, L, pal) + L.legenda.fs * 2.2, L, pal, true);
+    var xs = pts.map(function (p) { return p.x; }), ys = [];
+    pts.forEach(function (p) { ys.push(p.y); if (p.ate !== undefined) ys.push(p.ate); });
+    if (g.reta) { ys.push(g.reta.a + g.reta.b * g.reta.de, g.reta.a + g.reta.b * g.reta.ate); }
+    var ex = escalaY(Math.min.apply(null, xs), Math.max.apply(null, xs), Object.assign({ zero: false }, g.eixoX));
+    var ey = escalaY(Math.min.apply(null, ys.concat([0])), Math.max.apply(null, ys.concat([0])), Object.assign({ zero: false }, g.eixoY));
+    var fs = L.tick, tw = Math.max.apply(null, ey.ticks.map(function (t) { return largura(Fy.eixo(t, ey.passo), fs); }));
+    var x0 = L.titulo.x + fs * 1.6 + tw + 14, x1 = L.W - L.titulo.x - 20;
+    var y0 = yLeg + L.legenda.fs * 1.6, y1 = L.fonte.y - L.fonte.fs * 2 - fs * 3.2;
+    var X = function (v) { return x0 + (v - ex.min) / (ex.max - ex.min) * (x1 - x0); };
+    var Y = function (v) { return y1 - (v - ey.min) / (ey.max - ey.min) * (y1 - y0); };
+    // grade e eixos
+    ey.ticks.forEach(function (t) {
+      svg.appendChild(el("line", { x1: x0, x2: x1, y1: Y(t), y2: Y(t), stroke: t === 0 ? (pal.zero || pal.texto) : pal.grade,
+                                   "stroke-width": t === 0 ? 1.5 : 1 }));
+      svg.appendChild(texto(Fy.eixo(t, ey.passo), { x: x0 - 12, y: Y(t), "font-size": fs, fill: pal.texto,
+                                                     "text-anchor": "end", "dominant-baseline": "central" }));
+    });
+    ex.ticks.forEach(function (t) {
+      svg.appendChild(el("line", { x1: X(t), x2: X(t), y1: y0, y2: y1, stroke: pal.grade, "stroke-width": 1 }));
+      svg.appendChild(texto(Fx.eixo(t, ex.passo), { x: X(t), y: y1 + fs * 1.3, "font-size": fs, fill: pal.texto,
+                                                     "text-anchor": "middle" }));
+    });
+    if ((g.eixoX || {}).rot) {
+      svg.appendChild(texto(g.eixoX.rot, { x: (x0 + x1) / 2, y: y1 + fs * 2.9, "font-size": fs, fill: pal.texto,
+                                           "text-anchor": "middle" }));
+    }
+    if ((g.eixoY || {}).rot) {
+      var yr = (y0 + y1) / 2, xr = L.titulo.x + fs * 0.6;
+      svg.appendChild(texto(g.eixoY.rot, { x: xr, y: yr, "font-size": fs, fill: pal.texto, "text-anchor": "middle",
+                                           transform: "rotate(-90 " + xr + " " + yr + ")" }));
+    }
+    if (g.reta) {
+      var r = g.reta, idClipD = "clip-disp-" + g.id + "-" + nomeTema;
+      // a reta não sai da área do gráfico (passaria de zero vetos, por exemplo)
+      svg.appendChild(el("defs", {}, [el("clipPath", { id: idClipD }, [
+        el("rect", { x: x0, y: y0, width: x1 - x0, height: y1 - y0 })])]));
+      svg.appendChild(el("line", { "clip-path": "url(#" + idClipD + ")",
+                                   x1: X(r.de), x2: X(r.ate), y1: Y(r.a + r.b * r.de), y2: Y(r.a + r.b * r.ate),
+                                   stroke: corNoTema(r.cor || "#FFFFFF", pal), "stroke-width": 2.5,
+                                   "stroke-dasharray": "3 7", "stroke-linecap": "round", opacity: 0.85 }));
+    }
+    var raio = Math.max(7, fs * 0.36), fsR = Math.round(fs * 0.72);
+    // rótulos: o destaque primeiro; cada um tenta direita, esquerda, cima e
+    // baixo, e fica no primeiro lado que não bate em outro rótulo nem sai da
+    // área. Quem não couber em lado nenhum fica sem rótulo (a dica continua).
+    var caixas = [];
+    function livre(b) {
+      if (b.x < x0 - 4 || b.x + b.w > L.W - L.titulo.x || b.y < y0 - fs || b.y + b.h > y1 + 2) return false;
+      return !caixas.some(function (c) { return b.x < c.x + c.w && c.x < b.x + b.w && b.y < c.y + c.h && c.y < b.y + b.h; });
+    }
+    var posRot = {};
+    pts.map(function (p, k) { return k; }).sort(function (a, b) { return (pts[b].destaque ? 1 : 0) - (pts[a].destaque ? 1 : 0); })
+      .forEach(function (k) {
+        var p = pts[k];
+        if (!p.rot) return;
+        var cx = X(p.x), cy = Y(p.y), rr = p.destaque ? raio * 1.5 : raio, f = p.destaque ? fs : fsR;
+        var w = largura(p.rot, f, p.destaque ? "bold" : "normal"), h = f * 1.15;
+        var lados = [
+          { x: cx + rr + 6, y: cy, a: "start", b: { x: cx + rr + 6, y: cy - h / 2, w: w, h: h } },
+          { x: cx - rr - 6, y: cy, a: "end", b: { x: cx - rr - 6 - w, y: cy - h / 2, w: w, h: h } },
+          { x: cx, y: cy - rr - h * 0.6, a: "middle", b: { x: cx - w / 2, y: cy - rr - h * 1.1, w: w, h: h } },
+          { x: cx, y: cy + rr + h * 0.6, a: "middle", b: { x: cx - w / 2, y: cy + rr + h * 0.1, w: w, h: h } }
+        ];
+        var lado = lados.filter(function (l) { return livre(l.b); })[0] || (p.destaque ? lados[0] : null);
+        if (!lado) return;
+        caixas.push(lado.b);
+        if (p.nota) {
+          var wn = largura(p.nota, fsR), bn = { x: lado.a === "end" ? lado.x - wn : lado.x, y: lado.y + h * 0.6, w: wn, h: fsR * 1.15 };
+          caixas.push(bn);
+        }
+        posRot[k] = lado;
+      });
+    pts.forEach(function (p, k) {
+      var cor = corNoTema(p.cor || "#4F81BD", pal), cx = X(p.x), cy = Y(p.y), rr = p.destaque ? raio * 1.5 : raio;
+      var gp = el("g", {});
+      if (p.ate !== undefined) {
+        gp.appendChild(el("line", { x1: cx, x2: cx, y1: cy, y2: Y(p.ate), stroke: cor, "stroke-width": 3,
+                                    "stroke-dasharray": "4 4" }));
+        gp.appendChild(el("circle", { cx: cx, cy: Y(p.ate), r: rr * 0.8, fill: pal.bg, stroke: cor, "stroke-width": 2.5 }));
+      }
+      gp.appendChild(el("circle", { cx: cx, cy: cy, r: rr, fill: cor, stroke: pal.bg, "stroke-width": 2 }));
+      if (p.dica) { var t = el("title", {}); t.textContent = p.dica; gp.appendChild(t); }
+      svg.appendChild(gp);
+      var lado = posRot[k];
+      if (lado) {
+        var at = { x: lado.x, y: lado.y, "font-size": p.destaque ? fs : fsR, "dominant-baseline": "central",
+                   "text-anchor": lado.a, "font-weight": p.destaque ? "bold" : null, "pointer-events": "none" };
+        svg.appendChild(texto(p.rot, Object.assign({}, at, { stroke: pal.bg, "stroke-width": 5, "stroke-linejoin": "round", fill: pal.bg })));
+        svg.appendChild(texto(p.rot, Object.assign({}, at, { fill: p.destaque ? cor : pal.texto })));
+      }
+      if (p.nota && lado) {
+        var an = { x: lado.x, y: lado.y + fs * 1.15, "font-size": fsR, "dominant-baseline": "central",
+                   "text-anchor": lado.a, "pointer-events": "none" };
+        svg.appendChild(texto(p.nota, Object.assign({}, an, { stroke: pal.bg, "stroke-width": 5, "stroke-linejoin": "round", fill: pal.bg })));
+        svg.appendChild(texto(p.nota, Object.assign({}, an, { fill: cor })));
+      }
+    });
+    return { svg: svg, L: L, pal: pal, ranking: true };
+  }
+
   function construir(cartao, L0, nomeTema) {
     var g = graficoDe(cartao), pal = PALETAS[nomeTema], F = unidade(g);
     if (g.tipo === "ranking") return construirRanking(cartao, L0, nomeTema);
@@ -985,6 +1102,7 @@
     if (g.tipo === "estados") return construirEstados(cartao, L0, nomeTema);
     if (g.tipo === "hemiciclo") return construirHemiciclo(cartao, L0, nomeTema);
     if (g.tipo === "distritos") return construirDistritos(cartao, L0, nomeTema);
+    if (g.tipo === "dispersao") return construirDispersao(cartao, L0, nomeTema);
     var L = Object.assign({}, L0);
 
     // subtítulo que não cabe numa linha quebra em duas (versão estreita)
@@ -2819,6 +2937,12 @@
     if (g.tipo === "estados") {
       return salvar(new Blob(["\ufeff" + ["uf;rotulo;descricao"].concat((g.estados || []).map(function (e) {
         return [e.uf, e.rot || "", e.dica || ""].map(function (x) { return String(x).replace(/;/g, ","); }).join(";");
+      })).join("\r\n")], { type: "text/csv;charset=utf-8" }), nomeArquivo(cartao, "csv"));
+    }
+    if (g.tipo === "dispersao") {
+      return salvar(new Blob(["\ufeff" + ["item;x;y;y_ate"].concat((g.pontos || []).map(function (q) {
+        return [q.rot || "", q.x, q.y, q.ate === undefined ? "" : q.ate].map(function (v) {
+          return String(v).replace(".", ",").replace(/;/g, ","); }).join(";");
       })).join("\r\n")], { type: "text/csv;charset=utf-8" }), nomeArquivo(cartao, "csv"));
     }
     if (g.tipo === "hemiciclo") {
