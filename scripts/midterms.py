@@ -554,6 +554,58 @@ SECOES = [
 ]
 
 
+# Pesquisa Markets Pulse da Bloomberg, feita de 2 a 17/10/2026 com participantes
+# do mercado, digitada do quadro que a Bloomberg publicou. Em %, por cenário:
+# controle democrata do Congresso, dividido e republicano.
+BLOOMBERG = "https://www.bloomberg.com/graphics/2026-us-election-results/markets/?leadSource=uverify%20wall"
+PESQUISA = {
+    "juros_bolsa": {"ambos sobem": (10, 22, 39), "juros sobem, S&P cai": (37, 42, 35),
+                    "juros caem, S&P sobe": (32, 26, 22), "ambos caem": (21, 10, 4)},
+    "sp500": {"acelera": (8, 7, 20), "segue igual": (29, 37, 45), "desacelera": (41, 42, 22),
+              "vira perda": (22, 14, 14)},
+    "bitcoin": {"acima de US$ 100 mil": (8, 14, 29), "sobe até US$ 100 mil": (20, 40, 43),
+                "cai até US$ 60 mil": (55, 42, 22), "abaixo de US$ 60 mil": (16, 5, 5)},
+    "ia": {"ajuda a alta": 22, "sem efeito": 16, "prejudica": 62},
+    "vender": {"controle democrata": 22, "dividido": 7, "controle republicano": 17, "não venderia": 55},
+}
+
+
+def secao_mercado():
+    p = PESQUISA
+    pior_sp = p["sp500"]["desacelera"][0] + p["sp500"]["vira perda"][0]
+    queda_btc = p["bitcoin"]["cai até US$ 60 mil"][0] + p["bitcoin"]["abaixo de US$ 60 mil"][0]
+    return {
+        "titulo": "E o mercado",
+        "fontes": [{"id": "bloomberg", "rot": "Bloomberg, a eleição e os mercados", "url": BLOOMBERG}],
+        "texto": (
+            "A Bloomberg abriu de graça a cobertura da eleição, e a [página sobre os mercados](fonte:bloomberg) "
+            "traz a pesquisa Markets Pulse, feita de 2 a 17 de outubro com participantes do mercado. Ela perguntou "
+            "o que cada um esperava para os 12 meses seguintes em três cenários: Congresso democrata, dividido ou "
+            "republicano. O que saiu das urnas foi o primeiro.\n\n"
+            "**Com o Congresso democrata, a maioria esperava bolsa mais fraca.** %d%% previam que a alta do S&P "
+            "500, de cerca de 1,3%% ao mês neste ano, desaceleraria ou viraria perda; com o Congresso republicano, "
+            "eram %d%%. A combinação mais citada foi juros dos Treasuries em alta com a bolsa em queda (%d%%); só "
+            "%d%% esperavam juros e bolsa subindo juntos, contra %d%% no cenário republicano.\n\n"
+            "**No bitcoin, o pessimismo era maior.** Com o bitcoin perto de US$ 83,6 mil no fim de setembro, e "
+            "depois que o projeto de regulação das criptomoedas caiu no Senado, %d%% esperavam queda até o fim "
+            "do ano se o Congresso fosse democrata, e %d%% esperavam o bitcoin acima de US$ 100 mil.\n\n"
+            "**A regulação de inteligência artificial aparece como risco.** Se a troca de controle do Congresso "
+            "trouxer regras mais duras para a IA, %d%% acham que isso prejudica as ações americanas, e %d%% que "
+            "ajuda a alta. Ainda assim, %d%% disseram que nenhum resultado os faria pensar em vender ações "
+            "americanas; %d%% considerariam seriamente vender parte das suas com o Congresso democrata, e %d%% "
+            "com o republicano."
+        ) % (pior_sp, p["sp500"]["desacelera"][2] + p["sp500"]["vira perda"][2], p["juros_bolsa"]["juros sobem, S&P cai"][0],
+             p["juros_bolsa"]["ambos sobem"][0], p["juros_bolsa"]["ambos sobem"][2],
+             queda_btc, p["bitcoin"]["acima de US$ 100 mil"][0],
+             p["ia"]["prejudica"], p["ia"]["ajuda a alta"], p["vender"]["não venderia"],
+             p["vender"]["controle democrata"], p["vender"]["controle republicano"]),
+        "graficos": [],
+    }
+
+
+SECAO_MERCADO = secao_mercado()
+
+
 def main():
     for s in SECOES:
         for g in s["graficos"]:
@@ -565,14 +617,14 @@ def main():
     dados = {
         "atualizado": "2026-11-04",
         "referencia": "2026-11-02",
-        "fonte": "House Press Gallery, Senado dos EUA, Census Bureau, Universidade de Michigan, Edison Research/CNN, UCSB, BLS, Fed e Freddie Mac",
+        "fonte": "House Press Gallery, Senado dos EUA, Census Bureau, Universidade de Michigan, Edison Research/CNN, UCSB, BLS, Fed, Freddie Mac e Bloomberg",
         "assunto": "Midterms de 2026 nos EUA",
         "grupo": "Análises Variadas",
         "apresentacao": APRESENTACAO,
         "formato": "artigo",
         "formas": formas(),
-        "secoes": [dict(fontes=[], figuras=[], **s) for s in SECOES + midterms_resultados.secoes(NOME)
-                   + midterms_historia.secoes(set(SENADO_R) | set(SENADO_ESPECIAL)) + midterms_motivos.secoes() + midterms_economia.secoes()],
+        "secoes": [{"fontes": [], "figuras": [], **s} for s in SECOES + midterms_resultados.secoes(NOME)
+                   + midterms_historia.secoes(set(SENADO_R) | set(SENADO_ESPECIAL)) + midterms_motivos.secoes() + midterms_economia.secoes() + [SECAO_MERCADO]],
     }
     SAIDA.write_text(json.dumps(dados, ensure_ascii=False, separators=(",", ":")))
     print("gravado %s (%.0f KB)" % (SAIDA.relative_to(RAIZ), SAIDA.stat().st_size / 1024))
