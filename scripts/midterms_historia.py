@@ -105,6 +105,16 @@ def mmq(xs, ys):
     return my - b * mx, b
 
 
+def r2(xs, ys):
+    """R² da reta de mínimos quadrados e o R² ajustado (um regressor: n - 2 graus de liberdade)."""
+    a, b = mmq(xs, ys)
+    my, n = sum(ys) / len(ys), len(ys)
+    resid = sum((y - a - b * x) ** 2 for x, y in zip(xs, ys))
+    total = sum((y - my) ** 2 for y in ys)
+    r = 1 - resid / total
+    return r, 1 - (1 - r) * (n - 1) / (n - 2), n
+
+
 def nf(v, casas=1):
     return ("%.*f" % (casas, v)).replace(".", ",")
 
@@ -160,6 +170,7 @@ def secoes(senado_r):
     def dispersao(campo, rot_y):
         base = [m for m in hist if m["aprov"] is not None and m["ano"] >= 1946]
         a, b = mmq([m["aprov"] for m in base], [m[campo] for m in base])
+        rq, rqa, n = r2([m["aprov"] for m in base], [m[campo] for m in base])
         pts = [{"x": m["aprov"], "y": m[campo], "rot": str(m["ano"]), "cor": D if m["partido"] == "D" else R,
                 "dica": "%d, %s: aprovação de %d%%, %s cadeiras" % (m["ano"], NOMES[m["pres"]], m["aprov"], sinal(m[campo]))}
                for m in base]
@@ -170,15 +181,18 @@ def secoes(senado_r):
                     "dica": "2026, Trump: aprovação de %s%%; %s cadeiras confirmadas, %s se quem lidera vencer"
                             % (nf(m26["aprov"]), sinal(m26[campo]), sinal(m26[campo + "_cen"]))})
         xs = [p["x"] for p in pts]
-        return a, b, prev, {
+        return a, b, prev, (rq, rqa, n), {
             "unidade": "n", "pontos": pts,
             "eixoX": {"rot": "Aprovação do presidente antes da eleição (%)", "unidade": "n"},
             "eixoY": {"rot": rot_y, "unidade": "margem"},
             "reta": {"a": a, "b": b, "de": min(xs), "ate": max(xs)},
+            "legenda": [{"rot": "Presidente democrata", "cor": D}, {"rot": "Presidente republicano", "cor": R},
+                        {"rot": "Tendência de 1946 a 2022 (R² %s; ajustado %s)" % (nf(rq, 2), nf(rqa, 2)),
+                         "cor": "linha:#FFFFFF"}],
         }
 
-    sa, sb, sprev, d_sen = dispersao("sen", "Cadeiras no Senado")
-    ca, cb, cprev, d_cam = dispersao("cam", "Cadeiras na Câmara")
+    sa, sb, sprev, sr2, d_sen = dispersao("sen", "Cadeiras no Senado")
+    ca, cb, cprev, cr2, d_cam = dispersao("cam", "Cadeiras na Câmara")
     g_disp = {
         "id": "midterms-historia-aprovacao", "tipo": "dispersao",
         "titulo": "Aprovação do presidente e cadeiras do partido dele nas midterms",
@@ -262,12 +276,16 @@ def secoes(senado_r):
                     "destaque": True, "dica": "119º Congresso (2025-2026), Trump: %s%% da Câmara, %d vetos até agora"
                     % (nf(atual["cam_pct"]), atual["total"])})
         xs = [q["x"] for q in pts]
-        return a, b, {"pontos": pts, "unidade": "n",
-                      "eixoX": {"rot": "Cadeiras do partido do presidente na Câmara (%)", "unidade": "pct1"},
-                      "eixoY": {"rot": "Vetos no Congresso", "unidade": "n", "min": 0},
-                      "reta": {"a": a, "b": b, "de": min(xs), "ate": max(xs)}}
-    va45, vb45, dv45 = disp_vetos(1945)
-    va81, vb81, dv81 = disp_vetos(1981)
+        rq, rqa, n = r2([v["cam_pct"] for v in base], [v["total"] for v in base])
+        return a, b, (rq, rqa, n), {
+            "pontos": pts, "unidade": "n",
+            "eixoX": {"rot": "Cadeiras do partido do presidente na Câmara (%)", "unidade": "pct1"},
+            "eixoY": {"rot": "Vetos no Congresso", "unidade": "n", "min": 0},
+            "reta": {"a": a, "b": b, "de": min(xs), "ate": max(xs)},
+            "legenda": [{"rot": "Presidente democrata", "cor": D}, {"rot": "Presidente republicano", "cor": R},
+                        {"rot": "Tendência (R² %s; ajustado %s)" % (nf(rq, 2), nf(rqa, 2)), "cor": "linha:#FFFFFF"}]}
+    va45, vb45, vr45, dv45 = disp_vetos(1945)
+    va81, vb81, vr81, dv81 = disp_vetos(1981)
     g_vdisp = {
         "id": "midterms-historia-vetos-camara", "tipo": "dispersao",
         "titulo": "Cadeiras do partido do presidente na Câmara e vetos",
@@ -303,10 +321,16 @@ def secoes(senado_r):
         "**Quanto mais impopular o presidente, maior a perda, mas a relação é frouxa.** Na reta de 1946 a 2022, "
         "cada 10 pontos a menos de aprovação custam em média %s cadeiras no Senado e %s na Câmara. Com %s%% "
         "de aprovação, abaixo de todos os presidentes da tabela menos %s em %d (%d%%), a reta previa para Trump "
-        "%s cadeiras no Senado e %s na Câmara; até agora são %s e %s."
+        "%s cadeiras no Senado e %s na Câmara; até agora são %s e %s.\n\n"
+        "A aprovação explica pouco da perda: o R² da reta é de %s no Senado (%s ajustado) e de %s na Câmara (%s "
+        "ajustado), com %d midterms. Ou seja, cerca de %s%% e %s%% da variação nas cadeiras acompanham a "
+        "aprovação. O resto depende de outras coisas, como o mapa de cada eleição e quantas cadeiras o partido "
+        "defendia, que a reta não mede."
     ) % (nf(sb * 10), nf(cb * 10), nf(m26["aprov"]), NOMES[menor["pres"]], menor["ano"], menor["aprov"],
          sinal(round(sprev)), sinal(round(cprev)),
-         sinal(sconf), sinal(conf))
+         sinal(sconf), sinal(conf),
+         nf(sr2[0], 2), nf(sr2[1], 2), nf(cr2[0], 2), nf(cr2[1], 2), sr2[2],
+         nf(sr2[0] * 100, 0), nf(cr2[0] * 100, 0))
     texto_vet = (
         "**O que muda a partir de 2027 é o veto.** Desde 1981, quando o partido do presidente tinha a maioria "
         "nas duas Casas, cada Congresso de dois anos teve em média %s vetos; quando estava em minoria em ao "
@@ -317,10 +341,13 @@ def secoes(senado_r):
 
     texto_vdisp = (
         "A relação aparece também contra o tamanho da bancada. Desde 1981, cada 10 pontos a menos de cadeiras do "
-        "partido do presidente na Câmara vêm, na média, com %s vetos a mais por Congresso. Contando desde 1945, "
-        "a reta é mais plana (%s por 10 pontos): nos anos 1940 e 1950, Truman e Eisenhower vetaram dezenas de "
-        "projetos privados, de interesse de uma pessoa só, mesmo com o Congresso a favor."
-    ) % (nf(-vb81 * 10), nf(-vb45 * 10))
+        "partido do presidente na Câmara vêm, na média, com %s vetos a mais por Congresso, e a bancada explica "
+        "%s%% da variação dos vetos (R² de %s; %s ajustado, com %d Congressos). Contando desde 1945, a reta é "
+        "mais plana (%s por 10 pontos) e explica quase nada (R² de %s; %s ajustado): nos anos 1940 e 1950, "
+        "Truman e Eisenhower vetaram dezenas de projetos privados, de interesse de uma pessoa só, mesmo com o "
+        "Congresso a favor."
+    ) % (nf(-vb81 * 10), nf(vr81[0] * 100, 0), nf(vr81[0], 2), nf(vr81[1], 2), vr81[2],
+         nf(-vb45 * 10), nf(vr45[0], 2), nf(vr45[1], 2))
 
     return [
         {"titulo": "As midterms de outros presidentes", "texto": texto_barras + "\n\n" + texto_sen, "graficos": [g_barras]},
