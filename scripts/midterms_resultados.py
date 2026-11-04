@@ -215,6 +215,11 @@ def secoes(NOME):
         s = disp.get(uf)
         return s and s["status"] == "W" and partido(s["venc"]) == p
 
+    def perdeu(uf, sobrenome):
+        """O titular com esse sobrenome está entre os perdedores (a CNN às vezes erra o primeiro nome)."""
+        return any(c.get("isIncumbent") and c["lastName"] == sobrenome and not c["winner"]
+                   for r in senado if r["stateAbbreviation"] == uf for c in r["candidates"])
+
     cur = []
     if venceu(sen, "KS", "D"):
         cur.append("**Kansas** elegeu %s, o primeiro senador democrata do estado desde George McGill, "
@@ -228,13 +233,13 @@ def secoes(NOME):
     if venceu(gv, "TX", "D"):
         cur.append("O **Texas** também elegeu %s governadora, a primeira democrata no cargo desde Ann "
                    "Richards, que governou de 1991 a 1995." % nome(gv["TX"]["venc"]))
-    if venceu(sen, "ME", "D") and sen["ME"]["vira"]:
+    if venceu(sen, "ME", "D") and perdeu("ME", "Collins"):
         cur.append("**Susan Collins**, do Maine, senadora desde 1997 e a única republicana da Nova Inglaterra "
                    "no Senado, perdeu para %s." % nome(sen["ME"]["venc"]))
-    if venceu(sen, "SC", "D") and sen["SC"]["vira"]:
+    if venceu(sen, "SC", "D") and perdeu("SC", "Graham"):
         cur.append("**Lindsey Graham**, senador pela Carolina do Sul desde 2003, perdeu para %s. O estado não "
                    "tinha senador democrata desde que Fritz Hollings se aposentou, em 2005." % nome(sen["SC"]["venc"]))
-    if venceu(sen, "OH", "D") and sen["OH"]["vira"]:
+    if venceu(sen, "OH", "D") and sen["OH"]["venc"]["lastName"] == "Brown":
         cur.append("Em **Ohio**, Sherrod Brown voltou ao Senado dois anos depois de perder a própria cadeira, "
                    "em 2024, agora na vaga que foi de JD Vance.")
 

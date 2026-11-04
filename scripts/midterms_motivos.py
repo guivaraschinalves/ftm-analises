@@ -217,7 +217,7 @@ def grafico_aprovacao():
         "titulo": "Aprovação do presidente nos dois primeiros anos de mandato",
         "subtitulo": "% de adultos que aprovam o presidente, média do mês; o mês 1 é o da posse",
         "fonte": "The American Presidency Project (UCSB), com Gallup até dez/2025 e outras pesquisas depois",
-        "unidade": "pct1", "eixo": {"zero": False},
+        "unidade": "pct1", "eixo": {"zero": False}, "buracoMax": 2,  # Gallup pulou nov/2022 com Biden
         "categorias": cats,
         "eventos": [{"em": "22", "rot": "eleição de meio de mandato"}],
         "series": [
@@ -262,6 +262,7 @@ def secoes():
          rotulo_mes(min(partido, key=lambda x: x[2])[0]), nf(min(x[2] for x in partido)),
          rotulo_mes(ult[0]), nf(ult[2]), nf(ult[1]), nf(ult[3]))
 
+    assert rmin[1][0] == rmin[2][0], "revisar a frase de renda: mínimos do terço baixo e do meio em meses diferentes"
     texto_renda = (
         "**A queda pesou mais para quem ganha menos.** Michigan divide os entrevistados em três terços pela renda "
         "familiar, e em %s o terço de renda mais baixa e o do meio marcaram os menores níveis desde o início "
@@ -276,11 +277,12 @@ def secoes():
         "**Na urna, a virada apareceu em todas as faixas de renda.** Pela boca de urna, os democratas venceram "
         "em todas as cinco faixas, de quem ganha menos de US$ 30 mil por ano (%s pontos) a quem ganha mais "
         "de US$ 200 mil (%s). Em 2024, os republicanos tinham vencido a Câmara entre US$ 30 mil e 100 mil. "
-        "A maior mudança foi entre os de renda mais baixa: %s pontos para os democratas abaixo de US$ 30 mil "
-        "e %s entre US$ 30 mil e 50 mil, contra %s entre US$ 100 mil e 200 mil.\n\n"
+        "Na comparação com 2024, a margem democrata cresceu %d pontos abaixo de US$ 30 mil, %d de US$ 30 mil "
+        "a 50 mil e %d de US$ 50 mil a 100 mil, contra %d de US$ 100 mil a 200 mil e %d acima de US$ 200 mil.\n\n"
         "Os números de 2026 ainda são preliminares: a boca de urna é reponderada pelo resultado apurado nos "
         "dias seguintes à eleição. E as faixas são em dólares de cada ano, sem correção pela inflação."
-    ) % (sinal(marg(2026, 0)), sinal(marg(2026, 4)), sinal(mudanca[0]), sinal(mudanca[1]), sinal(mudanca[3]))
+    ) % (sinal(marg(2026, 0)), sinal(marg(2026, 4)), *(round(v) for v in mudanca))
+    assert min(mudanca[:3]) > max(mudanca[3:]), "revisar a frase da mudança por renda: o contraste mudou"
 
     comp = sorted(((n, v[k_ult]) for n, v in ap.items() if k_ult in v and n != "Trump, 2º mandato"),
                   key=lambda x: x[1])
@@ -292,7 +294,7 @@ def secoes():
         "**Trump chegou à eleição como o presidente mais impopular nesse ponto do mandato.** Em %s de "
         "mandato, a aprovação média foi de %s%%; o mais baixo entre os antecessores no mesmo mês foi %s, "
         "com %s%%. Na boca de urna, %d%% dos eleitores disseram desaprovar o presidente, %d%% disseram "
-        "que a política econômica dele piorou a economia e %d%%, que as tarifas prejudicaram o país.\n\n"
+        "que a política econômica dele piorou a economia e %d%%, que as tarifas prejudicaram a economia do país.\n\n"
         "Até dezembro de 2025 a série é a do Gallup, a mesma de todos os presidentes do gráfico. O Gallup "
         "deixou de medir aprovação presidencial em 2026; dali em diante a linha de Trump é a média das "
         "pesquisas com todos os adultos reunidas pela UCSB, que mede um pouco diferente."

@@ -81,9 +81,10 @@ def apuracao_2026(senado_r):
     r_total += sum(1 for s in cam if s["status"] == "V")       # segundo turno: fica com quem tinha (R)
     sen = [resumo(r) for r in disputas("SG")]
     sconf = sum((1 if partido(s["venc"]) == "R" else -1) for s in sen if s["status"] == "W" and s["vira"])
-    spend = sum(-1 for s in sen if s["status"] != "W" and s["uf"] in senado_r and partido(s["lider"]) != "R")
-    spend += sum(1 for s in sen if s["status"] != "W" and s["uf"] not in senado_r and partido(s["lider"]) == "R")
-    return conf, r_total - 220, sconf, sconf + spend
+    # sem resultado e com o líder de outro partido que o dono da cadeira: viraria
+    vira = [s["uf"] for s in sen if s["status"] != "W" and (s["uf"] in senado_r) != (partido(s["lider"]) == "R")]
+    spend = sum(-1 if uf in senado_r else 1 for uf in vira)
+    return conf, r_total - 220, sconf, sconf + spend, vira
 
 
 PARTIDO_V = {"Franklin D. Roosevelt": "D", "Harry S. Truman": "D", "Dwight D. Eisenhower": "R",
@@ -123,9 +124,9 @@ def sinal(v):
     return ("+%d" % v) if v > 0 else str(v)
 
 
-def secoes(senado_r):
+def secoes(senado_r, NOME):
     ms = midterms()
-    conf, cen, sconf, scen = apuracao_2026(senado_r)
+    conf, cen, sconf, scen, sen_vira = apuracao_2026(senado_r)
     ap26 = aprovacao("donald-j-trump-2nd-term", 2025)
     k26 = max(ap26)
     m26 = [m for m in ms if m["ano"] == 2026][0]
@@ -211,11 +212,12 @@ def secoes(senado_r):
     def linha(m, cen=False):
         cam = m["cam_cen"] if cen else m["cam"]
         sen = m["sen_cen"] if cen else m["sen"]
-        return [{"t": "%d%s" % (m["ano"], " (parcial)" if cen else ""), "forte": True}, NOMES[m["pres"]],
+        # cor só no presidente, pelo partido; os números ficam neutros (azul e vermelho são partidos aqui)
+        return [{"t": "%d%s" % (m["ano"], " (parcial)" if cen else ""), "forte": True},
+                {"t": NOMES[m["pres"]], "cor": D if m["partido"] == "D" else R},
                 {"t": ("%s%%" % nf(m["aprov"], 0)) if m["aprov"] is not None else "n/d"},
-                {"t": sinal(cam), "cor": D if cam > 0 else R},
-                {"t": nf(cam / m["def_cam"] * 100) + "%", "cor": D if cam > 0 else R},
-                {"t": sinal(sen) if sen else "0", "cor": D if sen > 0 else (R if sen < 0 else None)}]
+                {"t": sinal(cam)}, {"t": nf(cam / m["def_cam"] * 100) + "%"},
+                {"t": sinal(sen) if sen else "0"}]
     lin = [linha(m) for m in linhas]
     lin.insert(min(pos_cen - 1, len(lin)), linha(m26, True))
     g_tab = {
@@ -314,8 +316,9 @@ def secoes(senado_r):
     pos_sen = 1 + sum(1 for m in hist if m["sen"] < scen)
     texto_sen = (
         "No Senado, os republicanos perderam %d das 22 cadeiras que defendiam%s. Em número, a perda maior desde "
-        "1934 foi a de 1958, de 13 cadeiras; a de 2026, com %d, fica em %dº lugar%s."
-    ) % (-sconf, (" (%d se o Mississippi também virar)" % -scen) if scen != sconf else "", -scen, pos_sen,
+        "1934 foi a de 1958, de 13 cadeiras; a de 2026, com %d, %s em %dº lugar%s."
+    ) % (-sconf, (" (%d se quem lidera %s vencer)" % (-scen, lista_pt([em_estado(NOME[uf]) for uf in sorted(sen_vira, key=lambda u: NOME[u])])))
+         if scen != sconf else "", -scen, "ficaria" if scen != sconf else "fica", pos_sen,
          empate([m for m in hist if m["sen"] == scen]))
     texto_disp = (
         "**Quanto mais impopular o presidente, maior a perda, mas a relação é frouxa.** Na reta de 1946 a 2022, "
@@ -363,6 +366,16 @@ def empate(iguais):
         return ""
     anos = [str(m["ano"]) for m in sorted(iguais, key=lambda m: m["ano"])]
     return ", empatada com a de %s" % lista_pt(anos) if len(anos) == 1 else ", empatada com as de %s" % lista_pt(anos)
+
+
+def em_estado(nome):
+    """'no Alasca', 'na Geórgia', 'em Nevada'."""
+    if nome.startswith(("Carolina", "Dakota", "Virgínia")) or nome in ("Geórgia", "Flórida", "Luisiana", "Califórnia", "Pensilvânia"):
+        return "na " + nome
+    if nome in ("Alasca", "Mississippi", "Texas", "Maine", "Kansas", "Iowa", "Ohio", "Colorado", "Kentucky", "Arkansas",
+                "Alabama", "Michigan", "Oregon", "Tennessee", "Illinois", "Arizona", "Novo México", "Montana", "Wyoming"):
+        return "no " + nome
+    return "em " + nome
 
 
 def lista_pt(xs):

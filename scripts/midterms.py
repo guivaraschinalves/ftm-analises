@@ -41,6 +41,7 @@ DE ONDE VÊM OS NÚMEROS
 O mapa é guardado uma vez, em "formas" no topo do arquivo; os cartões do tipo
 "estados" só dizem a cor e o texto de cada estado.
 """
+import datetime as dt
 import json
 import math
 import urllib.request
@@ -457,7 +458,7 @@ SECOES = [
     {
         "titulo": "O Senado",
         "texto": (
-            "**Cada estado tem dois senadores, qualquer que seja a população**: Wyoming, com 600 mil habitantes, "
+            "**Cada estado tem dois senadores, qualquer que seja a população**: Wyoming, com menos de 600 mil habitantes, "
             "pesa o mesmo que a Califórnia, com 39 milhões. O mandato é de seis anos, e as 100 cadeiras são "
             "divididas em três turmas que se renovam em rodízio, uma a cada dois anos. Por isso só um terço do "
             "Senado vai a voto em cada eleição, e os dois senadores de um estado nunca são eleitos juntos, a não "
@@ -614,9 +615,12 @@ def main():
     assert len(GOV_D) == 18 and len(GOV_R) == 18 and len(GOV_FORA) == 14
     assert not (set(GOV_D) | set(GOV_R)) & set(GOV_FORA)
     assert sum(CADEIRAS.values()) == 435
+    # dados até o momento da apuração da CNN (horário de Brasília)
+    ts = max(r["extractedAt"] for t in ("HG", "SG", "GG") for r in midterms_resultados.disputas(t))
+    apuracao = (dt.datetime.fromisoformat(ts[:19]) - dt.timedelta(hours=3)).date().isoformat()
     dados = {
-        "atualizado": "2026-11-04",
-        "referencia": "2026-11-02",
+        "atualizado": dt.date.today().isoformat(),
+        "referencia": apuracao,
         "fonte": "House Press Gallery, Senado dos EUA, Census Bureau, Universidade de Michigan, Edison Research/CNN, UCSB e Bloomberg",
         "assunto": "Midterms de 2026 nos EUA",
         "grupo": "Análises Variadas",
@@ -624,7 +628,7 @@ def main():
         "formato": "artigo",
         "formas": formas(),
         "secoes": [{"fontes": [], "figuras": [], **s} for s in SECOES + midterms_resultados.secoes(NOME)
-                   + midterms_historia.secoes(set(SENADO_R) | set(SENADO_ESPECIAL)) + midterms_motivos.secoes() + [SECAO_MERCADO]],
+                   + midterms_historia.secoes(set(SENADO_R) | set(SENADO_ESPECIAL), NOME) + midterms_motivos.secoes() + [SECAO_MERCADO]],
     }
     SAIDA.write_text(json.dumps(dados, ensure_ascii=False, separators=(",", ":")))
     print("gravado %s (%.0f KB)" % (SAIDA.relative_to(RAIZ), SAIDA.stat().st_size / 1024))
