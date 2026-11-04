@@ -1424,9 +1424,9 @@
     var buracoMax = g.buracoMax || (g.intradiario ? 8 : g.diario ? 6 : 1);
     g.series.forEach(function (s, k) {
       if (s.tipo === "barra" || s.tipo === "faixa" || !vis[k].length) return;
-      var d = "", ant = null;
+      var d = "", ant = null, bm = s.buracoMax || buracoMax;  // série anual num eixo mensal liga de 12 em 12
       vis[k].forEach(function (p) {
-        d += (ant === null || p.i - ant > buracoMax ? "M" : "L") + X(p.i + 0.5).toFixed(1) + " " + Y(p.v).toFixed(1);
+        d += (ant === null || p.i - ant > bm ? "M" : "L") + X(p.i + 0.5).toFixed(1) + " " + Y(p.v).toFixed(1);
         ant = p.i;
       });
       var w = s.largura || L.linha;

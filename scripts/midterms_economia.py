@@ -31,7 +31,7 @@ CONTAS
 
   Salário real: o tracker menos a inflação de 12 meses do CPI (sem ajuste) na
     mesma média móvel de 12 meses do tracker.
-  Prestação da casa mediana: preço mediano do trimestre, 20% de entrada, 30
+  Prestação da casa mediana (só no texto): preço mediano do trimestre, 20% de entrada, 30
     anos ao juro médio do trimestre (Freddie Mac); sem impostos e seguro. Em %
     da renda mediana mensal das famílias; para 2026, ainda sem renda
     publicada, vale a de 2025.
@@ -233,19 +233,25 @@ def grafico_precos(m30):
     cs = mensal(fred("CSUSHPINSA"))
     mp = {k[:7]: v for k, v in fred("MSPUS").items()}
     renda = {k[:4]: v for k, v in fred("MEHOINUSA646N").items()}
+    # renda anual no meio do ano (julho), ligada de 12 em 12 meses
+    ini_cs = min(cs)[:4]
+    renda_ind = {"nome": "Renda mediana das famílias", "cor": "#E8A33D", "rotulo": True, "buracoMax": 12,
+                 "dados": [[a + "-07", round(v / renda["2000"] * 100, 1)] for a, v in sorted(renda.items()) if a >= ini_cs]}
+    renda_usd = {"nome": "Renda mediana anual das famílias", "cor": "#E8A33D", "rotulo": True, "buracoMax": 12,
+                 "dados": [[a + "-07", round(v / 1000, 1)] for a, v in sorted(renda.items()) if a + "-07" >= min(mp)]}
     precos = {
         "id": "midterms-preco-casas",
-        "titulo": "Preço das casas",
-        "subtitulo": "Case-Shiller nacional e preço mediano de venda de casas, novas e usadas",
-        "fonte": "S&P CoreLogic Case-Shiller e Census/HUD, via FRED",
+        "titulo": "Preço das casas e renda mediana",
+        "subtitulo": "Case-Shiller nacional, preço mediano de venda de casas novas e usadas e renda mediana anual das famílias",
+        "fonte": "S&P CoreLogic Case-Shiller, Census/HUD e Census (renda), via FRED",
         "eixo": {"zero": False}, "periodoPadrao": "20",
         "variantes": [
-            {"rot": "Case-Shiller, índice (jan/2000 = 100)", "unidade": "pts", "series": [
-                {"nome": "Case-Shiller nacional", "cor": "#4F81BD", "rotulo": True,
-                 "dados": [[k, round(v / cs["2000-01"] * 100, 1)] for k, v in cs.items()]}]},
-            {"rot": "preço mediano de venda, em US$ mil", "unidade": "usd-mil", "buracoMax": 3, "series": [
-                {"nome": "Preço mediano", "cor": "#4F81BD", "rotulo": True,
-                 "dados": [[k, round(v / 1000, 1)] for k, v in mp.items()]}]},
+            {"rot": "índice (2000 = 100)", "unidade": "pts", "series": [
+                {"nome": "Case-Shiller nacional (jan/2000 = 100)", "cor": "#4F81BD", "rotulo": True,
+                 "dados": [[k, round(v / cs["2000-01"] * 100, 1)] for k, v in cs.items()]}, renda_ind]},
+            {"rot": "em US$ mil", "unidade": "usd-mil", "buracoMax": 3, "series": [
+                {"nome": "Preço mediano de venda", "cor": "#4F81BD", "rotulo": True,
+                 "dados": [[k, round(v / 1000, 1)] for k, v in mp.items()]}, renda_usd]},
         ],
     }
     # prestação: juro médio do trimestre do preço
@@ -253,7 +259,7 @@ def grafico_precos(m30):
     for k, v in m30.items():
         jt.setdefault(trimestre(k), []).append(v)
     ult_renda = max(renda)
-    pmt, pct = [], []
+    pct = []
     for k, p in sorted(mp.items()):
         if k not in jt or k[:4] < "1984":
             continue
@@ -262,22 +268,8 @@ def grafico_precos(m30):
         ren = renda.get(k[:4], renda[ult_renda] if k[:4] > ult_renda else None)
         if ren is None:
             continue
-        pmt.append([k, round(prest)])
         pct.append([k, round(prest * 12 / ren * 100, 1)])
-    prest = {
-        "id": "midterms-prestacao-casa",
-        "titulo": "Prestação da casa mediana",
-        "subtitulo": "Preço mediano de venda, 20% de entrada, 30 anos ao juro médio do trimestre; sem impostos e seguro",
-        "fonte": "Census/HUD, Freddie Mac e Census (renda), via FRED; conta do FtM",
-        "eixo": {"zero": False}, "buracoMax": 3, "periodoPadrao": "20",
-        "variantes": [
-            {"rot": "em %% da renda mediana das famílias (2026 com a renda de %s)" % ult_renda, "unidade": "pct1",
-             "series": [{"nome": "Prestação / renda mensal", "cor": "#E8A33D", "rotulo": True, "dados": pct}]},
-            {"rot": "em US$ por mês", "unidade": "usd", "series": [
-                {"nome": "Prestação mensal", "cor": "#E8A33D", "rotulo": True, "dados": pmt}]},
-        ],
-    }
-    return pct, pmt, precos, prest
+    return pct, precos
 
 
 def grafico_carro():
@@ -301,7 +293,7 @@ def secoes():
     sal, g_sal = grafico_salario()
     ult, vals, g_itens = grafico_itens()
     m30, m15, g_hip = grafico_hipoteca()
-    pct, pmt, g_preco, g_prest = grafico_precos(m30)
+    pct, g_preco = grafico_precos(m30)
     a60, a72, g_carro = grafico_carro()
     print("economia: CPI até %s; salário até %s; hipoteca até %s; casa até %s; carro até %s"
           % (ult, sal["q1"][-1][0], max(m30), pct[-1][0], max(a60)[:7]))
@@ -370,7 +362,7 @@ def secoes():
     return [
         {"titulo": "O custo de vida", "texto": texto_sal, "graficos": [g_sal]},
         {"titulo": "", "texto": texto_itens, "graficos": [g_itens]},
-        {"titulo": "", "texto": texto_casa, "graficos": [g_hip, g_preco, g_prest]},
+        {"titulo": "", "texto": texto_casa, "graficos": [g_hip, g_preco]},
         {"titulo": "", "texto": texto_carro, "graficos": [g_carro]},
     ]
 
