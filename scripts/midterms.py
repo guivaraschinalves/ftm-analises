@@ -575,7 +575,7 @@ def secao_mercado():
     pior_sp = p["sp500"]["desacelera"][0] + p["sp500"]["vira perda"][0]
     queda_btc = p["bitcoin"]["cai até US$ 60 mil"][0] + p["bitcoin"]["abaixo de US$ 60 mil"][0]
     return {
-        "titulo": "E o mercado",
+        "titulo": "E o mercado?",
         "fontes": [{"id": "bloomberg", "rot": "Bloomberg, a eleição e os mercados", "url": BLOOMBERG}],
         "texto": (
             "A Bloomberg abriu de graça a cobertura da eleição, e a [página sobre os mercados](fonte:bloomberg) "
