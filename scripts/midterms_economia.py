@@ -21,6 +21,11 @@ DE ONDE VÊM OS NÚMEROS
     MEHOINUSA646N renda mediana das famílias, nominal (Census), anual
     RIFLPBCIANM60NM / ...72NM  juro de carro novo em 60 e 72 meses, bancos
                  comerciais (Fed, G.19)
+    UNRATE       taxa de desemprego (BLS); out/2025 não tem (paralisação do governo)
+    DSPIC96      renda pessoal disponível real (BEA)
+    PCE, PCEPI   consumo pessoal nominal e o deflator dele (BEA): o consumo real
+                 é PCE / PCEPI, que é o PCEC96 desde 2007 e vai até 1959
+    PSAVERT      taxa de poupança pessoal (BEA)
   BLS (API pública v1, sem chave): seguro de carro, CUSR0000SETE e
     CUUR0000SETE. O FRED não tem essa série.
   Fed de Atlanta, Wage Growth Tracker, aba "Average Wage Quartile": mediana do
@@ -28,6 +33,12 @@ DE ONDE VÊM OS NÚMEROS
     vezes, em média móvel de 12 meses, por quartil do salário médio.
 
 CONTAS
+
+  Renda contra consumo (a ideia é de um gráfico do Charles Schwab): em cada
+    mês, a variação em 12 meses da renda disponível real e a do consumo real;
+    conta quantos meses seguidos a renda cresce menos. Regra estrita: empate ou
+    renda maior zera a contagem. Com dados revisados a conta muda um pouco em
+    relação à de quem fez antes (o Schwab, em jun/2026, tinha 24 meses).
 
   Salário real: o tracker menos a inflação de 12 meses do CPI (sem ajuste) na
     mesma média móvel de 12 meses do tracker.
@@ -289,12 +300,47 @@ def grafico_carro():
 
 
 # ---------- texto ----------
+def grafico_trabalho():
+    m = lambda d: {k[:7]: v for k, v in d.items()}  # noqa: E731
+    u = m(fred("UNRATE"))
+    desemprego = {
+        "id": "midterms-desemprego",
+        "titulo": "Taxa de desemprego",
+        "subtitulo": "% da força de trabalho, com ajuste sazonal; out/2025 não foi apurado",
+        "fonte": "BLS, via FRED",
+        "unidade": "pct1", "eixo": {"zero": False}, "periodoPadrao": "10", "buracoMax": 2,
+        "series": [{"nome": "Taxa de desemprego", "cor": "#E8A33D", "rotulo": True,
+                    "dados": [[k, v] for k, v in sorted(u.items())]}],
+    }
+    renda = m(fred("DSPIC96"))
+    pce, pi = m(fred("PCE")), m(fred("PCEPI"))
+    cons = {k: pce[k] / pi[k] * 100 for k in pce if k in pi}
+    yr, yc = var12(renda), var12(cons)
+    seq, c = {}, 0
+    for k in sorted(yr):
+        if k in yc:
+            c = c + 1 if yr[k] < yc[k] else 0
+            seq[k] = c
+    g = {
+        "id": "midterms-renda-consumo",
+        "titulo": "Meses seguidos com a renda real crescendo menos que o consumo real",
+        "subtitulo": "Renda pessoal disponível real contra consumo pessoal real, variação em 12 meses; a contagem zera "
+                     "quando a renda cresce mais",
+        "fonte": "BEA, via FRED; conta do FtM, a partir de um gráfico do Charles Schwab",
+        "unidade": "n", "eixo": {"zero": True},
+        "series": [{"nome": "Meses seguidos", "cor": "#E8A33D", "rotulo": True,
+                    "dados": [[k, v] for k, v in sorted(seq.items())]}],
+    }
+    return u, seq, yr, yc, m(fred("PSAVERT")), desemprego, g
+
+
 def secoes():
     sal, g_sal = grafico_salario()
     ult, vals, g_itens = grafico_itens()
     m30, m15, g_hip = grafico_hipoteca()
     pct, g_preco = grafico_precos(m30)
     a60, a72, g_carro = grafico_carro()
+    u, seq, yr, yc, poup, g_desemp, g_rc = grafico_trabalho()
     print("economia: CPI até %s; salário até %s; hipoteca até %s; casa até %s; carro até %s"
           % (ult, sal["q1"][-1][0], max(m30), pct[-1][0], max(a60)[:7]))
 
@@ -317,6 +363,45 @@ def secoes():
         "%s e %s em junho de 2024."
     ) % (rotulo_mes(ini), rotulo_mes(virada), rotulo_mes(k_ult), nf(d1[k_ult]), nf(d4[k_ult]),
          nf(r1[k_ult]), nf(r4[k_ult]), nf(r1["2024-06"]), nf(r4["2024-06"]))
+
+    # ---- desemprego
+    ku = max(u)
+    piso = min((x, k) for k, x in u.items() if k >= "2021")
+    antes_piso = max(k for k, x in u.items() if k < "2020" and x <= piso[0])
+    teto = max((x, k) for k, x in u.items() if k >= "2025")
+    texto_desemp = (
+        "**O desemprego subiu sem disparar.** A taxa estava em %s%% em %s, contra %s%% em janeiro de 2025, "
+        "na posse de Trump, e %s%% em %s, a menor desde %s. O ponto mais alto desde a posse foi %s%%, em %s."
+    ) % (nf(u[ku]), rotulo_mes(ku), nf(u["2025-01"]), nf(piso[0]), rotulo_mes(piso[1]), antes_piso[:4],
+         nf(teto[0]), rotulo_mes(teto[1]))
+
+    # ---- renda contra consumo
+    ks = sorted(seq)
+    k_rc = ks[-1]
+    fins = [(k, seq[k]) for i, k in enumerate(ks) if seq[k] and (i + 1 == len(ks) or seq[ks[i + 1]] == 0)]
+    recorde = max(fins, key=lambda x: x[1])
+    # a sequência anterior à atual, e o mês que a interrompeu
+    ant = [f for f in fins if f[0] < k_rc][-1]
+    corte = ks[ks.index(ant[0]) + 1]
+    junto = ant[1] + 1 + seq[k_rc] if seq[ks[ks.index(corte) + 1]] == 1 and seq[k_rc] > 0 else None
+    kp = max(poup)
+    baixa = max(k for k, x in poup.items() if k < kp[:4] + "-01" and x <= poup[kp])
+    texto_rc = (
+        "**O consumo cresce mais que a renda.** A renda pessoal disponível real subiu %s%% em 12 meses até %s, "
+        "e o consumo real, %s%%. A renda cresce menos que o consumo desde %s, com uma exceção: em %s, a renda "
+        "subiu %s%% e o consumo, %s%%, praticamente empatados. Pela conta estrita, que zera a contagem quando a "
+        "renda cresce mais, foram %d meses seguidos até %s e são %d desde então%s. O recorde é de %d meses, "
+        "até %s.\n\n"
+        "Quando o consumo sobe mais que a renda, a diferença sai da poupança ou do crédito: a taxa de poupança "
+        "caiu de %s%% em %s para %s%% em %s, a menor desde %s."
+    ) % (nf(yr[k_rc]), rotulo_mes(k_rc), nf(yc[k_rc]),
+         rotulo_mes(ks[ks.index(ant[0]) - ant[1] + 1]), rotulo_mes(corte), nf(yr[corte], 2), nf(yc[corte], 2),
+         ant[1], rotulo_mes(ant[0]), seq[k_rc],
+         ("; sem esse mês, seriam %d meses, mais que qualquer sequência da série" % junto)
+         if junto and junto > recorde[1] else "",
+         recorde[1], rotulo_mes(recorde[0]),
+         nf(poup[ks[ks.index(ant[0]) - ant[1] + 1]]), rotulo_mes(ks[ks.index(ant[0]) - ant[1] + 1]),
+         nf(poup[kp]), rotulo_mes(kp), rotulo_mes(baixa))
 
     # ---- itens
     v = vals
@@ -361,6 +446,8 @@ def secoes():
 
     return [
         {"titulo": "O custo de vida", "texto": texto_sal, "graficos": [g_sal]},
+        {"titulo": "", "texto": texto_desemp, "graficos": [g_desemp]},
+        {"titulo": "", "texto": texto_rc, "graficos": [g_rc]},
         {"titulo": "", "texto": texto_itens, "graficos": [g_itens]},
         {"titulo": "", "texto": texto_casa, "graficos": [g_hip, g_preco]},
         {"titulo": "", "texto": texto_carro, "graficos": [g_carro]},

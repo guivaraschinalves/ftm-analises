@@ -621,7 +621,7 @@ def main():
     dados = {
         "atualizado": dt.date.today().isoformat(),
         "referencia": apuracao,
-        "fonte": "House Press Gallery, Senado dos EUA, Census Bureau, Universidade de Michigan, Edison Research/CNN, UCSB, BLS, Fed, Freddie Mac e Bloomberg",
+        "fonte": "House Press Gallery, Senado dos EUA, Census Bureau, Universidade de Michigan, Edison Research/CNN, UCSB, BLS, BEA, Fed, Freddie Mac e Bloomberg",
         "assunto": "Midterms de 2026 nos EUA",
         "grupo": "Análises Variadas",
         "apresentacao": APRESENTACAO,
