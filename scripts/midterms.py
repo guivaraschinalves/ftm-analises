@@ -49,7 +49,7 @@ from pathlib import Path
 
 import midterms_motivos
 import midterms_resultados
-import midterms_economia  # noqa: F401  seção "O custo de vida" fora por enquanto; volta com midterms_economia.secoes() antes de SECAO_MERCADO
+import midterms_economia
 import midterms_historia
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -621,14 +621,14 @@ def main():
     dados = {
         "atualizado": dt.date.today().isoformat(),
         "referencia": apuracao,
-        "fonte": "House Press Gallery, Senado dos EUA, Census Bureau, Universidade de Michigan, Edison Research/CNN, UCSB e Bloomberg",
+        "fonte": "House Press Gallery, Senado dos EUA, Census Bureau, Universidade de Michigan, Edison Research/CNN, UCSB, BLS, Fed, Freddie Mac e Bloomberg",
         "assunto": "Midterms de 2026 nos EUA",
         "grupo": "Análises Variadas",
         "apresentacao": APRESENTACAO,
         "formato": "artigo",
         "formas": formas(),
         "secoes": [{"fontes": [], "figuras": [], **s} for s in SECOES + midterms_resultados.secoes(NOME)
-                   + midterms_historia.secoes(set(SENADO_R) | set(SENADO_ESPECIAL), NOME) + midterms_motivos.secoes() + [SECAO_MERCADO]],
+                   + midterms_historia.secoes(set(SENADO_R) | set(SENADO_ESPECIAL), NOME) + midterms_motivos.secoes() + midterms_economia.secoes() + [SECAO_MERCADO]],
     }
     SAIDA.write_text(json.dumps(dados, ensure_ascii=False, separators=(",", ":")))
     print("gravado %s (%.0f KB)" % (SAIDA.relative_to(RAIZ), SAIDA.stat().st_size / 1024))
