@@ -272,6 +272,9 @@
     // diferença entre dois partidos em pontos percentuais, com sinal
     margem: { eixo: function (v) { return nf(0).format(v); },
               valor: function (v) { return (v > 0 ? "+" : "") + nf(0).format(v); } },
+    // dólares: inteiros (prestação) e milhares (preço de casa)
+    usd: { eixo: function (v) { return "US$ " + nf(0).format(v); }, valor: function (v) { return "US$ " + nf(0).format(v); } },
+    "usd-mil": { eixo: function (v) { return nf(0).format(v); }, valor: function (v) { return "US$ " + nf(0).format(v) + " mil"; } },
     // contagem (cadeiras, eleições): número inteiro, sem unidade
     n: { eixo: function (v) { return nf(0).format(v); }, valor: function (v) { return nf(0).format(v); } },
     "%": { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v) + "%"; },

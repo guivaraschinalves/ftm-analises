@@ -48,6 +48,7 @@ from pathlib import Path
 
 import midterms_motivos
 import midterms_resultados
+import midterms_economia
 
 RAIZ = Path(__file__).resolve().parent.parent
 SAIDA = RAIZ / "dados" / "midterms-2026.json"
@@ -436,7 +437,8 @@ SECOES = [
             "das comissões e o que vai a voto.\n\n"
             "Antes da eleição, os republicanos tinham a maioria mínima: 218 cadeiras, contra 214 dos democratas, "
             "um independente que continua na bancada republicana (Kevin Kiley, da Califórnia) e duas cadeiras "
-            "vagas por renúncia."
+            "vagas por renúncia (Tony Gonzales, republicano do Texas, e Sheila Cherfilus-McCormick, democrata da "
+            "Flórida)."
         ),
         "graficos": [hemiciclo_camara()],
     },
@@ -562,13 +564,13 @@ def main():
     dados = {
         "atualizado": "2026-11-04",
         "referencia": "2026-11-02",
-        "fonte": "House Press Gallery, Senado dos EUA, Census Bureau, Universidade de Michigan, Edison Research/CNN e UCSB",
+        "fonte": "House Press Gallery, Senado dos EUA, Census Bureau, Universidade de Michigan, Edison Research/CNN, UCSB, BLS, Fed e Freddie Mac",
         "assunto": "Midterms de 2026 nos EUA",
         "grupo": "Análises Variadas",
         "apresentacao": APRESENTACAO,
         "formato": "artigo",
         "formas": formas(),
-        "secoes": [dict(fontes=[], figuras=[], **s) for s in SECOES + midterms_resultados.secoes(NOME) + midterms_motivos.secoes()],
+        "secoes": [dict(fontes=[], figuras=[], **s) for s in SECOES + midterms_resultados.secoes(NOME) + midterms_motivos.secoes() + midterms_economia.secoes()],
     }
     SAIDA.write_text(json.dumps(dados, ensure_ascii=False, separators=(",", ":")))
     print("gravado %s (%.0f KB)" % (SAIDA.relative_to(RAIZ), SAIDA.stat().st_size / 1024))
