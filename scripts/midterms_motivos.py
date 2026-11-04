@@ -183,6 +183,13 @@ PRESIDENTES = [
     ("george-bush", "Bush pai", 1989),
     ("ronald-reagan", "Reagan", 1981),
     ("jimmy-carter", "Carter", 1977),
+    # Truman e Johnson assumiram no meio de um mandato: entram pelo mandato para o
+    # qual foram eleitos, que começa em janeiro. Ford nunca foi eleito e fica de fora.
+    ("richard-m-nixon", "Nixon", 1969),
+    ("lyndon-b-johnson", "Johnson", 1965),
+    ("john-f-kennedy", "Kennedy", 1961),
+    ("dwight-d-eisenhower", "Eisenhower", 1953),
+    ("harry-s-truman", "Truman", 1949),
 ]
 MESES_MANDATO = 24
 
@@ -221,7 +228,7 @@ def grafico_aprovacao():
         "categorias": cats,
         "eventos": [{"em": "22", "rot": "eleição de meio de mandato"}],
         "series": [
-            {"nome": "De Carter (1976) a Obama: menor e maior no mesmo mês", "cor": "#95A5A6", "tipo": "faixa",
+            {"nome": "De Truman (1948) a Obama: menor e maior no mesmo mês", "cor": "#95A5A6", "tipo": "faixa",
              "opacidade": 0.28, "dados": faixa},
             {"nome": "Biden", "cor": D, "largura": 4, "dados": linha("Biden")},
             {"nome": "Trump, 1º mandato", "cor": "#F2A08F", "largura": 4, "traco": "pontilhado",
@@ -290,16 +297,26 @@ def secoes():
     desap = resposta(2026, "Opinion of Trump as president", "Disapprove")
     piorou = resposta(2026, "Effect of Trump's policies on economy", "Worsened conditions")
     tarifa = resposta(2026, "Effect of Trump's tariffs on national economy", "Have hurt")
+    # todas as midterms desde 1946, com a última leitura do Gallup antes da votação (a tabela da UCSB)
+    from midterms_historia import midterms, NOMES as NOMES_H
+    abaixo = [x for x in midterms() if x["ano"] < 2026 and x["aprov"] is not None and x["aprov"] < t2[k_ult]]
+    assert [x["ano"] for x in abaixo] == [1946], "revisar a frase da aprovação: %r" % abaixo
     texto_ap = (
-        "**Trump chegou à eleição como o presidente mais impopular nesse ponto do mandato.** Em %s de "
-        "mandato, a aprovação média foi de %s%%; o mais baixo entre os antecessores no mesmo mês foi %s, "
-        "com %s%%. Na boca de urna, %d%% dos eleitores disseram desaprovar o presidente, %d%% disseram "
-        "que a política econômica dele piorou a economia e %d%%, que as tarifas prejudicaram a economia do país.\n\n"
-        "Até dezembro de 2025 a série é a do Gallup, a mesma de todos os presidentes do gráfico. O Gallup "
-        "deixou de medir aprovação presidencial em 2026; dali em diante a linha de Trump é a média das "
-        "pesquisas com todos os adultos reunidas pela UCSB, que mede um pouco diferente."
+        "**Trump chegou à eleição com a menor aprovação de um presidente numa midterm desde Truman, em 1946.** "
+        "Em %s de mandato, a aprovação média foi de %s%%; entre os presidentes do gráfico, o mais baixo no "
+        "mesmo mês tinha sido %s, em %d, com %s%%. Contando todas as midterms desde 1946, com a última pesquisa do "
+        "Gallup antes da votação, só %s ficou abaixo: %d%%, em 1946, um ano e meio depois de assumir com a morte "
+        "de Roosevelt. Na boca de urna, %d%% dos eleitores disseram desaprovar o presidente, %d%% disseram que "
+        "a política econômica dele piorou a economia e %d%%, que as tarifas prejudicaram a economia do país.\n\n"
+        "Truman e Johnson, que assumiram no meio de um mandato, entram no gráfico pelo mandato para o qual foram "
+        "eleitos, a partir de 1949 e 1965; Ford, que nunca foi eleito, fica de fora. Até dezembro de 2025 a série "
+        "é a do Gallup, a mesma de todos os presidentes do gráfico. O Gallup deixou de medir aprovação "
+        "presidencial em 2026; dali em diante a linha de Trump é a média das pesquisas com todos os adultos "
+        "reunidas pela UCSB, que mede um pouco diferente."
     ) % ("outubro do segundo ano" if k_ult == 22 else "%d meses" % k_ult,
-         nf(t2[k_ult]), comp[0][0], nf(comp[0][1]), desap, piorou, tarifa)
+         nf(t2[k_ult]), comp[0][0], {n: p for _, n, p in PRESIDENTES}[comp[0][0]] + 1, nf(comp[0][1]),
+         NOMES_H[abaixo[0]["pres"]], abaixo[0]["aprov"],
+         desap, piorou, tarifa)
 
     return [
         {"titulo": "Os motivos da virada",

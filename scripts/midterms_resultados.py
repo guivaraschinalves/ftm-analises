@@ -279,5 +279,6 @@ def secoes(NOME):
         {"titulo": "", "texto": texto_senado, "graficos": [hemi_senado, mapa_sen]},
         {"titulo": "", "texto": texto_gov, "graficos": [mapa_gov]},
         {"titulo": "Curiosidades", "texto": "\n".join("- " + c for c in cur), "graficos": []},
-        {"titulo": "O que falta", "texto": "\n".join("- " + f for f in falta), "graficos": []},
+        {"titulo": "O que falta", "texto": "Pela apuração de %s (horário de Brasília):\n\n" % quando
+         + "\n".join("- " + f for f in falta), "graficos": []},
     ]

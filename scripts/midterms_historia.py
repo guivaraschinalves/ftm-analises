@@ -205,6 +205,68 @@ def secoes(senado_r, NOME):
         "variantes": [dict(rot="Senado", **d_sen), dict(rot="Câmara", **d_cam)],
     }
 
+    # ---- cadeiras defendidas
+    def disp_defesa(campo, rot_x, rot_y):
+        dc = "def_" + campo
+        xs, ys = [m[dc] for m in hist], [m[campo] for m in hist]
+        a, b = mmq(xs, ys)
+        rq, rqa, n, rc = r2(xs, ys)
+        pts = [{"x": m[dc], "y": m[campo], "rot": str(m["ano"]), "cor": D if m["partido"] == "D" else R,
+                "dica": "%d, %s: defendia %d, %s cadeiras" % (m["ano"], NOMES[m["pres"]], m[dc], sinal(m[campo]))}
+               for m in hist]
+        prev = a + b * m26[dc]
+        pts.append({"x": m26[dc], "y": m26[campo], "ate": m26[campo + "_cen"], "rot": "2026, Trump",
+                    "cor": R, "destaque": True,
+                    "nota": "a reta previa %s; até agora %s" % (sinal(round(prev)), sinal(m26[campo])),
+                    "dica": "2026, Trump: defendia %d; %s cadeiras confirmadas, %s se quem lidera vencer"
+                            % (m26[dc], sinal(m26[campo]), sinal(m26[campo + "_cen"]))})
+        todos = [p["x"] for p in pts]
+        return prev, (rq, rqa, n, rc), {
+            "unidade": "n", "pontos": pts,
+            "eixoX": {"rot": rot_x, "unidade": "n"},
+            "eixoY": {"rot": rot_y, "unidade": "margem"},
+            "reta": {"a": a, "b": b, "de": min(todos), "ate": max(todos)},
+            "legenda": [{"rot": "Presidente democrata", "cor": D}, {"rot": "Presidente republicano", "cor": R},
+                        {"rot": "Tendência de 1934 a 2022 (correlação %s; R² %s; ajustado %s)"
+                                % (nf(rc, 2), nf(rq, 2), nf(rqa, 2)), "cor": "linha:#FFFFFF"}],
+        }
+
+    dprev_c, dr2_c, dd_cam = disp_defesa("cam", "Cadeiras que o partido do presidente defendia na Câmara",
+                                         "Cadeiras na Câmara")
+    dprev_s, dr2_s, dd_sen = disp_defesa("sen", "Cadeiras que o partido do presidente defendia no Senado",
+                                         "Cadeiras no Senado")
+    g_def = {
+        "id": "midterms-historia-defesa", "tipo": "dispersao",
+        "titulo": "Cadeiras defendidas e cadeiras ganhas ou perdidas pelo partido do presidente",
+        "subtitulo": "Uma midterm por ponto, de 1934 a 2026; reta de tendência de 1934 a 2022",
+        "fonte": "The American Presidency Project (UCSB); 2026: Edison Research para a CNN",
+        "variantes": [dict(rot="Câmara", **dd_cam), dict(rot="Senado", **dd_sen)],
+    }
+    parecidos = [m for m in hist if abs(m["def_cam"] - m26["def_cam"]) <= 5]
+    p_cam = sum(m["cam"] for m in parecidos) / len(parecidos)
+    p_sen = sum(m["sen"] for m in parecidos) / len(parecidos)
+    pior = all(m26["cam"] < m["cam"] and m26["sen"] < m["sen"] for m in parecidos)
+    primeiro = all(m["ano"] in (1954, 2002, 2022) for m in parecidos)
+    texto_def = (
+        "**Quanto mais cadeiras o partido do presidente defende, mais ele tende a perder.** Em 2026, os "
+        "republicanos defendiam %d cadeiras na Câmara (218 da bancada, mais o independente Kevin Kiley e a vaga "
+        "de Tony Gonzales) e %d no Senado (as 20 da turma que vence agora e as 2 eleições especiais). De 1934 a "
+        "2022, o partido do presidente defendeu em média %s cadeiras na Câmara e %s no Senado. A correlação "
+        "entre as cadeiras defendidas e o ganho ou a perda é de %s na Câmara e de %s no Senado (R² de %s e %s). "
+        "Pela reta, os republicanos perderiam %d cadeiras na Câmara e %d no Senado; até agora são %d e %d.\n\n"
+        "Os presidentes que defendiam um número parecido de cadeiras na Câmara foram %s. %sEm média, perderam "
+        "%s cadeiras na Câmara e ganharam %s no Senado.%s"
+    ) % (m26["def_cam"], m26["def_sen"], nf(media_l([m["def_cam"] for m in hist]), 0),
+         nf(media_l([m["def_sen"] for m in hist]), 0), nf(dr2_c[3], 2), nf(dr2_s[3], 2),
+         nf(dr2_c[0], 2), nf(dr2_s[0], 2), -round(dprev_c), -round(dprev_s), -conf, -sconf,
+         lista_pt([("%s em %d (%d na Câmara e %d no Senado)" if i == 0 else "%s em %d (%d e %d)")
+                   % (NOMES[m["pres"]], m["ano"], m["def_cam"], m["def_sen"]) for i, m in enumerate(parecidos)]),
+         "Os três estavam no primeiro mandato, ao contrário de Trump. " if primeiro and len(parecidos) == 3 else "",
+         nf(-p_cam), nf(p_sen),
+         " Defender menos cadeiras que a média na Câmara não poupou Trump: com a aprovação mais baixa desde "
+         "Truman, a perda já é maior que a de todos eles, nas duas Casas." if pior and m26["def_cam"] < media_l(
+             [m["def_cam"] for m in hist]) else "")
+
     # ---- tabela das maiores perdas
     linhas = sorted(hist, key=lambda m: m["cam"])[:10]
     pos_cen = 1 + sum(1 for m in hist if m["cam"] < m26["cam_cen"])
@@ -358,9 +420,14 @@ def secoes(senado_r, NOME):
         {"titulo": "As midterms de outros presidentes", "texto": texto_barras + "\n\n" + texto_sen, "graficos": [g_barras]},
         {"titulo": "", "texto": texto_disp, "graficos": [g_disp]},
         {"titulo": "", "texto": "", "graficos": [g_tab]},
+        {"titulo": "", "texto": texto_def, "graficos": [g_def]},
         {"titulo": "", "texto": texto_vet, "graficos": [g_vet]},
         {"titulo": "", "texto": texto_vdisp, "graficos": [g_vdisp]},
     ]
+
+
+def media_l(xs):
+    return sum(xs) / len(xs)
 
 
 def empate(iguais):
