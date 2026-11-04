@@ -385,19 +385,22 @@ def secoes(senado_r, NOME):
          if scen != sconf else "", -scen, "ficaria" if scen != sconf else "fica", pos_sen,
          empate([m for m in hist if m["sen"] == scen]))
     texto_disp = (
-        "**Quanto mais impopular o presidente, maior a perda, mas a relação é frouxa.** Na reta de 1946 a 2022, "
-        "cada 10 pontos a menos de aprovação custam em média %s cadeiras no Senado e %s na Câmara. Com %s%% "
-        "de aprovação, abaixo de todos os presidentes da tabela menos %s em %d (%d%%), a reta previa para Trump "
-        "%s cadeiras no Senado e %s na Câmara; até agora são %s e %s.\n\n"
-        "A aprovação explica pouco da perda: a correlação é de %s no Senado e de %s na Câmara, e o R² da reta, "
-        "de %s (%s ajustado) e %s (%s ajustado), com %d midterms. Ou seja, cerca de %s%% e %s%% da variação nas cadeiras acompanham a "
-        "aprovação. O resto depende de outras coisas, como o mapa de cada eleição e quantas cadeiras o partido "
-        "defendia, que a reta não mede."
+        "**Quanto mais impopular o presidente, maior a perda.** Na reta de 1946 a 2022, cada 10 pontos a menos "
+        "de aprovação custam em média %s cadeiras no Senado e %s na Câmara. Com %s%% de aprovação, abaixo de "
+        "todos os presidentes da tabela menos %s em %d (%d%%), a reta previa para Trump %s cadeiras no Senado e "
+        "%s na Câmara; até agora são %s e %s.\n\n"
+        "A aprovação pesa mais na Câmara: a correlação é de %s na Câmara e de %s no Senado. Com 20 midterms, só "
+        "a aprovação responde por cerca de um terço da diferença de cadeiras de uma eleição para outra na Câmara "
+        "(R² de %s; %s ajustado) e por %s%% no Senado (R² de %s; %s ajustado). O resto vem de fatores como o "
+        "mapa de cada eleição e quantas cadeiras o partido defende. No Senado, as cadeiras defendidas pesam mais "
+        "que a aprovação (correlação de %s), como mostra a parte logo abaixo."
     ) % (nf(sb * 10), nf(cb * 10), nf(m26["aprov"]), NOMES[menor["pres"]], menor["ano"], menor["aprov"],
          sinal(round(sprev)), sinal(round(cprev)),
          sinal(sconf), sinal(conf),
-         nf(sr2[3], 2), nf(cr2[3], 2), nf(sr2[0], 2), nf(sr2[1], 2), nf(cr2[0], 2), nf(cr2[1], 2), sr2[2],
-         nf(sr2[0] * 100, 0), nf(cr2[0] * 100, 0))
+         nf(cr2[3], 2), nf(sr2[3], 2), nf(cr2[0], 2), nf(cr2[1], 2), nf(sr2[0] * 100, 0), nf(sr2[0], 2),
+         nf(sr2[1], 2), nf(dr2_s[3], 2))
+    assert abs(dr2_s[3]) > abs(sr2[3]), "revisar: no Senado a aprovação passou a pesar mais que as cadeiras defendidas"
+    assert 0.28 <= cr2[0] <= 0.38, "revisar 'cerca de um terço' (R² da Câmara %.2f)" % cr2[0]
     texto_vet = (
         "**O que muda a partir de 2027 é o veto.** Desde 1981, quando o partido do presidente tinha a maioria "
         "nas duas Casas, cada Congresso de dois anos teve em média %s vetos; quando estava em minoria em ao "
