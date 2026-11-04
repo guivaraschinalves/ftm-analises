@@ -15,10 +15,7 @@ DE ONDE VÊM OS NÚMEROS
       ...SEHF01 energia elétrica            ...SAF11  alimentação em casa
       ...SETB01 gasolina                    ...SETA01 carros novos
       ...SETA02 carros usados
-    MORTGAGE30US, MORTGAGE15US  Freddie Mac (PMMS), semanal; aqui, média do mês
-    CSUSHPINSA   Case-Shiller nacional, sem ajuste
-    MSPUS        preço mediano de venda de casa nova e usada (Census/HUD), trimestral
-    MEHOINUSA646N renda mediana das famílias, nominal (Census), anual
+    MORTGAGE30US juro de 30 anos da Freddie Mac (PMMS), semanal; aqui, média do mês
     RIFLPBCIANM60NM / ...72NM  juro de carro novo em 60 e 72 meses, bancos
                  comerciais (Fed, G.19)
     UNRATE       taxa de desemprego (BLS); out/2025 não tem (paralisação do governo)
@@ -28,6 +25,13 @@ DE ONDE VÊM OS NÚMEROS
     PSAVERT      taxa de poupança pessoal (BEA)
   BLS (API pública v1, sem chave): seguro de carro, CUSR0000SETE e
     CUUR0000SETE. O FRED não tem essa série.
+  Fed de Atlanta, Home Ownership Affordability Monitor (HOAM), planilha
+    nacional HOAM_US_Affordability_Index.xlsx: índice de acessibilidade (100 =
+    a família de renda mediana paga a casa mediana com 30% da renda; entrada
+    de 10%, 30 anos, com impostos, seguro e PMI), a parcela da renda que o
+    custo anual come e a diferença entre a renda necessária e a mediana.
+    "Change in Affordability" é a variação do índice, em pontos, contra o
+    mesmo mês do ano anterior.
   Fed de Atlanta, Wage Growth Tracker, aba "Average Wage Quartile": mediana do
     crescimento do salário-hora em 12 meses de quem foi entrevistado duas
     vezes, em média móvel de 12 meses, por quartil do salário médio.
@@ -42,10 +46,6 @@ CONTAS
 
   Salário real: o tracker menos a inflação de 12 meses do CPI (sem ajuste) na
     mesma média móvel de 12 meses do tracker.
-  Prestação da casa mediana (só no texto): preço mediano do trimestre, 20% de entrada, 30
-    anos ao juro médio do trimestre (Freddie Mac); sem impostos e seguro. Em %
-    da renda mediana mensal das famílias; para 2026, ainda sem renda
-    publicada, vale a de 2025.
 """
 import csv
 import io
@@ -220,67 +220,47 @@ def grafico_itens():
     return ult, vals, g
 
 
-def grafico_hipoteca():
-    m30, m15 = mensal(fred("MORTGAGE30US")), mensal(fred("MORTGAGE15US"))
+def hoam():
+    """{AAAA-MM: (índice, % da renda, renda mediana, renda necessária)} da planilha nacional."""
+    z = zipfile.ZipFile(io.BytesIO(baixar_sem_ua(
+        "https://www.atlantafed.org/-/media/Project/Atlanta/FRBA/Documents/research-and-data/data/hoam/"
+        "HOAM_US_Affordability_Index.xlsx", "atl-hoam.xlsx")))
+    ss = [re.sub("<[^>]+>", "", s) for s in re.findall(r"<si>(.*?)</si>", z.read("xl/sharedStrings.xml").decode(), re.S)]
+    x = z.read("xl/worksheets/sheet1.xml").decode()
+    out, cab = {}, None
+    for lin in re.findall(r"<row [^>]*>(.*?)</row>", x, re.S):
+        c = {ref: (ss[int(v)] if 't="s"' in t else v)
+             for ref, t, v in re.findall(r'<c r="([A-Z]+)\d+"([^>]*)>(?:<f>[^<]*</f>)?<v>([^<]*)</v>', lin)}
+        if c.get("A") == "Month":
+            cab = c
+            assert c["B"].startswith("Qualifying vs Actual Income Difference") and c["E"] == "Affordability Index", c
+            continue
+        if cab and re.match(r"^\d{4}-\d\d$", c.get("A", "")):
+            dif, pdif = float(c["B"]), float(c["C"])
+            renda = dif / pdif
+            out[c["A"]] = (float(c["E"]), float(c["D"]) * 100, renda, renda + dif)
+    return out
+
+
+def grafico_casa():
+    h = hoam()
     g = {
-        "id": "midterms-hipoteca",
-        "titulo": "Juro do financiamento imobiliário",
-        "subtitulo": "Taxa fixa média da hipoteca de 30 e de 15 anos, em % ao ano, média do mês",
-        "fonte": "Freddie Mac (PMMS), via FRED",
-        "unidade": "%", "eixo": {"zero": False}, "periodoPadrao": "10",
-        "series": [
-            {"nome": "30 anos", "cor": "#4F81BD", "rotulo": True, "dados": [[k, round(v, 2)] for k, v in m30.items()]},
-            {"nome": "15 anos", "cor": "#9BBB59", "rotulo": True, "dados": [[k, round(v, 2)] for k, v in m15.items()]},
-        ],
-    }
-    return m30, m15, g
-
-
-def trimestre(k):
-    return "%s-%02d" % (k[:4], (int(k[5:7]) - 1) // 3 * 3 + 1)
-
-
-def grafico_precos(m30):
-    cs = mensal(fred("CSUSHPINSA"))
-    mp = {k[:7]: v for k, v in fred("MSPUS").items()}
-    renda = {k[:4]: v for k, v in fred("MEHOINUSA646N").items()}
-    # renda anual no meio do ano (julho), ligada de 12 em 12 meses
-    ini_cs = min(cs)[:4]
-    renda_ind = {"nome": "Renda mediana das famílias", "cor": "#E8A33D", "rotulo": True, "buracoMax": 12,
-                 "dados": [[a + "-07", round(v / renda["2000"] * 100, 1)] for a, v in sorted(renda.items()) if a >= ini_cs]}
-    renda_usd = {"nome": "Renda mediana anual das famílias", "cor": "#E8A33D", "rotulo": True, "buracoMax": 12,
-                 "dados": [[a + "-07", round(v / 1000, 1)] for a, v in sorted(renda.items()) if a + "-07" >= min(mp)]}
-    precos = {
-        "id": "midterms-preco-casas",
-        "titulo": "Preço das casas e renda mediana",
-        "subtitulo": "Case-Shiller nacional, preço mediano de venda de casas novas e usadas e renda mediana anual das famílias",
-        "fonte": "S&P CoreLogic Case-Shiller, Census/HUD e Census (renda), via FRED",
-        "eixo": {"zero": False}, "periodoPadrao": "20",
+        "id": "midterms-hoam",
+        "titulo": "Índice de acessibilidade da casa própria",
+        "subtitulo": "Fed de Atlanta: 100 = a família de renda mediana paga a casa mediana com 30% da renda; "
+                     "abaixo de 100, não paga",
+        "fonte": "Federal Reserve Bank of Atlanta, Home Ownership Affordability Monitor",
+        "eixo": {"zero": False},
         "variantes": [
-            {"rot": "índice (2000 = 100)", "unidade": "pts", "series": [
-                {"nome": "Case-Shiller nacional (jan/2000 = 100)", "cor": "#4F81BD", "rotulo": True,
-                 "dados": [[k, round(v / cs["2000-01"] * 100, 1)] for k, v in cs.items()]}, renda_ind]},
-            {"rot": "em US$ mil", "unidade": "usd-mil", "buracoMax": 3, "series": [
-                {"nome": "Preço mediano de venda", "cor": "#4F81BD", "rotulo": True,
-                 "dados": [[k, round(v / 1000, 1)] for k, v in mp.items()]}, renda_usd]},
+            {"rot": "índice", "unidade": "pts", "series": [
+                {"nome": "Índice de acessibilidade", "cor": "#E8A33D", "rotulo": True,
+                 "dados": [[k, round(v[0], 1)] for k, v in sorted(h.items())]}]},
+            {"rot": "custo anual em % da renda mediana", "unidade": "pct1", "series": [
+                {"nome": "Custo anual da casa mediana / renda mediana", "cor": "#E8A33D", "rotulo": True,
+                 "dados": [[k, round(v[1], 1)] for k, v in sorted(h.items())]}]},
         ],
     }
-    # prestação: juro médio do trimestre do preço
-    jt = {}
-    for k, v in m30.items():
-        jt.setdefault(trimestre(k), []).append(v)
-    ult_renda = max(renda)
-    pct = []
-    for k, p in sorted(mp.items()):
-        if k not in jt or k[:4] < "1984":
-            continue
-        r = sum(jt[k]) / len(jt[k]) / 1200
-        prest = p * 0.8 * r / (1 - (1 + r) ** -360)
-        ren = renda.get(k[:4], renda[ult_renda] if k[:4] > ult_renda else None)
-        if ren is None:
-            continue
-        pct.append([k, round(prest * 12 / ren * 100, 1)])
-    return pct, precos
+    return h, mensal(fred("MORTGAGE30US")), g
 
 
 def grafico_carro():
@@ -337,12 +317,11 @@ def grafico_trabalho():
 def secoes():
     sal, g_sal = grafico_salario()
     ult, vals, g_itens = grafico_itens()
-    m30, m15, g_hip = grafico_hipoteca()
-    pct, g_preco = grafico_precos(m30)
+    casa, m30, g_casa = grafico_casa()
     a60, a72, g_carro = grafico_carro()
     u, seq, yr, yc, poup, g_desemp, g_rc = grafico_trabalho()
     print("economia: CPI até %s; salário até %s; hipoteca até %s; casa até %s; carro até %s"
-          % (ult, sal["q1"][-1][0], max(m30), pct[-1][0], max(a60)[:7]))
+          % (ult, sal["q1"][-1][0], max(m30), max(casa), max(a60)[:7]))
 
     # ---- salário
     d1, d4 = dict(sal["q1"]), dict(sal["q4"])
@@ -418,21 +397,25 @@ def secoes():
          if caiu25 else "")
 
     # ---- casa
+    kc = max(casa)
+    idx, parte, renda, nec = casa[kc]
+    abaixo = [k for k in sorted(casa) if all(casa[x][0] < 100 for x in sorted(casa) if x >= k)][0]
+    piso = min(casa.items(), key=lambda t: t[1][0])
+    alta = max(((k, v) for k, v in casa.items() if k >= "2025"), key=lambda t: t[1][0])
     k30 = max(m30)
-    pc = dict(pct)
-    k_casa = pct[-1][0]
-    antes = [k for k, x in pct if k < "2022" and x >= pc[k_casa]]
-    pico = max((p for p in pct if p[0] >= "2022"), key=lambda p: p[1])
     texto_casa = (
-        "**A casa própria ficou mais longe.** O juro da hipoteca de 30 anos estava em %s%% em %s, contra "
-        "%s%% em dezembro de 2020, o menor da série. O preço mediano de venda está em US$ %s mil. Com 20%% de "
-        "entrada, a prestação da casa mediana come %s%% da renda mediana das famílias, contra %s%% no fim de "
-        "2020 e %s%% na média de 2010 a 2019%s."
-    ) % (nf(m30[k30], 2), rotulo_mes(k30), nf(m30["2020-12"], 2),
-         nf(g_preco["variantes"][1]["series"][0]["dados"][-1][1], 0),
-         nf(pc[k_casa]), nf(pc["2020-10"]), nf(media([x for k, x in pct if "2010" <= k[:4] <= "2019"])),
-         ("; está abaixo do pico de %s%%, em %s, mas acima de qualquer trimestre de %d a 2021"
-          % (nf(pico[1]), rotulo_mes(pico[0]), int(antes[-1][:4]) + 1)) if antes and pico[1] > pc[k_casa] else "")
+        "**A casa própria ficou mais longe.** O índice de acessibilidade do Fed de Atlanta vale 100 quando a "
+        "família de renda mediana consegue pagar a casa mediana gastando 30%% da renda, com 10%% de entrada, "
+        "impostos e seguro. Em %s, estava em %s: o custo anual da casa mediana comia %s%% da renda mediana, de "
+        "US$ %s mil, e a renda necessária era de US$ %s mil, %s%% maior. Em dezembro de 2020, o índice estava em "
+        "%s, e o custo comia %s%% da renda.\n\n"
+        "O índice está abaixo de 100 desde %s e chegou ao menor nível da série, que começa em 2005, em %s: "
+        "%s, quando o juro de 30 anos da Freddie Mac estava em %s%%. Com o juro caindo a %s%% em %s, subiu a %s; desde então voltou a cair, "
+        "e o juro estava em %s%% em %s."
+    ) % (rotulo_mes(kc), nf(idx), nf(parte), nf(renda / 1000), nf(nec / 1000), nf((nec / renda - 1) * 100),
+         nf(casa["2020-12"][0]), nf(casa["2020-12"][1]),
+         rotulo_mes(abaixo), rotulo_mes(piso[0]), nf(piso[1][0]), nf(m30[piso[0]], 2),
+         nf(m30[alta[0]], 2), rotulo_mes(alta[0]), nf(alta[1][0]), nf(m30[k30], 2), rotulo_mes(k30))
 
     # ---- carro
     k72 = max(a72)
@@ -449,7 +432,7 @@ def secoes():
         {"titulo": "", "texto": texto_desemp, "graficos": [g_desemp]},
         {"titulo": "", "texto": texto_rc, "graficos": [g_rc]},
         {"titulo": "", "texto": texto_itens, "graficos": [g_itens]},
-        {"titulo": "", "texto": texto_casa, "graficos": [g_hip, g_preco]},
+        {"titulo": "", "texto": texto_casa, "graficos": [g_casa]},
         {"titulo": "", "texto": texto_carro, "graficos": [g_carro]},
     ]
 
