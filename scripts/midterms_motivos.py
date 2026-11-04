@@ -221,7 +221,7 @@ def grafico_aprovacao():
         "categorias": cats,
         "eventos": [{"em": "22", "rot": "eleição de meio de mandato"}],
         "series": [
-            {"nome": "De Carter a Obama: menor e maior no mesmo mês", "cor": "#95A5A6", "tipo": "faixa",
+            {"nome": "De Carter (1976) a Obama: menor e maior no mesmo mês", "cor": "#95A5A6", "tipo": "faixa",
              "opacidade": 0.28, "dados": faixa},
             {"nome": "Biden", "cor": D, "largura": 4, "dados": linha("Biden")},
             {"nome": "Trump, 1º mandato", "cor": "#F2A08F", "largura": 4, "traco": "pontilhado",
