@@ -156,6 +156,15 @@ parágrafo e `**assim**` fica em negrito. É o bastante para definir um termo
 técnico no meio da explicação sem o texto virar um bloco só, e de propósito não
 é Markdown — não quero abrir a porta a HTML vindo do arquivo de dados.
 
+### Índice lateral
+
+A partir de 1300px de largura, uma coluna fixa à esquerda lista as seções do
+assunto aberto, como o painel de navegação do Word; os gráficos aparecem só
+embaixo da seção em que o leitor está, e o item da vez acende com a rolagem.
+Com ele, o texto fica centrado com 280px livres de cada lado e as notas de
+fonte passam para a margem direita (ou voltam para o fim da seção, no assunto
+que tem comentários). Abaixo de 1300px some e fica o "Índice" da barra.
+
 ### Mapa por estado, hemiciclo e distritos
 
 Três desenhos sem eixo, nascidos com as midterms, todos com a moldura de

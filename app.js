@@ -3323,6 +3323,87 @@
     else setTimeout(pintar, 0);
   }
 
+  // ---------- índice lateral ----------
+  // O "painel de navegação" do Word: em tela larga, uma coluna fixa à
+  // esquerda com os títulos das seções do assunto aberto. Os gráficos de uma
+  // seção (e das seções sem título que vêm depois dela) aparecem só embaixo
+  // da seção em que o leitor está; o item da vez fica aceso enquanto a página
+  // rola. Em tela estreita some, e o índice da barra de cima continua.
+  var indiceLateral = null, indiceItens = [], indiceRolagem = null;
+  function montarIndiceLateral(dados) {
+    if (!indiceLateral) {
+      indiceLateral = html("nav", { "class": "indice-lateral", "aria-label": "Índice do assunto" });
+      document.body.appendChild(indiceLateral);
+      window.addEventListener("scroll", function () {
+        if (indiceRolagem) return;
+        indiceRolagem = (window.requestAnimationFrame || setTimeout)(function () {
+          indiceRolagem = null;
+          marcarIndiceLateral();
+        });
+      }, { passive: true });
+    }
+    indiceLateral.innerHTML = "";
+    indiceItens = [];
+    var grupos = [], grupo = null;
+    dados.secoes.forEach(function (sec, k) {
+      if (sec.titulo || !grupo) {
+        grupo = { titulo: sec.titulo, id: "secao-" + slug(dados.assunto) + "-" + k, graficos: [] };
+        grupos.push(grupo);
+      }
+      sec.graficos.forEach(function (g) { if (g.titulo) grupo.graficos.push(g); });
+    });
+    var topo = html("a", { "class": "il-assunto", href: "#" + idAssunto(dados), texto: dados.assunto });
+    topo.addEventListener("click", function (e) { e.preventDefault(); irPara(idAssunto(dados)); });
+    indiceLateral.appendChild(topo);
+    var lista = html("ol", { "class": "il-lista" });
+    grupos.forEach(function (gr) {
+      var li = html("li", { "class": "il-grupo" + (gr.titulo ? "" : " sem-titulo") });
+      if (gr.titulo) {
+        var a = html("a", { "class": "il-secao", href: "#" + gr.id, texto: gr.titulo });
+        a.addEventListener("click", function (e) { e.preventDefault(); irPara(gr.id); });
+        li.appendChild(a);
+        indiceItens.push({ id: gr.id, a: a, li: li });
+      }
+      if (gr.graficos.length) {
+        var sub = html("ol", { "class": "il-sub" });
+        gr.graficos.forEach(function (g) {
+          var item = html("li", {});
+          var b = html("a", { "class": "il-grafico", href: "#" + g.id, texto: g.titulo });
+          b.addEventListener("click", function (e) { e.preventDefault(); irPara(g.id); });
+          item.appendChild(b);
+          sub.appendChild(item);
+          indiceItens.push({ id: g.id, a: b, li: li });
+        });
+        li.appendChild(sub);
+      }
+      lista.appendChild(li);
+    });
+    indiceLateral.appendChild(lista);
+    // índice só faz sentido com mais de um lugar para ir
+    document.body.classList.toggle("com-indice-lateral", indiceItens.length > 1);
+    marcarIndiceLateral();
+  }
+  function marcarIndiceLateral() {
+    // (fixed não tem offsetParent: escondido é quem não tem caixa nenhuma)
+    if (!indiceLateral || !indiceItens.length || !indiceLateral.getClientRects().length) return;
+    // o da vez é o último cujo topo já passou da faixa logo abaixo da barra
+    var limite = 140, vez = null;
+    indiceItens.forEach(function (it) {
+      var alvo = document.getElementById(it.id);
+      if (alvo && alvo.getBoundingClientRect().top <= limite) vez = it;
+    });
+    if (!vez) vez = indiceItens[0];
+    indiceItens.forEach(function (it) {
+      it.a.classList.toggle("aceso", it === vez);
+      it.li.classList.toggle("ativo", it.li === vez.li);
+    });
+    // mantém o item aceso à vista dentro da coluna, sem mexer na página
+    var r = vez.a.getBoundingClientRect(), c = indiceLateral.getBoundingClientRect();
+    if (r.top < c.top + 8 || r.bottom > c.bottom - 8) {
+      indiceLateral.scrollTop += (r.top - c.top) - c.height / 3;
+    }
+  }
+
   // Um assunto por vez. Trocar desmonta o anterior inteiro, inclusive a lista
   // de cartões — ela é quem o resize e o irPara percorrem, e deixar nela
   // cartão que saiu do DOM faria os dois desenharem no vazio.
@@ -3334,6 +3415,7 @@
     // o assunto com comentários abre a coluna da margem direita (ver CSS)
     document.body.classList.toggle("com-comentarios", !!docs[i].comentarios);
     montarAssunto(docs[i], host);
+    montarIndiceLateral(docs[i]);
     montarNav(docs, document.getElementById("nav"), i);
     montarRodape([docs[i]]);
     fecharIndice();
@@ -3454,6 +3536,7 @@
       espera = setTimeout(function () {
         cartoes.forEach(function (c) { desenhar(c, false); });
         posicionarNotas(secoesComNotas);
+        marcarIndiceLateral();
       }, 120);
     });
     if (GATE.ligado && !tokenSalvo()) return mostrarGate();
