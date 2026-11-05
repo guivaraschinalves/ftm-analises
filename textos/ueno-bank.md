@@ -22,11 +22,12 @@ O BCP trata o caso como isolado, uma fraude num banco, e não como crise do sist
 ## O índice que levou à resolução
 
 fonte: lei | Ley 2.334/2003, art. 13 e 14 | https://paraguay.justia.com/nacionales/leyes/ley-2334-dec-12-2003/gdoc
+fonte: subordinadas | Dívidas subordinadas: títulos que o banco vende a investidores e que, se ele quebrar, só são pagos depois de todos os depositantes. Por isso contam como capital
 fonte: regularizacao | Regularização: quando um banco descumpre um limite prudencial, apresenta à Superintendência um plano para se ajustar em até 90 dias, sem distribuir lucro. Não é anunciada ao público (Ley 2.334, arts. 6 a 11) | https://paraguay.justia.com/nacionales/leyes/ley-2334-dec-12-2003/gdoc
 
 O índice que levou à resolução é o de solvência: o capital do banco dividido pelos seus ativos e contingentes ponderados por risco (AYCP). Na prática, mede quanto dinheiro dos acionistas o banco tem para cada 100 guaranis de risco que assume, principalmente em empréstimos, com os mais arriscados pesando mais.
 
-O BCP separa o capital em dois níveis. O C1 é o capital principal, o de melhor qualidade (capital integralizado, reservas e lucros retidos); o C2 é o complementar, sobretudo dívidas subordinadas: títulos que o banco vende a investidores e que, se ele quebrar, só são pagos depois de todos os depositantes. A lei exige C1/AYCP de pelo menos 8% e (C1+C2)/AYCP, o índice de solvência, de pelo menos 12%. Se este cair abaixo da metade do mínimo, 6%, [o BCP é obrigado a abrir a resolução do banco em até 24 horas](fonte:lei).
+O BCP separa o capital em dois níveis. O C1 é o capital principal, o de melhor qualidade (capital integralizado, reservas e lucros retidos); o C2 é o complementar, sobretudo [dívidas subordinadas](fonte:subordinadas). A lei exige C1/AYCP de pelo menos 8% e (C1+C2)/AYCP, o índice de solvência, de pelo menos 12%. Se este cair abaixo da metade do mínimo, 6%, [o BCP é obrigado a abrir a resolução do banco em até 24 horas](fonte:lei).
 
 Em junho de 2024, o Ueno, então um banco pequeno, incorporou o Visión Banco, que tinha o dobro dos seus depósitos. Saiu da fusão com folga, com índice de solvência de 28,4%, e foi perdendo margem até 13,8% em setembro de 2026: acima do mínimo, mas bem abaixo dos 17% do sistema.
 
