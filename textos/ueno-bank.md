@@ -10,15 +10,15 @@ O Ueno era um banco médio em dinheiro e gigante em alcance. Em setembro de 2026
 
 fonte: lei | Ley 2.334/2003, art. 13 e 14 | https://paraguay.justia.com/nacionales/leyes/ley-2334-dec-12-2003/gdoc
 
-O índice de capital mede quanto dinheiro dos acionistas o banco tem para cada 100 guaranis de risco que assume, principalmente em empréstimos (os mais arriscados pesam mais na conta). É o colchão que absorve perdas antes que elas cheguem aos depositantes. A lei exige 8% no C1, que conta só o capital de melhor qualidade, e 12% no C2, que soma também dívidas subordinadas, as que só são pagas depois dos depositantes.
+O índice de capital mede quanto dinheiro dos acionistas o banco tem para cada 100 guaranis de risco que assume, principalmente em empréstimos (os mais arriscados pesam mais na conta). É o colchão que absorve perdas antes que elas cheguem aos depositantes. A lei exige que o capital principal (C1), o de melhor qualidade, seja de pelo menos 8% dos ativos ponderados por risco, e que o capital total, o C1 mais o complementar (C2, sobretudo dívidas subordinadas, que só são pagas depois dos depositantes), seja de pelo menos 12%. Esse segundo índice é o que a lei chama de índice de solvência.
 
-O Ueno saiu da fusão com folga, com 28,4% no C2, e foi perdendo colchão até 13,8% em setembro de 2026: acima do mínimo, mas bem abaixo dos 17% do sistema. Em novembro, depois de ajustes nos balanços feitos sob supervisão do Banco Central, o índice caiu abaixo de 6%, a metade do mínimo. Nesse ponto, [a lei obriga o Banco Central a abrir a resolução em até 24 horas](fonte:lei). Os números que o banco declarava até setembro não mostravam esse buraco.
+O Ueno saiu da fusão com folga, com capital total de 28,4% dos ativos ponderados, e foi perdendo colchão até 13,8% em setembro de 2026: acima do mínimo, mas bem abaixo dos 17% do sistema. Em novembro, depois de ajustes nos balanços feitos sob supervisão do Banco Central, o índice de solvência caiu abaixo de 6%, a metade do mínimo. Nesse ponto, [a lei obriga o Banco Central a abrir a resolução em até 24 horas](fonte:lei). Os números que o banco declarava até setembro não mostravam esse buraco.
 
 ## Risco e capital
 
 Este gráfico mostra por que o índice de capital caiu. As três linhas partem de 100 em junho de 2024, mês da fusão. A laranja é o risco que o Ueno carregava (os ativos ponderados por risco, basicamente a carteira de crédito); a azul, o capital principal que cobre esse risco; a branca, o risco do sistema inteiro, para comparar.
 
-Em pouco mais de dois anos, o risco do Ueno triplicou, enquanto o do sistema cresceu um terço. O capital dobrou, quase todo em degraus que são aportes dos acionistas, mas não acompanhou. Quando a laranja sobe mais que a azul, o índice de capital cai: o C1 foi de 17,6% para 11,7%.
+Em pouco mais de dois anos, o risco do Ueno triplicou, enquanto o do sistema cresceu um terço. O capital dobrou, quase todo em degraus que são aportes dos acionistas, mas não acompanhou. Quando a laranja sobe mais que a azul, o índice de capital cai: o capital principal foi de 17,6% para 11,7% dos ativos ponderados.
 
 ## Qualidade do crédito
 

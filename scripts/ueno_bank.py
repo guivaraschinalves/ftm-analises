@@ -21,9 +21,10 @@ Como ler a planilha:
     ₲ 9,2 trilhões, a fusão.
   - 1000 é o sistema, mas só na aba Ratios; nas outras o sistema é a soma das
     entidades.
-  - C1 = capital principal (nível 1) / AYCP, mínimo 8%; C2 = (nível 1 +
-    nível 2) / AYCP, mínimo 12% (o BCP pode subir até 14%). A resolução foi
-    por "índice de solvência abaixo de 50% do mínimo", isto é, C2 abaixo de 6%.
+  - C1 e C2 são VALORES (capital de nível 1 e de nível 2), não índices. Os
+    índices são C1/AYCP, mínimo 8%, e (C1+C2)/AYCP, mínimo 12% (o BCP pode subir
+    até 14%); C1+C2 é o patrimônio efetivo. A resolução foi
+    por "índice de solvência abaixo de 50% do mínimo", isto é, (C1+C2)/AYCP abaixo de 6%.
 """
 import collections
 import datetime
@@ -123,14 +124,14 @@ def main():
     meses = sorted(m for m in R[(UENO, T1)] if m >= INICIO)
     capital = dict(
         id="ueno-capital", titulo="Ueno Bank: capital sobre ativos ponderados por risco",
-        subtitulo="Capital sobre ativos e contingentes ponderados por risco, em %, com os mínimos legais e o limite da resolução",
+        subtitulo="Em %; C1 é o capital principal e C2 o complementar, sobre ativos e contingentes ponderados por risco (AYCP)",
         unidade="pct1", fonte=FONTE,
-        series=[serie("C2 do Ueno", LARANJA, rat(UENO, T12), 1, rotulo=True),
-                serie("C1 do Ueno", AZUL, rat(UENO, T1), 1, rotulo=True),
-                serie("C2 do sistema", BRANCO, rat(SISTEMA, T12), 1),
-                serie("Mínimo do C2 (12%)", AMARELO, {m: 12.0 for m in meses}, 1, traco="pontilhado"),
-                serie("Mínimo do C1 (8%)", CINZA, {m: 8.0 for m in meses}, 1, traco="pontilhado"),
-                serie("Resolução (metade do mínimo do C2)", VERMELHO, {m: 6.0 for m in meses}, 1, traco="pontilhado")],
+        series=[serie("(C1+C2)/AYCP do Ueno", LARANJA, rat(UENO, T12), 1, rotulo=True),
+                serie("C1/AYCP do Ueno", AZUL, rat(UENO, T1), 1, rotulo=True),
+                serie("(C1+C2)/AYCP do sistema", BRANCO, rat(SISTEMA, T12), 1),
+                serie("Mínimo, C1+C2: 12%", AMARELO, {m: 12.0 for m in meses}, 1, traco="pontilhado"),
+                serie("Mínimo, C1: 8%", CINZA, {m: 8.0 for m in meses}, 1, traco="pontilhado"),
+                serie("Resolução: 6%", VERMELHO, {m: 6.0 for m in meses}, 1, traco="pontilhado")],
     )
 
     def indice(d, base=FUSAO):
@@ -296,7 +297,7 @@ def main():
         json.dump(doc, f, ensure_ascii=False, separators=(",", ":"))
     u = lambda d: d.get(ult)
     print(f"gravado {os.path.relpath(SAIDA, RAIZ)}, até {ult}")
-    print(f"  C1 {rat(UENO, T1)[ult]:.1f}% C2 {rat(UENO, T12)[ult]:.1f}% (sistema {rat(SISTEMA, T12)[ult]:.1f}%); "
+    print(f"  C1/AYCP {rat(UENO, T1)[ult]:.1f}% (C1+C2)/AYCP {rat(UENO, T12)[ult]:.1f}% (sistema {rat(SISTEMA, T12)[ult]:.1f}%); "
           f"alavancagem {u(alav_u):.1f}x (sistema {u(alav_s):.1f}x); AYCP x{aycp_u[ult]/aycp_u[FUSAO]:.2f} desde a fusão "
           f"(sistema x{aycp_s[ult]/aycp_s[FUSAO]:.2f})")
     print(f"  serviços: ₲ {serv_u[ult]:.2f} tri ({serv_f[ult]:.1f}% do setor no sistema), contra ₲ {serv_u[FUSAO]:.2f} tri em {FUSAO}")
