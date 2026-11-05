@@ -289,7 +289,7 @@ def main():
         # Uma seção por gráfico: o texto de cada uma (textos/ueno-bank.md, costurado pelo
         # aplicar_texto.py) explica o gráfico logo antes dele. Os títulos têm de ser os do .md.
         secoes=[dict(titulo=tit, graficos=[g]) for tit, g in [
-            ("Participação no sistema", fatias), ("Capital", capital), ("Risco e capital", crescimento),
+            ("Participação no sistema", fatias), ("O índice que levou à resolução", capital), ("Risco e capital", crescimento),
             ("Qualidade do crédito", qualidade), ("Crédito por setor", setor), ("Crédito a serviços", servicos),
             ("Depósitos", depositos), ("Correspondentes não bancários", correspondentes)]],
     )
