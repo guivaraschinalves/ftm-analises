@@ -76,7 +76,7 @@
   // a ordem é a do índice; assuntos do mesmo "grupo" ficam juntos
   var FONTES = ["dados/gave.json", "dados/cenario-2026-10-28-fomc.json",
                 "dados/defasagem-combustiveis.json", "dados/eleicoes.json", "dados/midterms-2026.json",
-                "dados/petroleo.json"];
+                "dados/petroleo.json", "dados/ueno-bank.json"];
   // Uma página pode pedir outros arquivos: <body data-fontes="dados/x.json">.
   if (document.body && document.body.getAttribute("data-fontes")) {
     FONTES = document.body.getAttribute("data-fontes").split(/\s*,\s*/);
@@ -284,6 +284,9 @@
             valor: function (v) { return pct(v, 1); } },
     bi: { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
           valor: function (v) { return "R$ " + nf(1).format(v) + " bi"; } },
+    // guarani em trilhões (balanço de banco paraguaio): "₲ 16,85 tri"
+    "gs-tri": { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
+                valor: function (v) { return "₲ " + nf(2).format(v) + " tri"; } },
     anos: { eixo: function (v, passo) { return nf(Math.max(1, casasDoPasso(passo))).format(v); },
             valor: function (v) { return nf(2).format(v) + " anos"; } },
     // desvio-padrão: o tamanho do movimento medido na régua do próprio ano
