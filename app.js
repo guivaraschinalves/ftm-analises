@@ -2261,10 +2261,7 @@
       acoes.appendChild(btnFsC);
     } else if (g.tipo === "tabela") {
       // nada de tela cheia nem de PNG: não há desenho para ampliar nem para
-      // rasterizar. O dado, esse sai em CSV como o de qualquer cartão.
-      var btnCsv = html("button", { type: "button", "class": "btn", texto: "Baixar CSV" });
-      btnCsv.addEventListener("click", function () { baixarCSV(cartao); });
-      acoes.appendChild(btnCsv);
+      // rasterizar. E sem CSV, como os gráficos (05/11/2026): tabela só se lê.
     } else {
       // Zoom: o gráfico ampliado dentro da janela. Tela cheia: ocupa a tela
       // toda, e o Esc volta direto à página.
@@ -2816,11 +2813,7 @@
       b.addEventListener("click", function () { fechar(); exportar(cartao, tamanhoPorId(sel.value), f.id); });
       menu.appendChild(b);
     });
-    menu.appendChild(html("hr"));
-    var bc = html("button", { type: "button", role: "menuitem" });
-    bc.innerHTML = "Dados (CSV)<small>uma coluna por série, para o Excel</small>";
-    bc.addEventListener("click", function () { fechar(); baixarCSV(cartao); });
-    menu.appendChild(bc);
+    // Sem CSV: o dado fica para o assinante ver, não para baixar (pedido de 05/11/2026).
 
     function fechar() { menu.hidden = true; botao.setAttribute("aria-expanded", "false"); }
     botao.addEventListener("click", function (e) {
