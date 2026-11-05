@@ -48,7 +48,8 @@ COMENTARIOS = {"cenario-2026-10-28-fomc.json": "comentarios/cenario-2026-10-28-f
 
 PARES = [("defasagem-combustiveis.md", "defasagem-combustiveis.json"),
          ("petroleo.md", "petroleo.json"),
-         ("cenario-2026-10-28-fomc.md", "cenario-2026-10-28-fomc.json")]
+         ("cenario-2026-10-28-fomc.md", "cenario-2026-10-28-fomc.json"),
+         ("ueno-bank.md", "ueno-bank.json")]
 
 
 def aplicar(nome_texto, nome_json):
