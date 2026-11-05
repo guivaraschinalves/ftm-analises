@@ -81,6 +81,10 @@ def num(x):
         return 0.0
 
 
+def virg(x, casas=1):
+    return f"{x:.{casas}f}".replace(".", ",")
+
+
 def serie(nome, cor, dados, casas=2, **extra):
     return dict(nome=nome, cor=cor, dados=[[m, round(v, casas)] for m, v in sorted(dados.items()) if v is not None], **extra)
 
@@ -119,14 +123,15 @@ def main():
     meses = sorted(m for m in R[(UENO, T1)] if m >= INICIO)
     capital = dict(
         id="ueno-capital", titulo="Ueno Bank: capital sobre ativos ponderados por risco",
-        subtitulo=("Em %; C1 é o capital principal e C2 soma o complementar, sobre ativos e contingentes "
-                   "ponderados por risco. Mínimos legais: 8% e 12%"),
+        subtitulo=("Capital próprio para cada 100 de risco assumido, em %. O C1 conta só o capital de melhor qualidade; "
+                   "o C2 soma dívidas que absorvem perdas. Abaixo de 6%, a resolução é obrigatória"),
         unidade="pct1", fonte=FONTE,
         series=[serie("C2 do Ueno", LARANJA, rat(UENO, T12), 1, rotulo=True),
                 serie("C1 do Ueno", AZUL, rat(UENO, T1), 1, rotulo=True),
                 serie("C2 do sistema", BRANCO, rat(SISTEMA, T12), 1),
-                serie("Mínimo do C2", VERMELHO, {m: 12.0 for m in meses}, 1, traco="pontilhado"),
-                serie("Mínimo do C1", CINZA, {m: 8.0 for m in meses}, 1, traco="pontilhado")],
+                serie("Mínimo do C2 (12%)", AMARELO, {m: 12.0 for m in meses}, 1, traco="pontilhado"),
+                serie("Mínimo do C1 (8%)", CINZA, {m: 8.0 for m in meses}, 1, traco="pontilhado"),
+                serie("Resolução (metade do mínimo do C2)", VERMELHO, {m: 6.0 for m in meses}, 1, traco="pontilhado")],
     )
 
     def indice(d, base=FUSAO):
@@ -136,7 +141,8 @@ def main():
     cap1_u = rat(UENO, "Capital Principal (Nivel 1)", escala=1)
     crescimento = dict(
         id="ueno-crescimento", titulo="Ueno Bank: ativos ponderados por risco e capital principal",
-        subtitulo="Índice, jun/2024 = 100 (primeiro mês com o Visión Banco incorporado)",
+        subtitulo=("Jun/2024 = 100 (fusão com o Visión Banco). Laranja: o risco que o banco carrega; azul: o capital que o cobre. "
+                   "Laranja acima da azul, banco mais frágil"),
         unidade="n", fonte=FONTE,
         series=[serie("Ativos ponderados do Ueno", LARANJA, indice(aycp_u), 1, rotulo=True),
                 serie("Capital principal do Ueno", AZUL, indice(cap1_u), 1, rotulo=True),
@@ -165,7 +171,8 @@ def main():
         return out
     qualidade = dict(
         id="ueno-qualidade", titulo="Ueno Bank: inadimplência e carteira classificada fora da categoria 1",
-        subtitulo="Em % da carteira; a categoria 1 é a de menor risco, a 6 a de maior",
+        subtitulo=("Em % da carteira. Inadimplência é o crédito já vencido; a classificação, de 1 (menor risco) a 6, "
+                   "mostra o problema antes do vencimento"),
         unidade="pct1", fonte=FONTE,
         variantes=[
             dict(rot="Inadimplência (carteira vencida)", unidade="pct1",
@@ -195,7 +202,8 @@ def main():
                    "AGRICULTURA": "Agricultura", "OTROS": "Outros", "ADMINISTRACION PUBLICA": "Administração pública"}
     setor = dict(
         id="ueno-setor", titulo="Ueno Bank: crédito por setor",
-        subtitulo=f"Em % da carteira de cada um, {ult[5:]}/{ult[:4]}",
+        subtitulo=(f"Em % da carteira de cada um, {ult[5:]}/{ult[:4]}: a quem o banco empresta. O Ueno concentrava "
+                   f"{pares[0][0]:.0f}% em serviços, setor que pesa {pares[0][1]:.0f}% no sistema"),
         unidade="pct1", fonte=FONTE, categorias=[nomes_setor.get(s, s.title()) for _, _, s in pares], barra=0.8, agrupadas=True,
         series=[serie("Ueno", LARANJA, {str(i): u for i, (u, _, _) in enumerate(pares)}, 1, tipo="barra"),
                 serie("Sistema", BRANCO, {str(i): t for i, (_, t, _) in enumerate(pares)}, 1, tipo="barra")],
@@ -205,7 +213,8 @@ def main():
               for m in serv_u}
     servicos = dict(
         id="ueno-servicos", titulo="Ueno Bank: crédito ao setor de serviços",
-        subtitulo="Carteira vigente e vencida; o Ueno incorporou o Visión Banco em jun/2024",
+        subtitulo=(f"Crédito a empresas de serviços, o setor em que o Ueno mais cresceu: de ₲ {virg(serv_u[FUSAO])} tri em jun/2024 "
+                   f"para ₲ {virg(serv_u[ult])} tri, {serv_f[ult]:.0f}% de todo o crédito a serviços do país"),
         unidade="gs-tri", fonte=FONTE,
         variantes=[
             dict(rot="Trilhões de guaranis", unidade="gs-tri", series=[serie("Ueno", LARANJA, serv_u, 2, tipo="barra", rotulo=True)]),
@@ -231,7 +240,8 @@ def main():
     dep_pct.append(serie("Total", BRANCO, {m: 100 * dep_tot_u[m] / dep_tot_s[m] for m in meses}, 1, rotulo=True))
     depositos = dict(
         id="ueno-depositos", titulo="Ueno Bank: depósitos por tipo",
-        subtitulo="Saldo no fim do mês; o salto de jun/2024 é a incorporação do Visión Banco",
+        subtitulo=("Saldo no fim do mês. Conta corrente e à vista são de saque livre; prazo fixo e CDA, aplicações com prazo. "
+                   "O salto de jun/2024 é o Visión Banco"),
         unidade="gs-tri", fonte=FONTE, barra=1,
         variantes=[dict(rot="Trilhões de guaranis", unidade="gs-tri", series=dep_abs),
                    dict(rot="% do total de cada tipo no sistema", unidade="pct1", series=dep_pct)],
@@ -254,29 +264,37 @@ def main():
         return out
     cart = {m: sum(C.get((m, UENO, c), 0) for c in ("Cartera Vigente", "Cartera Vencida")) for m in meses}
     cart_s = {m: sum(total_tipo(m, c) for c in ("Cartera Vigente", "Cartera Vencida")) for m in meses}
+    fatia_dep = 100 * dep_tot_u[ult] / dep_tot_s[ult]
+    fatia_cart = 100 * cart[ult] / cart_s[ult]
+    fatia_tc = fatia(T, "Cantidad")[ult]
+    fatia_cnb = fatia(Ch, "corresponsal no bancario")[ult]
     fatias = dict(
         id="ueno-fatias", titulo="Ueno Bank: participação no sistema bancário",
-        subtitulo="Em % do total dos bancos",
+        subtitulo=(f"Em % do total dos bancos do Paraguai. Pequeno em dinheiro ({fatia_dep:.0f}% dos depósitos, "
+                   f"{fatia_cart:.0f}% do crédito), enorme em alcance: {fatia_tc:.0f}% dos cartões de crédito e "
+                   f"{fatia_cnb:.0f}% dos correspondentes"),
         unidade="pct1", fonte=FONTE,
-        series=[serie("Correspondentes não bancários", AMARELO, fatia(Ch, "corresponsal no bancario"), 1, rotulo=True),
-                serie("Cartões de crédito (quantidade)", ROXO, fatia(T, "Cantidad"), 1, rotulo=True),
-                serie("Cartões de crédito (saldo)", CIANO, fatia(T, "Saldo"), 1, rotulo=True),
-                serie("Depósitos", AZUL, {m: 100 * dep_tot_u[m] / dep_tot_s[m] for m in meses}, 1, rotulo=True),
-                serie("Carteira de crédito", LARANJA, {m: 100 * cart[m] / cart_s[m] for m in meses}, 1, rotulo=True)],
+        variantes=[dict(rot=nome, unidade="pct1", series=[serie(nome, cor, dados, 1, rotulo=True)]) for nome, cor, dados in [
+            ("Depósitos", AZUL, {m: 100 * dep_tot_u[m] / dep_tot_s[m] for m in meses}),
+            ("Carteira de crédito", LARANJA, {m: 100 * cart[m] / cart_s[m] for m in meses}),
+            ("Cartões de crédito (quantidade)", ROXO, fatia(T, "Cantidad")),
+            ("Cartões de crédito (saldo devedor)", CIANO, fatia(T, "Saldo")),
+            ("Correspondentes não bancários", AMARELO, fatia(Ch, "corresponsal no bancario"))]],
     )
     cnb_u = {m: Ch.get((m, UENO, "corresponsal no bancario"), 0) for m in meses}
     cnb_o = {m: sum(v for (mm, e, c), v in Ch.items() if mm == m and c == "corresponsal no bancario" and e != UENO) for m in meses}
     correspondentes = dict(
         id="ueno-correspondentes", titulo="Correspondentes não bancários: Ueno e demais bancos",
-        subtitulo="Número de pontos no fim do mês: comércios que recebem depósitos, pagam saques e contas em nome do banco",
-        unidade="n", fonte=FONTE, barra=1,
-        series=[serie("Ueno", LARANJA, cnb_u, 0, tipo="barra"), serie("Demais bancos", BRANCO, cnb_o, 0, tipo="barra")],
+        subtitulo=("Pontos no fim do mês: mercearias, farmácias e lojas que recebem depósitos e pagam saques e contas em nome "
+                   "do banco. É como ele chega a quem usa dinheiro vivo"),
+        unidade="n", fonte=FONTE,
+        series=[serie("Ueno", LARANJA, cnb_u, 0, rotulo=True), serie("Demais bancos", BRANCO, cnb_o, 0, rotulo=True)],
     )
 
     doc = dict(
         atualizado=datetime.date.today().isoformat(), referencia=ult, formato="artigo", fonte=FONTE,
         assunto="Ueno Bank", grupo="Análises Variadas",
-        secoes=[dict(titulo="", graficos=[capital, crescimento, qualidade, setor, servicos, depositos, fatias, correspondentes])],
+        secoes=[dict(titulo="", graficos=[fatias, capital, crescimento, qualidade, setor, servicos, depositos, correspondentes])],
     )
     with open(SAIDA, "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False, separators=(",", ":"))
