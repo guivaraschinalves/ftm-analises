@@ -26,7 +26,7 @@ No Paraguai, a renúncia do presidente só vale se o Congresso a aceitar, numa s
 
 Ao mesmo tempo, corre o juízo político, o equivalente ao impeachment brasileiro, em duas etapas: a Câmara dos Deputados acusa e o Senado julga, e cada etapa exige dois terços dos votos. [A primeira já passou: no mesmo dia 5, a Câmara aprovou a acusação por unanimidade, com 78 votos](fonte:juicio). A acusação cita o conflito de interesses de Peña com o Ueno, a nomeação de Carvallo e o dinheiro do IPS concentrado no banco acima dos limites. Agora o Senado decide, e são precisos 30 dos 45 senadores para destituí-lo. Renunciar ou ser destituído faz diferença: no Paraguai, o ex-presidente vira senador vitalício, com imunidade, e quem é destituído perde esse direito. Foi por esse rito que [o Senado destituiu Fernando Lugo em 2012, um dia depois da acusação](fonte:lugo).
 
-O BCP trata o caso como isolado, uma fraude num banco, e não como crise do sistema. Os gráficos abaixo mostram o que os números que o Ueno mandava ao Banco Central já diziam, e o que não diziam.
+O BCP trata o caso como isolado, uma fraude num banco, e não como crise do sistema. Os gráficos abaixo mostram o que os números que o Ueno mandava ao Banco Central já diziam, e o que não diziam. Neles, "sistema" é o conjunto de todos os bancos do Paraguai, com o Ueno dentro, e é a base das participações, como a fatia do Ueno nos depósitos do país. Nas comparações, como capital e qualidade do crédito, o Ueno aparece contra os demais bancos, o sistema sem ele, para não puxar a média.
 
 ## O índice que levou à resolução
 
@@ -42,7 +42,7 @@ O BCP separa o capital em dois níveis. O C1 é o capital principal, o de melhor
 
 Um exemplo com números redondos. Um banco empresta R$ 1.000 a empresas, que entram pelo valor cheio nos ativos ponderados por risco. Para isso, precisa de pelo menos R$ 120 de capital. Digamos que tenha R$ 130: o índice é de 13%, acima do mínimo. Um dia, o banco reconhece que R$ 80 desses empréstimos não vão voltar. A perda sai do capital, que cai para R$ 50, e os empréstimos que contam no índice caem para R$ 920. O índice vai a 5,4%, abaixo de 6%, e o banco entra em resolução.
 
-Em junho de 2024, o Ueno, então um banco pequeno, incorporou o Visión Banco, que tinha o dobro dos seus depósitos. Saiu da fusão com folga, com índice de solvência de 28,4%, e foi perdendo margem até 13,8% em setembro de 2026: acima do mínimo, mas bem abaixo dos 17% do sistema.
+Em junho de 2024, o Ueno, então um banco pequeno, incorporou o Visión Banco, que tinha o dobro dos seus depósitos. Saiu da fusão com folga, com índice de solvência de 28,4%, e foi perdendo margem até 13,8% em setembro de 2026: acima do mínimo, mas bem abaixo dos 17,3% dos demais bancos.
 
 A queda para menos de 6% não aparece nos dados do BCP, que vão até setembro. Ela surgiu depois, durante a [regularização](fonte:regularizacao) do banco, quando os balanços foram ajustados, segundo o comunicado do próprio BCP. O BCP não divulgou o índice na data da intervenção: sabemos só que ficou abaixo de 6%, não o quão solvente, ou insolvente, o banco está. O BCP não disse se os ajustes reduziram o capital, aumentaram os ativos ponderados por risco ou as duas coisas. Se tivesse sido só o capital, para o índice sair de 13,8% para 6% seria preciso perder perto de ₲ 1,4 trilhão, cerca de R$ 1,3 bilhão.
 
@@ -89,23 +89,23 @@ As duas fatias grandes vêm do modelo do banco. Num banco digital, a conta se ab
 
 ## Risco e capital
 
-Este gráfico mostra por que o índice de solvência caiu antes mesmo dos ajustes. As três linhas partem de 100 em junho de 2024, mês da fusão. A laranja é o risco que o Ueno carregava (os ativos ponderados por risco, basicamente a carteira de crédito); a azul, o capital principal que cobre esse risco; a branca, o risco do sistema inteiro, para comparar.
+Este gráfico mostra por que o índice de solvência caiu antes mesmo dos ajustes. As três linhas partem de 100 em junho de 2024, mês da fusão. A laranja é o risco que o Ueno carregava (os ativos ponderados por risco, basicamente a carteira de crédito); a azul, o capital principal que cobre esse risco; a branca, o risco dos demais bancos, para comparar.
 
-Em pouco mais de dois anos, o risco do Ueno triplicou, enquanto o do sistema cresceu um terço. O capital dobrou, quase todo em degraus que são aportes dos acionistas, mas não acompanhou. Quando a laranja sobe mais que a azul, o índice cai: o C1/AYCP foi de 17,6% para 11,7%.
+Em pouco mais de dois anos, o risco do Ueno triplicou, enquanto o dos demais bancos cresceu um quarto. O capital dobrou, quase todo em degraus que são aportes dos acionistas, mas não acompanhou. Quando a laranja sobe mais que a azul, o índice cai: o C1/AYCP foi de 17,6% para 11,7%.
 
 ## Qualidade do crédito
 
 fonte: abc-fiscalia | Diario HOY, 04/11/2026 | https://www.hoy.com.py/nacionales/2026/11/04/ueno-fiscalia-coloca-a-vazquez-en-el-centro-de-la-red-de-empresas-que-recibio-creditos
 
-A inadimplência, na primeira aba, conta só os empréstimos já vencidos. Por esse critério, o Ueno parecia exemplar: 0,8% da carteira em setembro de 2026, contra 2,5% do sistema, num banco de consumo e cartão de crédito, que costuma ter inadimplência acima da média.
+A inadimplência, na primeira aba, conta só os empréstimos já vencidos. Por esse critério, o Ueno parecia exemplar: 0,8% da carteira em setembro de 2026, contra 2,7% dos demais bancos, num banco de consumo e cartão de crédito, que costuma ter inadimplência acima da média.
 
 A classificação de risco, nas outras abas, conta outra história. Cada banco classifica todos os seus créditos numa escala de 1 (menor risco) a 6 (maior), olhando não só o atraso, mas também renegociações e a situação do devedor. Os números são fatias da carteira inteira, não taxas de inadimplência.
 
-A última aba, a da categoria 6, é a mais reveladora. Na fusão, em junho de 2024, o Ueno passou a declarar ₲ 1,3 trilhão nessa categoria, 19% da carteira, quando os dois bancos somavam ₲ 0,3 trilhão um mês antes. O volume chegou a ₲ 1,55 trilhão em meados de 2025, perto de 18% da carteira, enquanto a inadimplência declarada ficava abaixo de 1%. No sistema, a categoria 6 nunca passou de 2,2%. Entre novembro de 2025 e março de 2026, cerca de ₲ 1,1 trilhão (perto de R$ 1 bilhão) saiu dessa categoria, e ela caiu a 2,3% da carteira em setembro de 2026, ainda quase o dobro do sistema (1,2%).
+A última aba, a da categoria 6, é a mais reveladora. Na fusão, em junho de 2024, o Ueno passou a declarar ₲ 1,3 trilhão nessa categoria, 19% da carteira, quando os dois bancos somavam ₲ 0,3 trilhão um mês antes. O volume chegou a ₲ 1,55 trilhão em meados de 2025, perto de 18% da carteira, enquanto a inadimplência declarada ficava abaixo de 1%. Nos demais bancos, a categoria 6 nunca passou de 1,7%. Entre novembro de 2025 e março de 2026, cerca de ₲ 1,1 trilhão (perto de R$ 1 bilhão) saiu dessa categoria, e ela caiu a 2,3% da carteira em setembro de 2026, ainda o dobro dos demais bancos (1,1%).
 
 O boletim não diz se esses créditos foram pagos, baixados como perda ou vendidos. A Fiscalía investiga [a venda simulada de créditos ruins a empresas do grupo](fonte:abc-fiscalia), que os tiraria do balanço do banco.
 
-Nas categorias de observação, 1a e 1b, logo abaixo da melhor, o movimento recente foi o inverso: a fatia do Ueno subiu de 5,6% da carteira em abril de 2026 para 13,9% em setembro, contra 6,1% do sistema.
+Nas categorias de observação, 1a e 1b, logo abaixo da melhor, o movimento recente foi o inverso: a fatia do Ueno subiu de 5,6% da carteira em abril de 2026 para 13,9% em setembro, contra 5,4% dos demais bancos.
 
 ## Crédito por setor
 

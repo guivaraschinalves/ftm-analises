@@ -122,13 +122,20 @@ def main():
                 if pub is None:
                     R[(SISTEMA, chave)][m] = v
     meses = sorted(m for m in R[(UENO, T1)] if m >= INICIO)
+    # As comparações usam os demais bancos (o sistema sem o Ueno), para o Ueno não puxar a média.
+    # As participações (fatia do Ueno no total) continuam sobre o sistema inteiro.
+    outros = bancos - {UENO}
+
+    def soma(chave, m):
+        return sum(R[(e, chave)].get(m, 0) for e in outros)
+    cap_o = {m: 100 * (soma(CAP1, m) + soma(CAP2, m)) / soma(AYCP, m) for m in meses if soma(AYCP, m)}
     capital = dict(
         id="ueno-capital", titulo="Ueno Bank: capital sobre ativos ponderados por risco",
         subtitulo="Em %; C1 é o capital principal e C2 o complementar, sobre ativos e contingentes ponderados por risco (AYCP)",
         unidade="pct1", fonte=FONTE,
         series=[serie("(C1+C2)/AYCP do Ueno", LARANJA, rat(UENO, T12), 1, rotulo=True),
                 serie("C1/AYCP do Ueno", AZUL, rat(UENO, T1), 1, rotulo=True),
-                serie("(C1+C2)/AYCP do sistema", BRANCO, rat(SISTEMA, T12), 1),
+                serie("(C1+C2)/AYCP dos demais bancos", BRANCO, cap_o, 1),
                 serie("Mínimo, C1+C2: 12%", AMARELO, {m: 12.0 for m in meses}, 1, traco="pontilhado"),
                 serie("Mínimo, C1: 8%", CINZA, {m: 8.0 for m in meses}, 1, traco="pontilhado"),
                 serie("Resolução: 6%", VERMELHO, {m: 6.0 for m in meses}, 1, traco="pontilhado")],
@@ -138,6 +145,7 @@ def main():
         return {m: 100 * v / d[base] for m, v in d.items() if m >= base}
     aycp_u = rat(UENO, "ACTIVOS Y CONTINGENTES PONDERADOS", escala=1)
     aycp_s = rat(SISTEMA, "ACTIVOS Y CONTINGENTES PONDERADOS", escala=1)
+    aycp_o = {m: soma(AYCP, m) for m in meses}
     cap1_u = rat(UENO, "Capital Principal (Nivel 1)", escala=1)
     crescimento = dict(
         id="ueno-crescimento", titulo="Ueno Bank: ativos ponderados por risco e capital principal",
@@ -145,12 +153,29 @@ def main():
         unidade="n", fonte=FONTE,
         series=[serie("Ativos ponderados do Ueno", LARANJA, indice(aycp_u), 1, rotulo=True),
                 serie("Capital principal do Ueno", AZUL, indice(cap1_u), 1, rotulo=True),
-                serie("Ativos ponderados do sistema", BRANCO, indice(aycp_s), 1, rotulo=True)],
+                serie("Ativos ponderados dos demais bancos", BRANCO, indice(aycp_o), 1, rotulo=True)],
     )
     alav_u = rat(UENO, "Activos y Contingentes/ Patrimonio Neto (veces)", escala=1)
     alav_s = rat(SISTEMA, "Activos y Contingentes/ Patrimonio Neto (veces)", escala=1)
 
     MORA = "Cartera Vencida/Cartera Total - Morosidad"
+    C = collections.defaultdict(float)
+    for r in ler_aba(b, "Carteras"):
+        if r["Codigo Cuenta"] in ("Cartera Vencida", "Cartera Vigente"):
+            C[(mes(r["Fecha"]), r["Codigo Entidad"], r["Codigo Cuenta"])] += num(r["Importe"])
+
+    def mora(ents):
+        out = {}
+        for m in meses:
+            venc = sum(C[(m, e, "Cartera Vencida")] for e in ents)
+            tot = venc + sum(C[(m, e, "Cartera Vigente")] for e in ents)
+            if tot:
+                out[m] = 100 * venc / tot
+        return out
+    for e, nome in ((UENO, "Ueno"), (SISTEMA, "sistema")):
+        calc = mora({UENO} if e == UENO else bancos)
+        dif = max(abs(calc[m] - 100 * R[(e, MORA)][m]) for m in calc if m in R[(e, MORA)])
+        print(f"  inadimplência pela aba Carteras, {nome}: maior diferença para o publicado {dif:.2f} p.p.")
     # ---------- categorias de risco
     K = collections.defaultdict(float)
     for r in ler_aba(b, "Categoría Creditos"):
@@ -161,9 +186,9 @@ def main():
         for m in meses:
             if m == "2024-11":      # o boletim traz só parte da carteira do Ueno neste mês (₲ 4,6 tri, contra 6,9 e 7,3 ao redor)
                 continue
-            if ent == SISTEMA:
-                tot = sum(v for (mm, e, c), v in K.items() if mm == m)
-                parte = sum(v for (mm, e, c), v in K.items() if mm == m and c in cats)
+            if ent == "outros":
+                tot = sum(v for (mm, e, c), v in K.items() if mm == m and e != UENO)
+                parte = sum(v for (mm, e, c), v in K.items() if mm == m and e != UENO and c in cats)
             else:
                 tot = sum(v for (mm, e, c), v in K.items() if mm == m and e == ent)
                 parte = sum(v for (mm, e, c), v in K.items() if mm == m and e == ent and c in cats)
@@ -177,16 +202,16 @@ def main():
         variantes=[
             dict(rot="Inadimplência (carteira vencida)", unidade="pct1",
                  series=[serie("Ueno", LARANJA, rat(UENO, MORA), 2, rotulo=True),
-                         serie("Sistema", BRANCO, rat(SISTEMA, MORA), 2, rotulo=True)]),
+                         serie("Demais bancos", BRANCO, mora(outros), 2, rotulo=True)]),
             dict(rot="Em observação (categorias 1a e 1b)", unidade="pct1",
                  series=[serie("Ueno", LARANJA, fatia_cat(UENO, {"1a", "1b"}), 1, rotulo=True),
-                         serie("Sistema", BRANCO, fatia_cat(SISTEMA, {"1a", "1b"}), 1, rotulo=True)]),
+                         serie("Demais bancos", BRANCO, fatia_cat("outros", {"1a", "1b"}), 1, rotulo=True)]),
             dict(rot="Categorias 2 a 6", unidade="pct1",
                  series=[serie("Ueno", LARANJA, fatia_cat(UENO, {"2", "3", "4", "5", "6"}), 1, rotulo=True),
-                         serie("Sistema", BRANCO, fatia_cat(SISTEMA, {"2", "3", "4", "5", "6"}), 1, rotulo=True)]),
+                         serie("Demais bancos", BRANCO, fatia_cat("outros", {"2", "3", "4", "5", "6"}), 1, rotulo=True)]),
             dict(rot="Categoria 6, a de maior risco", unidade="pct1",
                  series=[serie("Ueno", LARANJA, fatia_cat(UENO, {"6"}), 1, rotulo=True),
-                         serie("Sistema", BRANCO, fatia_cat(SISTEMA, {"6"}), 1, rotulo=True)]),
+                         serie("Demais bancos", BRANCO, fatia_cat("outros", {"6"}), 1, rotulo=True)]),
         ],
     )
 
@@ -308,8 +333,10 @@ def main():
           f"alavancagem {u(alav_u):.1f}x (sistema {u(alav_s):.1f}x); AYCP x{aycp_u[ult]/aycp_u[FUSAO]:.2f} desde a fusão "
           f"(sistema x{aycp_s[ult]/aycp_s[FUSAO]:.2f})")
     print("  setor (Ueno x demais bancos):", "; ".join(f"{nomes_setor.get(s, s)} {u:.1f}/{o:.1f}" for u, o, s in pares))
-    print(f"  categorias: 1a+1b Ueno {fatia_cat(UENO, {'1a', '1b'})[ult]:.1f} sistema {fatia_cat(SISTEMA, {'1a', '1b'})[ult]:.1f}; "
-          f"6 Ueno {fatia_cat(UENO, {'6'})[ult]:.1f} sistema {fatia_cat(SISTEMA, {'6'})[ult]:.1f}; 2-6 Ueno {fatia_cat(UENO, set('23456'))[ult]:.1f}")
+    print(f"  categorias: 1a+1b Ueno {fatia_cat(UENO, {'1a', '1b'})[ult]:.1f} demais {fatia_cat('outros', {'1a', '1b'})[ult]:.1f}; "
+          f"6 Ueno {fatia_cat(UENO, {'6'})[ult]:.1f} demais {fatia_cat('outros', {'6'})[ult]:.1f} (máx. {max(fatia_cat('outros', {'6'}).values()):.1f}); 2-6 Ueno {fatia_cat(UENO, set('23456'))[ult]:.1f}")
+    print(f"  demais bancos: (C1+C2)/AYCP {cap_o[ult]:.1f}% (em {FUSAO} {cap_o[FUSAO]:.1f}%); inadimplência {mora(outros)[ult]:.2f}%; "
+          f"AYCP x{aycp_o[ult]/aycp_o[FUSAO]:.2f} desde a fusão")
     print(f"  serviços: ₲ {serv_u[ult]:.2f} tri ({serv_f[ult]:.1f}% do setor no sistema), contra ₲ {serv_u[FUSAO]:.2f} tri em {FUSAO}")
 
 
