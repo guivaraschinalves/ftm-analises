@@ -81,11 +81,7 @@ O fundo garantidor tinha [US$ 1,11 bilhão no fim de 2024](fonte:fgd), cerca de 
 
 ## Participação no sistema
 
-fonte: memoria | Ueno Bank, Memoria 2025 | https://www.ueno.com.py/wp-content/uploads/2026/05/Memoria-ueno-bank-2025.pdf
-
-O Ueno era um banco médio em dinheiro e gigante em alcance. Em setembro de 2026, tinha 9% dos depósitos e 8% do crédito dos bancos do Paraguai, mas 42% dos cartões de crédito e 78% dos correspondentes não bancários.
-
-As duas fatias grandes vêm do modelo do banco. Num banco digital, a conta se abre pelo celular, e o Ueno trouxe mais de 1 milhão de pessoas para o sistema pela primeira vez. Chegou a [1,08 milhão de cartões de crédito no fim de 2025](fonte:memoria), quase todos de limite baixo: o saldo devedor deles era só 14,5% do total do país. Os correspondentes, explicados no fim da página, faziam o papel das agências: era neles que o cliente depositava e sacava dinheiro. O salto de junho de 2024 em todas as abas é a incorporação do Visión Banco.
+O Ueno era um banco médio em dinheiro e gigante em alcance. Em setembro de 2026, tinha 9% dos depósitos e 8% do crédito dos bancos do Paraguai, mas 42% dos cartões de crédito e 78% dos correspondentes não bancários. Os cartões eram muitos e de limite baixo: o saldo devedor deles era só 14,5% do total do país. O salto de junho de 2024 em todas as abas é a incorporação do Visión Banco.
 
 ## Risco e capital
 
