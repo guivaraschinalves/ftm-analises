@@ -159,6 +159,8 @@ def main():
     def fatia_cat(ent, cats):
         out = {}
         for m in meses:
+            if m == "2024-11":      # o boletim traz só parte da carteira do Ueno neste mês (₲ 4,6 tri, contra 6,9 e 7,3 ao redor)
+                continue
             if ent == SISTEMA:
                 tot = sum(v for (mm, e, c), v in K.items() if mm == m)
                 parte = sum(v for (mm, e, c), v in K.items() if mm == m and c in cats)
@@ -182,6 +184,9 @@ def main():
             dict(rot="Categorias 2 a 6", unidade="pct1",
                  series=[serie("Ueno", LARANJA, fatia_cat(UENO, {"2", "3", "4", "5", "6"}), 1, rotulo=True),
                          serie("Sistema", BRANCO, fatia_cat(SISTEMA, {"2", "3", "4", "5", "6"}), 1, rotulo=True)]),
+            dict(rot="Categoria 6, a de maior risco", unidade="pct1",
+                 series=[serie("Ueno", LARANJA, fatia_cat(UENO, {"6"}), 1, rotulo=True),
+                         serie("Sistema", BRANCO, fatia_cat(SISTEMA, {"6"}), 1, rotulo=True)]),
         ],
     )
 
@@ -191,8 +196,10 @@ def main():
         S[(mes(r["Fecha"]), r["Codigo Entidad"], r["Actividad_Destino_vs2"].strip())] += num(r["CARTERA VIGENTE"]) + num(r["CARTERA VENCIDA"])
     setores = sorted({k[2] for k in S})
     tot_u = sum(v for (m, e, s), v in S.items() if m == ult and e == UENO)
-    tot_s = sum(v for (m, e, s), v in S.items() if m == ult)
-    pares = sorted(((100 * S.get((ult, UENO, s), 0) / tot_u, 100 * sum(v for (m, e, ss), v in S.items() if m == ult and ss == s) / tot_s, s)
+    # a comparação é com os demais bancos (o sistema sem o Ueno), para o Ueno não puxar a média
+    tot_s = sum(v for (m, e, s), v in S.items() if m == ult and e != UENO)
+    pares = sorted(((100 * S.get((ult, UENO, s), 0) / tot_u,
+                     100 * sum(v for (m, e, ss), v in S.items() if m == ult and ss == s and e != UENO) / tot_s, s)
                     for s in setores), reverse=True)
     nomes_setor = {"SERVICIOS": "Serviços", "CONSUMO": "Consumo", "VIVIENDA": "Habitação", "ACTIVIDADES INMOBILIARIAS": "Imobiliário",
                    "COMERCIO AL POR MAYOR": "Atacado", "COMERCIO AL POR MENOR": "Varejo", "GANADERIA": "Pecuária",
@@ -203,7 +210,7 @@ def main():
         subtitulo=f"Em % da carteira de cada um, {ult[5:]}/{ult[:4]}",
         unidade="pct1", fonte=FONTE, categorias=[nomes_setor.get(s, s.title()) for _, _, s in pares], barra=0.8, agrupadas=True,
         series=[serie("Ueno", LARANJA, {str(i): u for i, (u, _, _) in enumerate(pares)}, 1, tipo="barra"),
-                serie("Sistema", BRANCO, {str(i): t for i, (_, t, _) in enumerate(pares)}, 1, tipo="barra")],
+                serie("Demais bancos", BRANCO, {str(i): t for i, (_, t, _) in enumerate(pares)}, 1, tipo="barra")],
     )
     serv_u = {m: v / 1e6 for (m, e, s), v in S.items() if e == UENO and s == "SERVICIOS"}
     serv_f = {m: 100 * S[(m, UENO, "SERVICIOS")] / sum(v for (mm, e, s), v in S.items() if mm == m and s == "SERVICIOS")
@@ -300,6 +307,9 @@ def main():
     print(f"  C1/AYCP {rat(UENO, T1)[ult]:.1f}% (C1+C2)/AYCP {rat(UENO, T12)[ult]:.1f}% (sistema {rat(SISTEMA, T12)[ult]:.1f}%); "
           f"alavancagem {u(alav_u):.1f}x (sistema {u(alav_s):.1f}x); AYCP x{aycp_u[ult]/aycp_u[FUSAO]:.2f} desde a fusão "
           f"(sistema x{aycp_s[ult]/aycp_s[FUSAO]:.2f})")
+    print("  setor (Ueno x demais bancos):", "; ".join(f"{nomes_setor.get(s, s)} {u:.1f}/{o:.1f}" for u, o, s in pares))
+    print(f"  categorias: 1a+1b Ueno {fatia_cat(UENO, {'1a', '1b'})[ult]:.1f} sistema {fatia_cat(SISTEMA, {'1a', '1b'})[ult]:.1f}; "
+          f"6 Ueno {fatia_cat(UENO, {'6'})[ult]:.1f} sistema {fatia_cat(SISTEMA, {'6'})[ult]:.1f}; 2-6 Ueno {fatia_cat(UENO, set('23456'))[ult]:.1f}")
     print(f"  serviços: ₲ {serv_u[ult]:.2f} tri ({serv_f[ult]:.1f}% do setor no sistema), contra ₲ {serv_u[FUSAO]:.2f} tri em {FUSAO}")
 
 
