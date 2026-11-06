@@ -32,7 +32,7 @@ O BCP separa o capital em dois níveis. O C1 é o capital principal, o de melhor
 
 Em junho de 2024, o Ueno, então um banco pequeno, incorporou o Visión Banco, que tinha o dobro dos seus depósitos. Saiu da fusão com folga, com índice de solvência de 28,4%, e foi perdendo margem até 13,8% em setembro de 2026: acima do mínimo, mas bem abaixo dos 17% do sistema.
 
-A queda para menos de 6% não aparece nos dados do BCP, que vão até setembro. Ela surgiu depois, durante a [regularização](fonte:regularizacao) do banco, quando os balanços foram ajustados, segundo o comunicado do próprio BCP. O BCP não disse se os ajustes reduziram o capital, aumentaram os ativos ponderados por risco ou as duas coisas. Se tivesse sido só o capital, para o índice sair de 13,8% para 6% seria preciso perder perto de ₲ 1,4 trilhão, cerca de R$ 1,3 bilhão.
+A queda para menos de 6% não aparece nos dados do BCP, que vão até setembro. Ela surgiu depois, durante a [regularização](fonte:regularizacao) do banco, quando os balanços foram ajustados, segundo o comunicado do próprio BCP. O BCP não divulgou o índice na data da intervenção: sabemos só que ficou abaixo de 6%, não o quão solvente, ou insolvente, o banco está. O BCP não disse se os ajustes reduziram o capital, aumentaram os ativos ponderados por risco ou as duas coisas. Se tivesse sido só o capital, para o índice sair de 13,8% para 6% seria preciso perder perto de ₲ 1,4 trilhão, cerca de R$ 1,3 bilhão.
 
 ## O que acontece agora
 
