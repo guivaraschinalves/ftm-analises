@@ -52,7 +52,7 @@ import cenario_fomc as cf                                     # noqa: E402
 
 NOME = "cenario-2026-11-08"
 SAIDA = os.path.join(RAIZ, "dados", NOME + ".json")
-ASSUNTO = "08/11/26 - Eleição, juros e a venda das ações de IA"
+ASSUNTO = "Relatório Wealth/FtM de Novembro"
 GRUPO = "Análise de Cenário"
 FTM_DADOS = os.path.join(os.path.dirname(RAIZ), "ftm-dados")
 

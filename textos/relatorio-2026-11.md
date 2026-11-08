@@ -1,6 +1,6 @@
 # Relatório Wealth/FtM de Novembro
 data: 08/11/2026
-assunto: 08-11-26-eleicao-juros-e-a-venda-das-acoes-de-ia
+assunto: relatorio-wealth-ftm-de-novembro
 dados: cenario-2026-11-08.json
 
 ## capa
