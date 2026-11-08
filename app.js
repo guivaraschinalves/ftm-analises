@@ -74,7 +74,7 @@
   // A análise vem primeiro: ela é o que se lê de ponta a ponta. Os painéis
   // antigos ficam embaixo, fechados, como acervo.
   // a ordem é a do índice; assuntos do mesmo "grupo" ficam juntos
-  var FONTES = ["dados/gave.json", "dados/cenario-2026-10-28-fomc.json",
+  var FONTES = ["dados/gave.json", "dados/cenario-2026-11-08.json", "dados/cenario-2026-10-28-fomc.json",
                 "dados/defasagem-combustiveis.json", "dados/eleicoes.json", "dados/midterms-2026.json",
                 "dados/petroleo.json", "dados/ueno-bank.json"];
   // Uma página pode pedir outros arquivos: <body data-fontes="dados/x.json">.
@@ -326,7 +326,10 @@
     "usd-tri": { eixo: function (v, passo) { return "US$ " + nf(casasDoPasso(passo)).format(v); },
                  valor: function (v) { return "US$ " + nf(2).format(v) + " tri"; } },
     "usd-bbl": { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
-                 valor: function (v) { return "US$ " + nf(2).format(v) + "/barril"; } }
+                 valor: function (v) { return "US$ " + nf(2).format(v) + "/barril"; } },
+    // câmbio: reais por dólar, com centavos ("R$ 5,49")
+    brl: { eixo: function (v, passo) { return nf(Math.max(2, casasDoPasso(passo))).format(v); },
+           valor: function (v) { return "R$ " + nf(2).format(v); } }
   };
   function unidade(g) { return UNIDADES[g.unidade] || UNIDADES["%"]; }
   // a série pode ter unidade própria (a que vai no eixo da direita, quando o
@@ -2697,7 +2700,7 @@
       [[a, "anterior"], [b, "novo"]].forEach(function (x, k) {
         if (k) links.appendChild(document.createTextNode(" · "));
         links.appendChild(html("a", { href: x[0].url, target: "_blank", rel: "noopener noreferrer",
-          texto: "Comunicado de " + dataBR(x[0].data) + " no site do Fed" }));
+          texto: "Comunicado de " + dataBR(x[0].data) + " no site do " + (g.site || "Fed") }));
       });
     }
     selA.addEventListener("change", comparar);

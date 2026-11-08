@@ -44,12 +44,14 @@ import texto_assunto as ta                                    # noqa: E402
 #
 # Cada "##" é o TÍTULO do gráfico como aparece no site (ou o id dele). Apagar
 # o bloco apaga o comentário.
-COMENTARIOS = {"cenario-2026-10-28-fomc.json": "comentarios/cenario-2026-10-28-fomc.md"}
+COMENTARIOS = {"cenario-2026-10-28-fomc.json": "comentarios/cenario-2026-10-28-fomc.md",
+               "cenario-2026-11-08.json": "comentarios/cenario-2026-11-08.md"}
 
 PARES = [("defasagem-combustiveis.md", "defasagem-combustiveis.json"),
          ("petroleo.md", "petroleo.json"),
          ("cenario-2026-10-28-fomc.md", "cenario-2026-10-28-fomc.json"),
-         ("ueno-bank.md", "ueno-bank.json")]
+         ("ueno-bank.md", "ueno-bank.json"),
+         ("cenario-2026-11-08.md", "cenario-2026-11-08.json")]
 
 
 def aplicar(nome_texto, nome_json):
