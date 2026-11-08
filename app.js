@@ -3413,6 +3413,9 @@
     host.innerHTML = "";
     // o assunto com comentários abre a coluna da margem direita (ver CSS)
     document.body.classList.toggle("com-comentarios", !!docs[i].comentarios);
+    // a marca do assunto (hoje só "wealth") troca o acento e põe o logo do parceiro no topo
+    if (docs[i].marca) document.documentElement.setAttribute("data-marca", docs[i].marca);
+    else document.documentElement.removeAttribute("data-marca");
     montarAssunto(docs[i], host);
     montarIndiceLateral(docs[i]);
     montarNav(docs, document.getElementById("nav"), i);

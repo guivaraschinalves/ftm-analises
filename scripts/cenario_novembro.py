@@ -487,7 +487,7 @@ def main():
         print(titulo + "…")
         secoes.append(dict(titulo=titulo, texto="", fontes=[], figuras=[], graficos=f()))
     doc = dict(atualizado=datetime.date.today().isoformat(), referencia=datetime.date.today().isoformat(),
-               formato="artigo", grupo=GRUPO, assunto=ASSUNTO,
+               formato="artigo", grupo=GRUPO, assunto=ASSUNTO, marca="wealth",
                fonte="FRED, BLS, Tesouro dos EUA, BIS, Nasdaq, Anthropic (S-1/A), Ipeadata, ANBIMA e Banco Central",
                secoes=secoes)
     with open(SAIDA, "w", encoding="utf-8") as f:

@@ -16,6 +16,15 @@
   --glow-2: rgba(64, 152, 255, .20);
   --grain-opacity: .18;
 }
+/* Análises da Liberta Wealth ("marca": "wealth" no JSON): o acento e o brilho
+   do fundo saem do azul e vão para o verde-oliva do logo da Wealth. */
+:root[data-marca="wealth"] {
+  --accent: #A8BC72;
+  --accent-wash: rgba(168, 188, 114, .16);
+  --glow: rgba(96, 140, 52, .24);
+  --glow-2: rgba(198, 206, 170, .16);
+  --wealth: #C6CEAA;
+}
 :root[data-theme="light"] {
   --bg: #f3f4f5;
   --surface: #ffffff;
@@ -714,3 +723,21 @@ body.visor-aberto { overflow: hidden; }
   }
   body.com-indice-lateral.com-comentarios .nota-margem::after { display: none; }
 }
+
+/* tema da Wealth no claro (vem depois do :root claro para ganhar dele) */
+:root[data-marca="wealth"][data-theme="light"] {
+  --accent: #5F7A2E;
+  --accent-wash: rgba(95, 122, 46, .12);
+  --glow: rgba(96, 140, 52, .12);
+  --glow-2: rgba(150, 170, 90, .10);
+  --wealth: #7D8A4F;
+}
+/* o logo da Wealth ao lado do FtM, separado por um filete */
+.logo-wealth { display: none; }
+:root[data-marca="wealth"] .logo-wealth {
+  display: flex; align-items: center; flex: none; color: var(--logo);
+  padding-left: 14px; border-left: 1px solid var(--wealth);
+}
+.logo-wealth svg { width: 128px; height: auto; display: block; }
+.logo-wealth .wealth-acento { fill: var(--wealth); }
+@media (max-width: 600px) { .logo-wealth svg { width: 96px; } }
