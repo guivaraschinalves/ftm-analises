@@ -237,7 +237,18 @@ def graficos_fomc_juros():
 # ================================================================ EUA: midterms
 
 def graficos_midterms():
+    g = copiar("midterms-2026.json", ["midterms-historia-aprovacao"])[0]
+    # o texto começa pela Câmara: ela abre primeiro
+    g["variantes"] = sorted(g["variantes"], key=lambda v: v["rot"] != "Câmara")
+    return [g]
+
+
+def graficos_midterms_resultado():
     return copiar("midterms-2026.json", ["midterms-resultado-camara", "midterms-resultado-senado"])
+
+
+def graficos_midterms_mercado():
+    return []
 
 
 # ================================================================ EUA: ações de IA
@@ -574,7 +585,7 @@ def graficos_credito():
 # antes do gráfico dele
 SECOES = [("Decisão do FOMC", graficos_fomc), ("", graficos_fomc_inflacao), ("", graficos_fomc_payroll),
           ("", graficos_fomc_desemprego), ("", graficos_fomc_participacao), ("", graficos_fomc_juros),
-          ("Midterms", graficos_midterms),
+          ("Midterms", graficos_midterms), ("", graficos_midterms_resultado), ("", graficos_midterms_mercado),
           ("A venda das ações de IA", graficos_ia), ("IPO da Anthropic", graficos_anthropic),
           ("Eleição: bolsa, câmbio e juros", graficos_eleicao), ("Expectativas do Focus", graficos_focus),
           ("Decisão do Copom", graficos_copom), ("Crédito privado", graficos_credito)]
