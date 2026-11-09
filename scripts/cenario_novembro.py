@@ -644,7 +644,7 @@ SECOES = [("Decisão do FOMC", ["fomc-comunicados"]), ("", ["ism-pmi"]), ("", ["
           ("", ["treasuries-5-10-30"]),
           ("Midterms", ["midterms-historia-aprovacao"]), ("", ["midterms-resultado-camara"]),
           ("", ["midterms-resultado-senado"]), ("", []),
-          ("A venda das ações de IA", ["ia-indices"]), ("", ["ia-setores-semana"]), ("", ["ia-vix"]), ("", ["ia-divida"]),
+          ("A venda das ações de IA", ["ia-indices"]), ("", ["ia-setores-semana"]), ("", ["ia-vix"]),
           ("IPO da Anthropic", ["anthropic-receita-trimestral"]), ("", ["anthropic-margens"]),
           ("", ["anthropic-simulador"]),
           ("Eleição: bolsa, câmbio e juros", ["eleicoes-reacao"]), ("", ["br-ibovespa"]), ("", ["br-dolar"]),
