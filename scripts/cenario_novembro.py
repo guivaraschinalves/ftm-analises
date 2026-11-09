@@ -596,10 +596,11 @@ def graficos_fiscal():
     desp, liq = achar("4. DESPESA TOTAL"), achar("3. RECEITA LÍQUIDA")
     nao_adm, t_edu, t_rec = (achar("1.4 - Receitas Não Administradas"), achar("2.3 Transferência de Contribuição"),
                              achar("2.4 Transferências de Exploração"))
-    # receita líquida sem as receitas não administradas pela Receita Federal
-    # (dividendos, royalties, concessões e outras), e sem as transferências
+    # receita líquida excluindo a parte tributária (pedido dele: "ex" =
+    # excluindo): sobram as receitas não administradas pela Receita Federal
+    # (dividendos, royalties, concessões e outras), líquidas das transferências
     # a estados e municípios que saem delas (salário-educação e royalties)
-    sem = {m: liq[m] - nao_adm[m] + t_edu.get(m, 0) + t_rec.get(m, 0) for m in liq}
+    sem = {m: nao_adm[m] - t_edu.get(m, 0) - t_rec.get(m, 0) for m in liq}
 
     def cresc12(s):
         ks = sorted(s)
@@ -608,10 +609,10 @@ def graficos_fiscal():
     ini = "2010-01"
     series = [serie("Despesa primária total", VERMELHO, desde(cresc12(desp), ini), 1, rotulo=True),
               serie("Receita primária líquida", AZUL, desde(cresc12(liq), ini), 1, rotulo=True),
-              serie("Receita líquida sem as receitas não administradas pela RFB", VERDE,
+              serie("Receita líquida excluindo a tributária", VERDE,
                     desde(cresc12(sem), ini), 1, rotulo=True)]
     ult = max(desp)
-    print("  RTN até %s (%s): despesa %.1f%%, receita líquida %.1f%%, sem não administradas %.1f%%"
+    print("  RTN até %s (%s): despesa %.1f%%, receita líquida %.1f%%, excluindo a tributária %.1f%%"
           % (ult, base, cresc12(desp)[ult], cresc12(liq)[ult], cresc12(sem)[ult]))
     mes = cf.rot_mes(ult)
     return [dict(id="br-fiscal-crescimento-real", titulo="Governo central: crescimento real da despesa e da receita primária",
@@ -647,7 +648,7 @@ SECOES = [("Decisão do FOMC", ["fomc-comunicados"]), ("", ["ism-pmi"]), ("", ["
           ("IPO da Anthropic", ["anthropic-receita-trimestral"]), ("", ["anthropic-margens"]),
           ("", ["anthropic-simulador"]),
           ("Eleição: bolsa, câmbio e juros", ["eleicoes-reacao"]), ("", ["br-ibovespa"]), ("", ["br-dolar"]),
-          ("", ["br-curva-pre"]), ("", ["br-ntnb-2035"]),
+          ("", ["br-ntnb-2035"]),
           ("Expectativas do Focus", ["br-focus"]), ("", ["ipca-projecoes-focus"]),
           ("Decisão do Copom", ["copom-comunicados"]), ("", ["ipca-distancia-meta"]),
           ("", ["servicos-industriais-alimentacao"]),
