@@ -124,19 +124,114 @@ def mensal(s):
 
 # ================================================================ EUA: FOMC
 
-def graficos_fomc():
+_FOMC = {}
+
+
+def fomc():
+    """Os gráficos da parte do FOMC, calculados uma vez e repartidos entre os
+    blocos (cada bloco tem o texto logo antes do seu gráfico)."""
+    if _FOMC:
+        return _FOMC
     base = "cenario-2026-10-28-fomc.json"
-    comunicados, dissidentes = copiar(base, ["fomc-comunicados", "fomc-dissidentes"])
+    comunicados, dissidentes, cpi = copiar(base, ["fomc-comunicados", "fomc-dissidentes", "cpi-cheio-nucleo"])
     trabalho = {g["id"]: g for g in cf.graficos_trabalho()}
-    juros = cf.graficos_juros()
-    treasuries = cf.graficos_treasuries()
-    cpi = copiar(base, ["cpi-cheio-nucleo"])[0]
+    treasuries = cf.graficos_treasuries()[0]
     # o arquivo diário desde 2000 pesa 400 KB: aqui bastam os últimos cinco anos
-    for s in treasuries[0]["series"]:
+    for s in treasuries["series"]:
         s["dados"] = [p for p in s["dados"] if p[0] >= "2021-01-01"]
-    treasuries[0].pop("periodoPadrao", None)
-    return [comunicados, dissidentes, juros[1], cpi, trabalho["payroll-setores"],
-            trabalho["desemprego-participacao"], trabalho["salario-horas"], treasuries[0]]
+    treasuries.pop("periodoPadrao", None)
+    _FOMC.update(comunicados=comunicados, dissidentes=dissidentes, cpi=cpi, pce=grafico_pce(),
+                 payroll=trabalho["payroll-setores"], treasuries=treasuries)
+    _FOMC.update(graficos_ftm_dados_eua())
+    return _FOMC
+
+
+def grafico_pce():
+    """PCE cheio, núcleo e supercore (12 meses, calculados do índice) contra as
+    medidas que cortam os extremos: média aparada (Fed de Dallas) e mediana do
+    CPI (Fed de Cleveland), que o FRED já publica em 12 meses."""
+    ini = "2017-01"
+    v12 = lambda sid: desde(cf.var(fred(sid)), ini)                       # noqa: E731
+    series = [serie("PCE cheio", BRANCO, v12("PCEPI"), rotulo=True),
+              serie("Núcleo do PCE", LARANJA, v12("PCEPILFE"), rotulo=True),
+              serie("Supercore (serviços sem energia e moradia)", VERMELHO, v12("IA001260M"), rotulo=True),
+              serie("Média aparada do PCE (Dallas)", VERDE, desde(fred("PCETRIM12M159SFRBDAL"), ini), rotulo=True),
+              serie("Mediana do CPI (Cleveland)", CIANO, desde(fred("MEDCPIM159SFRBCLE"), ini), rotulo=True)]
+    return dict(id="pce-nucleos", titulo="Inflação do consumo (PCE) e medidas de núcleo",
+                subtitulo="% em 12 meses; supercore = serviços sem energia e moradia; média aparada e mediana tiram "
+                          "os itens de variação mais extrema",
+                unidade="%", fonte="BEA, Fed de Dallas e Fed de Cleveland (via FRED) e FtM", series=series)
+
+
+def graficos_ftm_dados_eua():
+    """PIB (contribuições), desemprego U-3/U-6 e participação ajustada, do ftm-dados."""
+    gs = {}
+    for arq in ("dados/trabalho-eua.json", "dados/pib-eua.json"):
+        def anda(secs):
+            for s in secs:
+                for g in s.get("graficos", []):
+                    gs[g["id"]] = g
+                anda(s.get("subsecoes", []))
+        anda(json_ftm_dados(arq)["secoes"])
+
+    # PIB: o eixo trimestral do ftm-dados vira categorias ("3T26"), desde 2021
+    p = gs["pib-eua-contribuicoes"]
+    ks = sorted({k for s in p["series"] for k, _ in s["dados"] if k >= "2021-Q1"})
+    pos = {k: str(i) for i, k in enumerate(ks)}
+    pib = dict(id="pib-eua-contribuicoes", titulo=p["titulo"], subtitulo=p["subtitulo"], unidade=p["unidade"],
+               fonte=p["fonte"], categorias=["%sT%s" % (k[-1], k[2:4]) for k in ks], barra=1,
+               series=[dict(s, dados=[[pos[k], v] for k, v in s["dados"] if k in pos]) for s in p["series"]])
+
+    d, c = gs["eua-desemprego"], gs["eua-u6-composicao"]
+    u6 = dict(id="eua-u3-u6", titulo="Taxa de desemprego: U-3 e U-6",
+              subtitulo="Com ajuste sazonal; o U-6 soma ao desemprego os desalentados, os marginalmente ligados e "
+                        "quem trabalha meio período por falta de opção",
+              unidade="pct1", fonte="BLS (via FRED) e FtM", variantes=[
+                  dict(rot="U-3 e U-6, % da força de trabalho", series=d["series"]),
+                  dict(rot="partes do U-6, em pontos", barra=1, series=c["variantes"][0]["series"],
+                       nota=c["variantes"][0].get("nota")),
+                  dict(rot="meio período por falta de opção, mil pessoas", unidade="mil", barra=1,
+                       series=c["variantes"][1]["series"], nota=c["variantes"][1].get("nota"))])
+
+    pa = gs["eua-participacao"]
+    obs, ajust = pa["variantes"][0], pa["variantes"][1]
+    participacao = dict(id="eua-participacao", titulo=pa["titulo"], subtitulo="% da população de 16 anos ou mais",
+                        unidade=pa["unidade"], fonte=ajust.get("fonte", pa["fonte"]), eixo=pa.get("eixo"),
+                        variantes=[
+                            dict(rot="observada e ajustada pela composição por idade e sexo de out/26",
+                                 series=ajust["series"], nota=ajust.get("nota")),
+                            dict(rot="observada, com ajuste sazonal",
+                                 series=obs.get("series") or [dict(s) for s in pa["series"]])])
+    for v in participacao["variantes"]:
+        for s in v["series"]:
+            s.pop("hover", None)
+    return dict(pib=pib, u6=u6, participacao=participacao)
+
+
+def graficos_fomc():
+    f = fomc()
+    return [f["comunicados"], f["pib"], f["dissidentes"]]
+
+
+def graficos_fomc_inflacao():
+    f = fomc()
+    return [f["pce"], f["cpi"]]
+
+
+def graficos_fomc_payroll():
+    return [fomc()["payroll"]]
+
+
+def graficos_fomc_desemprego():
+    return [fomc()["u6"]]
+
+
+def graficos_fomc_participacao():
+    return [fomc()["participacao"]]
+
+
+def graficos_fomc_juros():
+    return [fomc()["treasuries"]]
 
 
 # ================================================================ EUA: midterms
@@ -475,7 +570,11 @@ def graficos_credito():
 
 # ================================================================ montagem
 
-SECOES = [("Decisão do FOMC", graficos_fomc), ("Midterms", graficos_midterms),
+# os blocos sem título continuam a seção de cima: o texto de cada um fica logo
+# antes do gráfico dele
+SECOES = [("Decisão do FOMC", graficos_fomc), ("", graficos_fomc_inflacao), ("", graficos_fomc_payroll),
+          ("", graficos_fomc_desemprego), ("", graficos_fomc_participacao), ("", graficos_fomc_juros),
+          ("Midterms", graficos_midterms),
           ("A venda das ações de IA", graficos_ia), ("IPO da Anthropic", graficos_anthropic),
           ("Eleição: bolsa, câmbio e juros", graficos_eleicao), ("Expectativas do Focus", graficos_focus),
           ("Decisão do Copom", graficos_copom), ("Crédito privado", graficos_credito)]
