@@ -142,7 +142,9 @@ def fomc():
     treasuries.pop("periodoPadrao", None)
     _FOMC.update(comunicados=comunicados, dissidentes=dissidentes, cpi=cpi, pce=grafico_pce(),
                  payroll=trabalho["payroll-setores"], treasuries=treasuries)
-    _FOMC.update(graficos_ftm_dados_eua())
+    pmi = cf.graficos_atividade()[0]
+    pmi["subtitulo"] = "Acima de 50 = expansão; faixas cinza = recessões (NBER)"
+    _FOMC.update(graficos_ftm_dados_eua(), pmi=pmi)
     return _FOMC
 
 
@@ -164,7 +166,8 @@ def grafico_pce():
 
 
 def graficos_ftm_dados_eua():
-    """PIB (contribuições), desemprego U-3/U-6 e participação ajustada, do ftm-dados."""
+    """PIB (contribuições), desemprego U-3/U-6, participação ajustada e construção de data
+    centers, do ftm-dados."""
     gs = {}
     for arq in ("dados/trabalho-eua.json", "dados/pib-eua.json"):
         def anda(secs):
@@ -205,12 +208,12 @@ def graficos_ftm_dados_eua():
     for v in participacao["variantes"]:
         for s in v["series"]:
             s.pop("hover", None)
-    return dict(pib=pib, u6=u6, participacao=participacao)
+    return dict(pib=pib, u6=u6, participacao=participacao, datacenters=gs["construcao-datacenters-fabricas"])
 
 
 def graficos_fomc():
     f = fomc()
-    return [f["comunicados"], f["pib"], f["dissidentes"]]
+    return [f["comunicados"], f["pmi"], f["datacenters"], f["dissidentes"]]
 
 
 def graficos_fomc_inflacao():
