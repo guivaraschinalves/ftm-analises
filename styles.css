@@ -708,20 +708,16 @@ body.visor-aberto { overflow: hidden; }
 /* os gráficos só da seção da vez (a sem título do começo sempre aparece) */
 .il-grupo:not(.ativo):not(.sem-titulo) .il-sub { display: none; }
 
-/* com o índice na esquerda, as notas de fonte trocam de lado */
+/* com o índice na esquerda, as notas de fonte trocam de lado e vão para a
+   direita, na altura do trecho citado. Com comentários também: eles ficam
+   ao lado dos gráficos e as notas ao lado do texto, e os dois não se cruzam. */
 @media (min-width: 1500px) {
-  body.com-indice-lateral:not(.com-comentarios) .nota-margem {
+  body.com-indice-lateral .nota-margem {
     left: auto; right: -222px; text-align: left; padding: 0 0 0 14px;
     border-right: none; border-left: 2px solid var(--border);
   }
-  body.com-indice-lateral:not(.com-comentarios) .nota-margem::after { right: auto; left: -24px; }
-  body.com-indice-lateral:not(.com-comentarios) .nota-margem.aceso { border-left-color: var(--accent); }
-  /* a direita já é dos comentários: as notas voltam para o fim da seção */
-  body.com-indice-lateral.com-comentarios .nota-margem {
-    position: static; width: auto; margin: 0 0 10px; padding: 8px 12px;
-    text-align: left; border-right: none; border-left: 2px solid var(--border);
-  }
-  body.com-indice-lateral.com-comentarios .nota-margem::after { display: none; }
+  body.com-indice-lateral .nota-margem::after { right: auto; left: -24px; }
+  body.com-indice-lateral .nota-margem.aceso { border-left-color: var(--accent); }
 }
 
 /* tema da Wealth no claro (vem depois do :root claro para ganhar dele) */
@@ -741,3 +737,35 @@ body.visor-aberto { overflow: hidden; }
 .logo-wealth svg { width: 128px; height: auto; display: block; }
 .logo-wealth .wealth-acento { fill: var(--wealth); }
 @media (max-width: 600px) { .logo-wealth svg { width: 96px; } }
+
+/* simulador de valuation (tipo "simulador"): controles embaixo do desenho */
+.sim-controles { padding: 14px 18px 16px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 14px; }
+.sim-bases { align-items: center; }
+.sim-rotulo { font-size: 13.5px; color: var(--ink-2); margin-right: 4px; }
+.sim-grade { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 28px; }
+.sim-campo label { display: block; font-size: 13.5px; color: var(--ink-2); margin-bottom: 4px; }
+.sim-linha { display: flex; align-items: center; gap: 12px; }
+.sim-linha input[type="range"] { flex: 1; min-width: 0; accent-color: var(--accent); }
+.sim-linha input[type="number"] {
+  width: 76px; padding: 6px 8px; font: inherit; font-size: 14px; text-align: right; color: var(--ink);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+}
+.sim-voltar { align-self: flex-start; }
+@media (max-width: 699px) { .sim-grade { grid-template-columns: minmax(0, 1fr); } }
+
+/* "parte" de um artigo (EUA e mundo, Brasil): divisória grande entre blocos */
+.artigo-parte {
+  margin: 72px 0 8px; padding: 14px 0 10px; border-top: 3px solid var(--accent);
+  scroll-margin-top: 84px;
+}
+.artigo-parte span {
+  display: block; font-size: 30px; font-weight: 700; letter-spacing: -.01em; color: var(--accent);
+  text-transform: uppercase;
+}
+.artigo-parte + .artigo-secao { margin-top: 18px; }
+.il-parte { margin: 14px 0 4px; }
+.il-parte:first-child { margin-top: 0; }
+.il-parte a {
+  display: block; padding: 4px 10px; font-size: 11.5px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--accent); text-decoration: none;
+}

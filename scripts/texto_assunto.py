@@ -9,6 +9,7 @@ O FORMATO, que é de propósito pobre
 
     ## Título da seção
     chave: gasolina-probabilidade
+    parte: Brasil                 (divisória grande antes da seção; opcional)
     fonte: anp-producao | ANP, produção e vendas | https://...
     figura: abicom-tabela | assets/x.png | legenda | crédito | https://...
 
@@ -47,7 +48,7 @@ import re
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TEXTOS = os.path.join(RAIZ, "textos")
 
-METADADO = re.compile(r"^(chave|fonte|figura):\s*(.*)$")
+METADADO = re.compile(r"^(chave|fonte|figura|parte):\s*(.*)$")
 
 
 def partes(linha):
@@ -84,6 +85,9 @@ def ler(nome):
         tipo, resto = m.group(1), m.group(2)
         if tipo == "chave":
             atual["chave"] = resto.strip()
+        elif tipo == "parte":
+            # "parte: Brasil" abre uma divisória grande antes da seção
+            atual["parte"] = resto.strip()
         elif tipo == "fonte":
             p = partes(resto)
             if len(p) < 2:

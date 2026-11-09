@@ -40,6 +40,7 @@ import csv
 import datetime
 import io
 import json
+import re
 import os
 import subprocess
 import sys
@@ -211,31 +212,6 @@ def graficos_ftm_dados_eua():
     return dict(pib=pib, u6=u6, participacao=participacao, datacenters=gs["construcao-datacenters-fabricas"])
 
 
-def graficos_fomc():
-    f = fomc()
-    return [f["comunicados"], f["pmi"], f["datacenters"], f["dissidentes"]]
-
-
-def graficos_fomc_inflacao():
-    return [fomc()["pce"]]
-
-
-def graficos_fomc_payroll():
-    return [fomc()["payroll"]]
-
-
-def graficos_fomc_desemprego():
-    return [fomc()["u6"]]
-
-
-def graficos_fomc_participacao():
-    return [fomc()["participacao"]]
-
-
-def graficos_fomc_juros():
-    return [fomc()["treasuries"]]
-
-
 # ================================================================ EUA: midterms
 
 def graficos_midterms():
@@ -247,10 +223,6 @@ def graficos_midterms():
 
 def graficos_midterms_resultado():
     return copiar("midterms-2026.json", ["midterms-resultado-camara", "midterms-resultado-senado"])
-
-
-def graficos_midterms_mercado():
-    return []
 
 
 # ================================================================ EUA: ações de IA
@@ -317,7 +289,8 @@ def graficos_ia():
           % (br(variacao(fred("NASDAQCOM", False), "2026-11-04", dia), 2),
              br(variacao(fred("NASDAQSOX", False), "2026-11-04", dia), 2),
              br(variacao(fred("NASDAQCOM", False), base, fim), 2)))
-    return [g1, g2, g3, g4] + credito
+    # do bloco de crédito do FOMC fica só a dívida das empresas de IA
+    return [g1, g3, g4] + [g for g in credito if g["id"] == "ia-divida"]
 
 
 # ================================================================ EUA: Anthropic
@@ -372,7 +345,9 @@ def graficos_anthropic():
     v0 = gs["anthropic-captado-rodadas"]["variantes"][0]
     rodadas["series"] = [dict(nome="Dinheiro novo", cor=AZUL, tipo="barra", dados=v0["series"][0]["dados"],
                               legenda=False)]
-    return [receita, margem, rodadas, valor, pv]
+    sim = dict(gs["anthropic-simulador"], tipo="simulador")
+    sim.pop("painel", None)
+    return [receita, margem, sim]
 
 
 # ================================================================ Brasil: eleição
@@ -437,11 +412,19 @@ def graficos_eleicao():
     venc = lambda v: "%s/%s" % (MESES[int(v[5:7]) - 1], v[2:4])          # noqa: E731
     g_pre = grafico_curva("LTN", "br-curva-pre", "Curva de juros prefixados (LTN)",
                           "Taxa indicativa de cada vencimento, % ao ano", venc)
-    g_real = grafico_curva("NTN-B", "br-curva-real", "Curva de juros reais (NTN-B)",
-                           "Taxa indicativa de cada vencimento, % ao ano acima do IPCA", venc)
     print("  Ibovespa até %s (%s); dólar até %s (%s); ANBIMA até %s"
           % (max(ibov), br(ibov[max(ibov)], 0), max(dolar), br(dolar[max(dolar)], 4), hoje))
-    return [reacao, g_ibov, g_dolar, g_pre, g_real]
+    td = json_ftm_dados("dados/tesouro-direto.json")
+    ntnb = [s for sec in td["secoes"] for g in sec["graficos"] if g["id"] == "td-ntnb-vencimentos"
+            for s in g["series"] if s["nome"] == "2035"][0]
+    g_2035 = dict(id="br-ntnb-2035", titulo="NTN-B 2035 em 2025 e 2026",
+                  subtitulo="Tesouro IPCA+ com Juros Semestrais 2035, juro real em % a.a.; média entre a taxa de compra e "
+                            "a de venda", unidade="%", diario=True, buracoMax=6, eixo={"zero": False},
+                  fonte="Tesouro Nacional (Tesouro Direto) e FtM", eventos=ev,
+                  series=[dict(nome="NTN-B 2035", cor=LARANJA, rotulo=True,
+                               dados=[p for p in ntnb["dados"] if p[0] >= "2025-01-01"])])
+    print("  NTN-B 2035 até %s: %s" % (ntnb["dados"][-1][0], ntnb["dados"][-1][1]))
+    return [reacao, g_ibov, g_dolar, g_pre, g_2035]
 
 
 # ================================================================ Brasil: Focus
@@ -497,107 +480,193 @@ def graficos_copom():
                 subtitulo="Escolha dois comunicados: o que saiu do texto aparece riscado em vermelho, "
                           "o que entrou, em verde",
                 fonte="Banco Central do Brasil", site="BC", comunicados=comunicados)
-    selic = desde(sgs(432, "01/01/2016"), "2016-01-01")
-    g_selic = dict(id="br-selic", titulo="Selic Meta", subtitulo="% ao ano", unidade="%", diario=True,
-                   buracoMax=4000, fonte="Banco Central do Brasil",
-                   series=[serie("Selic Meta", BRANCO, cf.degraus(selic), 2, rotulo=True)])
-    print("  Copom: %d comunicados até %s; Selic %s" % (len(comunicados), comunicados[-1]["data"],
-                                                         selic[max(selic)]))
-    return [comp, g_selic]
+    print("  Copom: %d comunicados até %s" % (len(comunicados), comunicados[-1]["data"]))
+    return [comp]
 
 
-# ================================================================ Brasil: crédito privado
+# ================================================================ Brasil: IPCA (do ftm-dados)
 
-def ida_resumo():
-    """Quadro-resumo do IDA do último dia útil que a ANBIMA tiver."""
-    dia = datetime.date.today()
-    for _ in range(10):
-        dia -= datetime.timedelta(days=1)
-        if dia.weekday() >= 5:
+def graficos_ipca_ftm_dados():
+    doc = json_ftm_dados("dados/ipca.json")
+    gs = {g["id"]: g for s in doc["secoes"] for g in s["graficos"]}
+    # Focus: só as linhas (o app daqui não desenha velas)
+    focus = dict(gs["ipca-projecoes-focus"])
+    focus.pop("variantes", None)
+    # as cartas abertas viram marcas no alto, no formato de evento deste app
+    dist = dict(gs["ipca-distancia-meta"])
+    dist["eventos"] = [dict(em=e["x"], rot="Carta") for e in dist.get("eventos", [])]
+    dist["subtitulo"] = "IPCA em 12 meses menos a meta, em pontos percentuais; marcas no alto: cartas abertas do BC ao CMN"
+    grupos = gs["servicos-industriais-alimentacao"]
+    for g in (focus, dist, grupos):
+        g["fonte"] = g.get("fonte") or "IBGE, Banco Central do Brasil e FtM"
+    return dict(focus=focus, distancia=dist, grupos=grupos)
+
+
+_IPCA = {}
+
+
+def ipca_ftm_dados():
+    if not _IPCA:
+        _IPCA.update(graficos_ipca_ftm_dados())
+    return _IPCA
+
+
+def graficos_focus_ipca():
+    return [ipca_ftm_dados()["focus"]]
+
+
+def graficos_ipca_meta():
+    return [ipca_ftm_dados()["distancia"]]
+
+
+def graficos_ipca_grupos():
+    return [ipca_ftm_dados()["grupos"]]
+
+
+# ================================================================ Brasil: CAGED
+
+def ipea(codigo):
+    url = "http://www.ipeadata.gov.br/api/odata4/ValoresSerie(SERCODIGO='%s')" % codigo
+    return {l["VALDATA"][:7]: float(l["VALVALOR"]) for l in json.loads(baixar(url))["value"]
+            if l["VALVALOR"] is not None}
+
+
+# Mês que o Ipeadata ainda não tem: o saldo do comunicado do Ministério do
+# Trabalho (Novo Caged de setembro de 2026, divulgado em 04/11/2026). Sai
+# daqui quando o Ipeadata trouxer o mês (o Ipeadata ganha).
+CAGED_MANUAL = {"2026-09": 121305}
+
+
+def graficos_caged():
+    antigo, novo = ipea("CAGED12_SALDO12"), ipea("CAGED12_SALDON12")
+    for m, v in CAGED_MANUAL.items():
+        novo.setdefault(m, v)
+    saldo = {m: v for m, v in antigo.items() if m < "2020-01"}
+    saldo.update(novo)
+    ks = sorted(saldo)
+    doze = {ks[i]: sum(saldo[k] for k in ks[i - 11:i + 1]) / 1000 for i in range(11, len(ks))
+            if cf.mes_mais(ks[i - 11], 11) == ks[i]}
+    g1 = dict(id="br-caged-12m", titulo="Saldo de empregos formais (Caged) em 12 meses",
+              subtitulo="Mil vagas, soma de 12 meses; Caged até 2019 e Novo Caged desde 2020", unidade="mil",
+              fonte="Ministério do Trabalho (via Ipeadata; set/26 do comunicado do ministério) e FtM",
+              eventos=[dict(em="2020-01", rot="Novo Caged")],
+              series=[serie("Saldo em 12 meses", AZUL, {k: v for k, v in doze.items() if k >= "2003-01"}, 0, rotulo=True)])
+    anos = sorted({m[:4] for m in saldo if m.endswith("-09")})
+    cats = anos
+    velho = {str(i): saldo[a + "-09"] / 1000 for i, a in enumerate(anos) if a < "2020"}
+    novo_s = {str(i): saldo[a + "-09"] / 1000 for i, a in enumerate(anos) if a >= "2020"}
+    g2 = dict(id="br-caged-setembro", titulo="Saldo de empregos formais (Caged) em setembro de cada ano",
+              subtitulo="Mil vagas", unidade="mil", categorias=cats, valores=True,
+              fonte="Ministério do Trabalho (via Ipeadata; set/26 do comunicado do ministério) e FtM",
+              series=[dict(nome="Caged", cor=CINZA, tipo="barra",
+                           dados=[[k, round(v, 1)] for k, v in sorted(velho.items(), key=lambda x: int(x[0]))]),
+                      dict(nome="Novo Caged", cor=AZUL, tipo="barra",
+                           dados=[[k, round(v, 1)] for k, v in sorted(novo_s.items(), key=lambda x: int(x[0]))])])
+    print("  Caged: 12 meses até %s = %.0f mil; setembros %s" %
+          (max(doze), doze[max(doze)], {a: round(saldo[a + "-09"] / 1000, 1) for a in anos[-8:]}))
+    return [g1, g2]
+
+
+# ================================================================ Brasil: fiscal
+
+RTN_URL = ("https://www.tesourotransparente.gov.br/ckan/dataset/ab56485b-9c40-4efb-8563-9ce3e1973c4b/resource/"
+           "527ccdb1-3059-42f3-bf23-b5e3ab4c6dc6/download/serieh")
+
+
+def rtn_real():
+    """A tabela 1.1-A do Resultado do Tesouro Nacional: governo central, mensal,
+    em R$ milhões a preços do último mês (IPCA). {rótulo: {AAAA-MM: valor}}.
+    O servidor do Tesouro devolve erro com User-Agent de navegador: vai sem."""
+    aba = cf.xlsx_aba(baixar(RTN_URL), "1.1-A")
+    cab = next(r for r in aba.values() if str(r.get("A", "")).strip() == "Discriminação")
+    datas = {c: cf.data_excel(v) for c, v in cab.items() if c != "A" and cf.numero(v) is not None}
+    out = {}
+    for r in aba.values():
+        rot = re.sub(r"\s+", " ", str(r.get("A", ""))).strip()
+        if not rot:
             continue
-        corpo = urllib.parse.urlencode({"Idioma": "PT", "tipo": "qr", "indice": "DI", "escolha": "2",
-                                        "saida": "csv", "DataIniD": dia.strftime("%d/%m/%Y")}).encode()
-        txt = baixar("https://www.anbima.com.br/informacoes/ida/IDA_down.asp", dados=corpo).decode("latin-1")
-        linhas = [l.split(";") for l in txt.splitlines() if l.startswith("IDA")]
-        if linhas:
-            return dia.isoformat(), linhas
-    raise RuntimeError("IDA: nenhum quadro-resumo nos últimos dias")
+        out[rot] = {datas[c]: cf.numero(v) for c, v in r.items() if c in datas and cf.numero(v) is not None}
+    deflator = next(r for r in aba.values() if str(r.get("A", "")).startswith("R$ Milhões"))
+    return out, str(deflator.get("A"))
 
 
-def cdi_acumulado(cdi, ini, fim):
-    f = 1.0
-    for k, v in cdi.items():
-        if ini < k <= fim:
-            f *= 1 + v / 100
-    return 100 * (f - 1)
+def graficos_fiscal():
+    rtn, base = rtn_real()
+    achar = lambda prefixo: next(v for k, v in rtn.items() if k.startswith(prefixo))      # noqa: E731
+    desp, liq = achar("4. DESPESA TOTAL"), achar("3. RECEITA LÍQUIDA")
+    nao_adm, t_edu, t_rec = (achar("1.4 - Receitas Não Administradas"), achar("2.3 Transferência de Contribuição"),
+                             achar("2.4 Transferências de Exploração"))
+    # receita líquida sem as receitas não administradas pela Receita Federal
+    # (dividendos, royalties, concessões e outras), e sem as transferências
+    # a estados e municípios que saem delas (salário-educação e royalties)
+    sem = {m: liq[m] - nao_adm[m] + t_edu.get(m, 0) + t_rec.get(m, 0) for m in liq}
 
-
-def graficos_credito():
-    inad, inad_l = mensal(sgs(21083)), mensal(sgs(21086))
-    taxa, spread = mensal(sgs(20718)), mensal(sgs(20787))
-    conc = {k: v / 1000 for k, v in mensal(sgs(24440)).items()}
-    selic = sgs(432, "01/01/2011")
-    selic_m = {}
-    for k in sorted(selic):
-        selic_m[k[:7]] = selic[k]
-    selic_m = {k: v for k, v in selic_m.items() if k >= "2011-03" and k <= max(taxa)}
-    g1 = dict(id="br-credito-inadimplencia", titulo="Inadimplência do crédito às empresas",
-              subtitulo="% da carteira de pessoas jurídicas com atraso acima de 90 dias", unidade="%",
-              fonte="Banco Central do Brasil", series=[
-                  serie("Total", BRANCO, inad, 2, rotulo=True),
-                  serie("Recursos livres", LARANJA, inad_l, 2, rotulo=True)])
-    g2 = dict(id="br-credito-taxa", titulo="Taxa de juros e spread do crédito livre às empresas",
-              subtitulo="% ao ano; spread = taxa da operação menos o custo de captação do banco",
-              unidade="%", fonte="Banco Central do Brasil", series=[
-                  serie("Taxa média", BRANCO, taxa, 2, rotulo=True),
-                  serie("Spread", LARANJA, spread, 2, rotulo=True),
-                  serie("Selic Meta (fim do mês)", CINZA, selic_m, 2, rotulo=True)])
-    g3 = dict(id="br-credito-concessoes", titulo="Concessões de crédito às empresas",
-              subtitulo="R$ bilhões por mês, com ajuste sazonal", unidade="bi", fonte="Banco Central do Brasil",
-              series=[serie("Concessões, pessoas jurídicas", AZUL, conc, 1, rotulo=True)])
-
-    dia, linhas = ida_resumo()
-    cdi = sgs(12, "01/01/%d" % (int(dia[:4]) - 3))
-    d = datetime.date.fromisoformat(dia)
-    ref = {"mês": d.replace(day=1) - datetime.timedelta(days=1), "ano": datetime.date(d.year - 1, 12, 31),
-           "12 meses": d.replace(year=d.year - 1), "24 meses": d.replace(year=d.year - 2)}
-    cdi_v = {k: cdi_acumulado(cdi, v.isoformat(), dia) for k, v in ref.items()}
-    num = lambda t: float(t.replace(".", "").replace(",", "."))             # noqa: E731
-    cel = lambda v: {"t": br(v, 2) + "%"}                                  # noqa: E731
-    tabela = []
-    for l in linhas:
-        nome = l[0].replace("IDA - ", "IDA-").replace("Infraestrutura", "Infra").replace("GERAL", "Geral")
-        tabela.append([{"t": nome, "forte": nome == "IDA-DI"}, cel(num(l[4])), cel(num(l[5])), cel(num(l[6])),
-                       cel(num(l[7])), {"t": l[8]}])
-    tabela.append([{"t": "CDI", "forte": True}, cel(cdi_v["mês"]), cel(cdi_v["ano"]), cel(cdi_v["12 meses"]),
-                   cel(cdi_v["24 meses"]), {"t": "-"}])
-    g4 = dict(id="br-ida", tipo="tabela", titulo="Retorno dos índices de debêntures (IDA) e do CDI",
-              subtitulo="Retorno acumulado até %s, em %%; duration em dias úteis" % rotulo_dia(dia),
-              fonte="ANBIMA, Banco Central do Brasil (CDI, SGS 12) e FtM",
-              colunas=[{"rot": "Índice"}, {"rot": "No mês", "num": True}, {"rot": "No ano", "num": True},
-                       {"rot": "12 meses", "num": True}, {"rot": "24 meses", "num": True},
-                       {"rot": "Duration", "num": True}], linhas=tabela)
-    print("  crédito PJ até %s; IDA de %s" % (max(inad), dia))
-    return [g1, g2, g3, g4]
+    def cresc12(s):
+        ks = sorted(s)
+        soma = {ks[i]: sum(s[k] for k in ks[i - 11:i + 1]) for i in range(11, len(ks))}
+        return {m: 100 * (v / soma[cf.mes_mais(m, -12)] - 1) for m, v in soma.items() if cf.mes_mais(m, -12) in soma}
+    ini = "2010-01"
+    series = [serie("Despesa primária total", VERMELHO, desde(cresc12(desp), ini), 1, rotulo=True),
+              serie("Receita primária líquida", AZUL, desde(cresc12(liq), ini), 1, rotulo=True),
+              serie("Receita líquida sem as receitas não administradas pela RFB", VERDE,
+                    desde(cresc12(sem), ini), 1, rotulo=True)]
+    ult = max(desp)
+    print("  RTN até %s (%s): despesa %.1f%%, receita líquida %.1f%%, sem não administradas %.1f%%"
+          % (ult, base, cresc12(desp)[ult], cresc12(liq)[ult], cresc12(sem)[ult]))
+    mes = cf.rot_mes(ult)
+    return [dict(id="br-fiscal-crescimento-real", titulo="Governo central: crescimento real da despesa e da receita primária",
+                 subtitulo="Variação real dos valores acumulados em 12 meses sobre os 12 meses anteriores, em %%; "
+                           "a preços de %s (IPCA)" % mes,
+                 unidade="%", fonte="Tesouro Nacional (Resultado do Tesouro Nacional, tabela 1.1-A) e FtM",
+                 series=series)]
 
 
 # ================================================================ montagem
 
-# os blocos sem título continuam a seção de cima: o texto de cada um fica logo
-# antes do gráfico dele
-SECOES = [("Decisão do FOMC", graficos_fomc), ("", graficos_fomc_inflacao), ("", graficos_fomc_payroll),
-          ("", graficos_fomc_desemprego), ("", graficos_fomc_participacao), ("", graficos_fomc_juros),
-          ("Midterms", graficos_midterms), ("", graficos_midterms_resultado), ("", graficos_midterms_mercado),
-          ("A venda das ações de IA", graficos_ia), ("IPO da Anthropic", graficos_anthropic),
-          ("Eleição: bolsa, câmbio e juros", graficos_eleicao), ("Expectativas do Focus", graficos_focus),
-          ("Decisão do Copom", graficos_copom), ("Crédito privado", graficos_credito)]
+def graficos_fomc_todos():
+    f = fomc()
+    return [f[k] for k in ("comunicados", "pmi", "datacenters", "pce", "payroll", "u6", "participacao", "treasuries")]
+
+
+def graficos_midterms_todos():
+    return graficos_midterms() + graficos_midterms_resultado()
+
+
+GERADORES = [graficos_fomc_todos, graficos_midterms_todos, graficos_ia, graficos_anthropic, graficos_eleicao,
+             graficos_focus, graficos_focus_ipca, graficos_copom, graficos_ipca_meta, graficos_ipca_grupos,
+             graficos_caged, graficos_fiscal]
+
+# Um gráfico por bloco, com o comentário dele logo antes (pedido dele). Os
+# blocos sem título continuam a seção de cima; a ordem casa com a do texto.
+SECOES = [("Decisão do FOMC", ["fomc-comunicados"]), ("", ["ism-pmi"]), ("", ["construcao-datacenters-fabricas"]),
+          ("", ["pce-nucleos"]), ("", ["payroll-setores"]), ("", ["eua-u3-u6"]), ("", ["eua-participacao"]),
+          ("", ["treasuries-5-10-30"]),
+          ("Midterms", ["midterms-historia-aprovacao"]), ("", ["midterms-resultado-camara"]),
+          ("", ["midterms-resultado-senado"]), ("", []),
+          ("A venda das ações de IA", ["ia-indices"]), ("", ["ia-setores-semana"]), ("", ["ia-vix"]), ("", ["ia-divida"]),
+          ("IPO da Anthropic", ["anthropic-receita-trimestral"]), ("", ["anthropic-margens"]),
+          ("", ["anthropic-simulador"]),
+          ("Eleição: bolsa, câmbio e juros", ["eleicoes-reacao"]), ("", ["br-ibovespa"]), ("", ["br-dolar"]),
+          ("", ["br-curva-pre"]), ("", ["br-ntnb-2035"]),
+          ("Expectativas do Focus", ["br-focus"]), ("", ["ipca-projecoes-focus"]),
+          ("Decisão do Copom", ["copom-comunicados"]), ("", ["ipca-distancia-meta"]),
+          ("", ["servicos-industriais-alimentacao"]),
+          ("Emprego formal", ["br-caged-12m"]), ("", ["br-caged-setembro"]),
+          ("A principal questão para o próximo ano", ["br-fiscal-crescimento-real"])]
 
 
 def main():
-    secoes = []
-    for titulo, f in SECOES:
-        print(titulo + "…")
-        secoes.append(dict(titulo=titulo, texto="", fontes=[], figuras=[], graficos=f()))
+    graficos = {}
+    for f in GERADORES:
+        print(f.__name__ + "…")
+        for g in f():
+            graficos[g["id"]] = g
+    usados = [i for _, ids in SECOES for i in ids]
+    faltam = [i for i in usados if i not in graficos]
+    if faltam:
+        raise SystemExit("gráficos que o texto pede e ninguém gerou: %s" % ", ".join(faltam))
+    secoes = [dict(titulo=titulo, texto="", fontes=[], figuras=[], graficos=[graficos[i] for i in ids])
+              for titulo, ids in SECOES]
     doc = dict(atualizado=datetime.date.today().isoformat(), referencia=datetime.date.today().isoformat(),
                formato="artigo", grupo=GRUPO, assunto=ASSUNTO, marca="wealth",
                fonte="FRED, BLS, Tesouro dos EUA, BIS, Nasdaq, Anthropic (S-1/A), Ipeadata, ANBIMA e Banco Central",

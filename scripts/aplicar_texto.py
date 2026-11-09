@@ -79,6 +79,8 @@ def aplicar(nome_texto, nome_json):
         sec_nova = {"titulo": sec["titulo"], "texto": sec["texto"],
                     "fontes": sec["fontes"], "figuras": sec["figuras"],
                     "graficos": graficos}
+        if sec.get("parte"):
+            sec_nova["parte"] = sec["parte"]
         if i < len(doc["secoes"]):
             doc["secoes"][i] = sec_nova
         else:

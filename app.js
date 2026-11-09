@@ -993,6 +993,154 @@
   // y = a + b·x entre x = de e x = ate). "ate" num ponto desenha um traço
   // vertical de y até ate (o resultado parcial e o que falta apurar). O ponto
   // com "destaque" sai maior, com o rótulo em negrito e a "nota" ao lado.
+  // ---------- simulador de valuation (tipo "simulador") ----------
+  // Trazido do ftm-dados. A receita cresce "cresc"% ao ano a partir da base
+  // escolhida; o preço/vendas de hoje (preço × ações ÷ receita) vai em linha
+  // reta até o de saída, P/L × margem, no último ano. A meta é o preço de hoje
+  // corrigido pelo retorno exigido. As premissas moram no cartão (cartao.sim).
+  function simular(g, e) {
+    var r0 = g.bases[e.base || 0].v, n = Math.max(1, Math.round(e.anos)), ac = g.acoes;
+    var ps0 = g.preco * ac / r0, psf = e.pl * e.margem / 100;
+    var anos = [], precos = [], metas = [], receitas = [];
+    for (var a = 0; a <= n; a++) {
+      var rec = r0 * Math.pow(1 + e.cresc / 100, a), ps = ps0 + (psf - ps0) * a / n;
+      anos.push(a); receitas.push(rec);
+      precos.push(rec * ps / ac);
+      metas.push(g.preco * Math.pow(1 + e.retorno / 100, a));
+    }
+    var pN = precos[n], mN = metas[n];
+    return { n: n, anos: anos, precos: precos, metas: metas, receitas: receitas, r0: r0,
+             precoN: pN, metaN: mN, retornoAno: (Math.pow(Math.max(pN, 0) / g.preco, 1 / n) - 1) * 100 };
+  }
+  function usdSim(v) { return (v < 0 ? "−" : "") + "US$ " + nf(0).format(Math.abs(v)); }
+
+  function construirSimulador(cartao, L0, nomeTema) {
+    var g = graficoDe(cartao), pal = PALETAS[nomeTema], L = Object.assign({}, L0);
+    var e = cartao.sim || g.padrao, s = simular(g, e);
+    var svg = svgNovo(g, L), fimSub = moldura(svg, g, L, pal);
+    var estreito = L.W < L.H * 1.2, u = estreito ? 30 : 26;
+    var c = { x0: L.titulo.x, x1: L.W - L.titulo.x, y0: fimSub + u * 1.4, y1: L.fonte.y - L.fonte.fs * 1.6 };
+    var AZ = "#4F81BD", VD = "#9BBB59", VM = "#C0504D", bate = s.precoN >= s.metaN, corRes = bate ? VD : VM;
+    var qs = [
+      { rot: "Meta no ano " + s.n, valor: usdSim(s.metaN), det: usdSim(g.preco) + " a " + pct(e.retorno, 1) + " ao ano", cor: VD },
+      { rot: "Preço projetado no ano " + s.n, valor: usdSim(s.precoN), det: bate ? "acima da meta" : "abaixo da meta", cor: corRes },
+      { rot: "Retorno anual implícito", valor: pct(s.retornoAno, 1), det: "contra " + pct(e.retorno, 1) + " exigidos", cor: corRes },
+      { rot: "Receita no ano " + s.n, valor: usdSim(s.receitas[s.n]) + " bi",
+        det: nf(1).format(s.receitas[s.n] / s.r0) + "× a de hoje", cor: "#FFFFFF" }
+    ];
+    var nc = estreito ? 2 : 4, nl = Math.ceil(qs.length / nc), gap = u * 0.6, hq = u * 3.7;
+    var wq = (c.x1 - c.x0 - gap * (nc - 1)) / nc;
+    qs.forEach(function (q, k) {
+      var x = c.x0 + (k % nc) * (wq + gap), y = c.y0 + Math.floor(k / nc) * (hq + gap), p = u * 0.7;
+      svg.appendChild(el("rect", { x: x, y: y, width: wq, height: hq, rx: 10, fill: pal.texto, "fill-opacity": 0.05,
+                                   stroke: pal.grade, "stroke-width": 1.5 }));
+      svg.appendChild(texto(q.rot, { x: x + p, y: y + u * 1.05, "font-size": corpoQueCabe(q.rot, u * 0.85, wq - 2 * p), fill: pal.suave }));
+      svg.appendChild(texto(q.valor, { x: x + p, y: y + u * 2.55, "font-size": corpoQueCabe(q.valor, u * 1.6, wq - 2 * p, "bold"),
+                                       "font-weight": "bold", fill: corNoTema(q.cor, pal) }));
+      svg.appendChild(texto(q.det, { x: x + p, y: y + u * 3.3, "font-size": corpoQueCabe(q.det, u * 0.75, wq - 2 * p), fill: pal.suave }));
+    });
+    var yL = c.y0 + nl * (hq + gap) + u * 0.6, fsL = u * 0.85, premio = e.retorno - g.juros.v;
+    var itens = [
+      { cor: AZ, t: "Preço da ação (o preço/vendas converge para P/L × margem)" },
+      { cor: VD, t: "Meta: " + pct(e.retorno, 1) + " ao ano (" + g.juros.rot + ", " + pct(g.juros.v, 2) +
+        (Math.abs(premio) >= 0.05 ? (premio > 0 ? ", + " : ", − ") + nf(1).format(Math.abs(premio)) + " p.p." : "") + ")" }
+    ];
+    var xl = c.x0, linhaL = 0;
+    itens.forEach(function (it) {
+      var w = fsL * 1.6 + largura(it.t, fsL) + fsL * 2;
+      if (xl > c.x0 && xl + w > c.x1) { xl = c.x0; linhaL++; }
+      var yy = yL + linhaL * fsL * 1.6;
+      svg.appendChild(el("rect", { x: xl, y: yy, width: fsL, height: fsL, rx: 2, fill: it.cor }));
+      svg.appendChild(texto(it.t, { x: xl + fsL * 1.5, y: yy + fsL * 0.85, "font-size": fsL, fill: pal.suave }));
+      xl += w;
+    });
+    var gx0 = c.x0 + u * 3.6, gx1 = c.x1 - u * (estreito ? 4.2 : 5.2);
+    var gy0 = yL + (linhaL + 1) * fsL * 1.6 + u * 0.8, gy1 = c.y1 - u * 1.6;
+    var mx = Math.max.apply(null, s.precos.concat(s.metas)), mn = Math.min(0, Math.min.apply(null, s.precos));
+    var passo = passoBonito(mx - mn, 5), topo = Math.ceil(mx * 1.05 / passo) * passo, piso = Math.floor(mn / passo) * passo;
+    function X(a) { return gx0 + (gx1 - gx0) * a / s.n; }
+    function Y(v) { return gy1 - (gy1 - gy0) * (v - piso) / (topo - piso); }
+    for (var v = piso; v <= topo + 1e-9; v += passo) {
+      svg.appendChild(el("line", { x1: gx0, x2: gx1, y1: Y(v), y2: Y(v), stroke: Math.abs(v) < 1e-9 ? pal.zero : pal.grade,
+                                   "stroke-width": Math.abs(v) < 1e-9 ? 2 : 1.5 }));
+      svg.appendChild(texto(usdSim(v), { x: gx0 - u * 0.4, y: Y(v) + u * 0.32, "font-size": u * 0.8, fill: pal.suave, "text-anchor": "end" }));
+    }
+    s.anos.forEach(function (a) {
+      svg.appendChild(texto(a === 0 ? "Hoje" : "Ano " + a, { x: X(a), y: gy1 + u * 1.15, "font-size": u * 0.8, fill: pal.suave,
+                                                             "text-anchor": "middle" }));
+    });
+    function caminho(vs) { return vs.map(function (v, a) { return (a ? "L" : "M") + X(a) + "," + Y(v); }).join(" "); }
+    svg.appendChild(el("path", { d: caminho(s.precos) + " L" + X(s.n) + "," + Y(Math.max(piso, 0)) + " L" + X(0) + "," +
+                                    Y(Math.max(piso, 0)) + " Z", fill: AZ, "fill-opacity": 0.18 }));
+    [[s.metas, VD], [s.precos, AZ]].forEach(function (par) {
+      svg.appendChild(el("path", { d: caminho(par[0]), fill: "none", stroke: par[1], "stroke-width": u * 0.22, "stroke-linejoin": "round" }));
+      par[0].forEach(function (v, a) { svg.appendChild(el("circle", { cx: X(a), cy: Y(v), r: u * 0.22, fill: par[1] })); });
+    });
+    var yP = Y(s.precoN), yM = Y(s.metaN), dist = u * 1.1;
+    if (Math.abs(yP - yM) < dist) { var meio = (yP + yM) / 2, sg = yP <= yM ? -1 : 1; yP = meio + sg * dist / 2; yM = meio - sg * dist / 2; }
+    svg.appendChild(texto(usdSim(s.precoN), { x: X(s.n) + u * 0.5, y: yP + u * 0.33, "font-size": u * 0.9, "font-weight": "bold", fill: AZ }));
+    svg.appendChild(texto(usdSim(s.metaN), { x: X(s.n) + u * 0.5, y: yM + u * 0.33, "font-size": u * 0.9, "font-weight": "bold", fill: VD }));
+    svg.appendChild(texto(usdSim(g.preco), { x: X(0) + u * 0.4, y: Y(g.preco) + u * 1.2, "font-size": u * 0.85, "font-weight": "bold",
+                                             fill: pal.texto }));
+    return { svg: svg, L: L, pal: pal, ranking: true };
+  }
+
+  // Os controles: a receita-base em botões e, para cada premissa, um
+  // deslizador com caixa de número. Mexer em qualquer um redesenha.
+  function controlesSimulador(cartao) {
+    var g = cartao.grafico, e = cartao.sim = Object.assign({}, g.padrao);
+    var box = html("div", { "class": "sim-controles" });
+    var bases = html("div", { "class": "periodos sim-bases", role: "group", "aria-label": "Receita-base" });
+    bases.appendChild(html("span", { "class": "sim-rotulo", texto: "Receita de hoje:" }));
+    g.bases.forEach(function (b, k) {
+      var bt = html("button", { type: "button", texto: b.rot + " (US$ " + nf(1).format(b.v) + " bi)", "aria-pressed": String(k === e.base) });
+      bt.addEventListener("click", function () {
+        e.base = k;
+        Array.prototype.forEach.call(bases.querySelectorAll("button"), function (x, j) { x.setAttribute("aria-pressed", String(j === k)); });
+        desenhar(cartao, true);
+      });
+      bases.appendChild(bt);
+    });
+    box.appendChild(bases);
+    var grade = html("div", { "class": "sim-grade" });
+    [["cresc", "Crescimento anual da receita (%)", 0, 150, 1],
+     ["margem", "Margem líquida no fim (%)", 0, 60, 1],
+     ["pl", "P/L de saída (x)", 5, 80, 1],
+     ["retorno", "Retorno exigido ao ano (%)", 0, 25, 0.1],
+     ["anos", "Horizonte (anos)", 1, 10, 1]].forEach(function (c) {
+      var k = c[0], id = g.id + "-" + k;
+      var campo = html("div", { "class": "sim-campo" });
+      campo.appendChild(html("label", { "for": id, texto: c[1] }));
+      var linha = html("div", { "class": "sim-linha" });
+      var r = html("input", { type: "range", id: id, min: c[2], max: c[3], step: c[4], value: e[k] });
+      var n = html("input", { type: "number", min: c[2], max: c[3], step: c[4], value: e[k], "aria-label": c[1] });
+      function aplicar(v, origem) {
+        v = parseFloat(String(v).replace(",", "."));
+        if (isNaN(v)) return;
+        v = Math.min(c[3], Math.max(c[2], v));
+        e[k] = v;
+        if (origem !== r) r.value = v;
+        if (origem !== n) n.value = v;
+        desenhar(cartao, true);
+      }
+      r.addEventListener("input", function () { aplicar(r.value, r); });
+      n.addEventListener("change", function () { aplicar(n.value, n); });
+      linha.appendChild(r);
+      linha.appendChild(n);
+      campo.appendChild(linha);
+      grade.appendChild(campo);
+    });
+    box.appendChild(grade);
+    var volta = html("button", { type: "button", "class": "btn sim-voltar", texto: "Voltar ao padrão" });
+    volta.addEventListener("click", function () {
+      var novo = controlesSimulador(cartao);
+      box.replaceWith(novo);
+      desenhar(cartao, true);
+    });
+    box.appendChild(volta);
+    return box;
+  }
+
   function construirDispersao(cartao, L0, nomeTema) {
     var g = graficoDe(cartao), pal = PALETAS[nomeTema], L = Object.assign({}, L0);
     var Fx = UNIDADES[(g.eixoX || {}).unidade] || UNIDADES.n, Fy = UNIDADES[(g.eixoY || {}).unidade] || UNIDADES.n;
@@ -1109,6 +1257,7 @@
     if (g.tipo === "hemiciclo") return construirHemiciclo(cartao, L0, nomeTema);
     if (g.tipo === "distritos") return construirDistritos(cartao, L0, nomeTema);
     if (g.tipo === "dispersao") return construirDispersao(cartao, L0, nomeTema);
+    if (g.tipo === "simulador") return construirSimulador(cartao, L0, nomeTema);
     var L = Object.assign({}, L0);
 
     // subtítulo que não cabe numa linha quebra em duas (versão estreita)
@@ -1439,7 +1588,8 @@
       area.appendChild(el("path", {
         d: d, fill: "none", stroke: corNoTema(s.cor, pal), "stroke-width": w,
         "stroke-linejoin": "round", "stroke-linecap": s.traco ? "butt" : "round",
-        "stroke-dasharray": s.traco === "pontilhado" ? (w * 1.2) + " " + (w * 1.6) : null
+        "stroke-dasharray": s.traco === "pontilhado" ? (w * 1.2) + " " + (w * 1.6) : null,
+        opacity: s.opacidade || null
       }));
     });
 
@@ -2304,6 +2454,7 @@
     } else {
       raiz.appendChild(cartao.frame);
     }
+    if (g.tipo === "simulador") raiz.appendChild(controlesSimulador(cartao));
     paragrafos(g.nota, "nota").forEach(function (p) { raiz.appendChild(p); });
     // o gráfico leva o rótulo curto do acontecimento; a explicação inteira fica
     // aqui embaixo, em lista, na ordem em que aconteceu
@@ -3209,6 +3360,12 @@
     dados.secoes.forEach(function (sec, k) {
       // Seção sem título é legítima: a primeira costuma continuar o título
       // do assunto, e repetir um cabeçalho ali só empurra o texto para baixo.
+      // "parte": divisória grande (EUA e mundo, Brasil) antes da seção
+      if (sec.parte) {
+        var parte = html("div", { "class": "artigo-parte", id: "parte-" + slug(dados.assunto) + "-" + k });
+        parte.appendChild(html("span", { texto: sec.parte }));
+        art.appendChild(parte);
+      }
       var secao = html("section", {
         "class": "artigo-secao" + (sec.titulo ? "" : " sem-titulo"),
         id: "secao-" + slug(dados.assunto) + "-" + k
@@ -3345,7 +3502,8 @@
     indiceItens = [];
     var grupos = [], grupo = null;
     dados.secoes.forEach(function (sec, k) {
-      if (sec.titulo || !grupo) {
+      if (sec.parte) grupos.push({ parte: sec.parte, id: "parte-" + slug(dados.assunto) + "-" + k });
+      if (sec.titulo || !grupo || grupo.parte) {
         grupo = { titulo: sec.titulo, id: "secao-" + slug(dados.assunto) + "-" + k, graficos: [] };
         grupos.push(grupo);
       }
@@ -3356,6 +3514,14 @@
     indiceLateral.appendChild(topo);
     var lista = html("ol", { "class": "il-lista" });
     grupos.forEach(function (gr) {
+      if (gr.parte) {
+        var lp = html("li", { "class": "il-parte" });
+        var ap = html("a", { href: "#" + gr.id, texto: gr.parte });
+        ap.addEventListener("click", function (e) { e.preventDefault(); irPara(gr.id); });
+        lp.appendChild(ap);
+        lista.appendChild(lp);
+        return;
+      }
       var li = html("li", { "class": "il-grupo" + (gr.titulo ? "" : " sem-titulo") });
       if (gr.titulo) {
         var a = html("a", { "class": "il-secao", href: "#" + gr.id, texto: gr.titulo });
