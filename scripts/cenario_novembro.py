@@ -214,8 +214,7 @@ def graficos_fomc():
 
 
 def graficos_fomc_inflacao():
-    f = fomc()
-    return [f["pce"], f["cpi"]]
+    return [fomc()["pce"]]
 
 
 def graficos_fomc_payroll():
