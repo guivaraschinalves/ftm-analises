@@ -622,6 +622,22 @@ def graficos_fiscal():
                  series=series)]
 
 
+def graficos_divida():
+    """Dívida bruta do governo geral nas duas metodologias do BC, do ftm-dados."""
+    doc = json_ftm_dados("dados/fiscal.json")
+    g = next(g for s in doc["secoes"] for g in s["graficos"] if g["id"] == "fiscal-divida-bruta")
+    var = {v["rot"]: dict((d[0], d[1]) for d in v["series"][0]["dados"]) for v in g["variantes"]}
+    antiga, nova = var["Metodologia até 2007"], var["Metodologia a partir de 2008"]
+    print("  dívida bruta em %s: %.1f%% (a partir de 2008), %.1f%% (até 2007)"
+          % (max(nova), nova[max(nova)], antiga[max(antiga)]))
+    return [dict(id="br-divida-bruta", titulo="Dívida bruta do governo geral",
+                 subtitulo="Em % do PIB; a metodologia até 2007, a usada pelo FMI, inclui os títulos do Tesouro "
+                           "na carteira do Banco Central",
+                 unidade="%", eixo={"zero": False}, fonte="Banco Central (SGS) e FtM",
+                 series=[serie("Metodologia até 2007", VERMELHO, antiga, 1, rotulo=True),
+                         serie("Metodologia a partir de 2008", AZUL, nova, 1, rotulo=True)])]
+
+
 # ================================================================ montagem
 
 def graficos_fomc_todos():
@@ -635,7 +651,7 @@ def graficos_midterms_todos():
 
 GERADORES = [graficos_fomc_todos, graficos_midterms_todos, graficos_ia, graficos_anthropic, graficos_eleicao,
              graficos_focus, graficos_focus_ipca, graficos_copom, graficos_ipca_meta, graficos_ipca_grupos,
-             graficos_caged, graficos_fiscal]
+             graficos_caged, graficos_fiscal, graficos_divida]
 
 # Um gráfico por bloco, com o comentário dele logo antes (pedido dele). Os
 # blocos sem título continuam a seção de cima; a ordem casa com a do texto.
@@ -653,7 +669,7 @@ SECOES = [("Decisão do FOMC", ["fomc-comunicados"]), ("", ["ism-pmi"]), ("", ["
           ("Decisão do Copom", ["copom-comunicados"]), ("", ["ipca-distancia-meta"]),
           ("", ["servicos-industriais-alimentacao"]),
           ("Emprego formal", ["br-caged-12m"]), ("", ["br-caged-setembro"]),
-          ("A principal questão para o próximo ano", ["br-fiscal-crescimento-real"])]
+          ("A principal questão para o próximo ano", ["br-fiscal-crescimento-real"]), ("", ["br-divida-bruta"])]
 
 
 def main():
