@@ -82,17 +82,17 @@ EUA e mundo
 
 ## grafico: Anthropic: receita
 - **Receita multiplicada:** US$ 17,0 bilhões no 3º trimestre de 2026, 12 vezes a do mesmo trimestre de 2025.
-- **IPO a caminho:** pedido público em 26/10 e prospecto revisado em 2/11, ainda sem faixa de preço.
-- **Calendário da imprensa:** roadshow a partir da semana de 9/11 e estreia na Nasdaq, com o código ANT, antes de 26/11. A empresa não confirmou.
+- **Faixa de preço definida:** o prospecto de 10/11 fixou US$ 70 a 78 por ação, com 825 milhões de ações à venda.
+- **Estreia em 19/11:** na Nasdaq, com o código ANT, segundo a CNBC.
 
 ## grafico: Anthropic: margem operacional
 - **Perto do equilíbrio:** margem operacional de −3% no 3º trimestre de 2026, depois de +8% no 2º.
 - **Um ano antes:** −224% no 3º trimestre de 2025. O prejuízo encolheu enquanto a receita crescia 12 vezes.
 
 ## grafico: Anthropic: preço / vendas contra big techs, SpaceX e chinesas
-- **Mais cara que as big techs:** a US$ 115 por ação (contrato pré-IPO da trade.xyz, 27/10), cerca de 29 vezes a receita anualizada do último trimestre, contra 13,6 da Nvidia e 11,0 da Microsoft.
-- **Preço em queda:** depois da venda das ações de IA, a Bloomberg relatou conversas com investidores entre US$ 1,1 e 1,3 trilhão, ou 16 a 19 vezes a mesma receita.
-- **Não é faixa oficial:** a faixa de preço sai num novo prospecto, antes do roadshow.
+- **Mais cara que as big techs:** a US$ 74 por ação, o meio da faixa do IPO, cerca de 18 vezes a receita anualizada do último trimestre, contra 13,6 da Nvidia e 11,0 da Microsoft.
+- **Abaixo do pré-IPO:** o contrato da trade.xyz chegou a US$ 115 em 27/10, ou 29 vezes a mesma receita.
+- **Valor:** US$ 1,25 trilhão com as ações de antes da oferta; com as novas, até US$ 1,405 trilhão no topo da faixa.
 
 ## secao
 Brasil
