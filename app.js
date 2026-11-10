@@ -76,7 +76,7 @@
   // a ordem é a do índice; assuntos do mesmo "grupo" ficam juntos
   var FONTES = ["dados/gave.json", "dados/cenario-2026-11-08.json", "dados/cenario-2026-10-28-fomc.json",
                 "dados/defasagem-combustiveis.json", "dados/eleicoes.json", "dados/midterms-2026.json",
-                "dados/petroleo.json", "dados/ueno-bank.json"];
+                "dados/petroleo.json", "dados/ueno-bank.json", "dados/missao-global-miami.json"];
   // Uma página pode pedir outros arquivos: <body data-fontes="dados/x.json">.
   if (document.body && document.body.getAttribute("data-fontes")) {
     FONTES = document.body.getAttribute("data-fontes").split(/\s*,\s*/);
@@ -1386,11 +1386,25 @@
     // Faixas de fundo ("sombras": [{de, ate}]), como as recessões: um
     // retângulo translúcido do primeiro ao último período de cada uma, atrás
     // da grade e das séries. Quem explica o que a faixa é, é o subtítulo.
+    // Faixa com "cor" (ciclos de alta e de corte) sai na cor dela, um pouco
+    // mais forte; "rot" é um número curto escrito no alto da faixa, que desce
+    // uma linha quando bate no da faixa anterior e some se não couber.
+    var fsSomb = L.tick * 0.85, fimRot = [-Infinity, -Infinity];
     (g.sombras || []).forEach(function (sb) {
       var ia = Math.max(idxDe(g, sb.de), d0), ib = Math.min(idxDe(g, sb.ate) + 1, d1);
       if (ib <= ia) return;
+      var claro = tema() === "light";
       svg.appendChild(el("rect", { x: X(ia), y: L.y0, width: X(ib) - X(ia), height: ph,
-                                   fill: pal.texto, opacity: tema() === "light" ? 0.09 : 0.14 }));
+                                   fill: sb.cor ? corNoTema(sb.cor, pal) : pal.texto,
+                                   opacity: sb.cor ? (claro ? 0.2 : 0.26) : (claro ? 0.09 : 0.14) }));
+      if (!sb.rot) return;
+      var cx = (X(ia) + X(ib)) / 2, meia = largura(sb.rot, fsSomb, "bold") / 2 + 4;
+      var fila = cx - meia > fimRot[0] ? 0 : cx - meia > fimRot[1] ? 1 : -1;
+      if (fila < 0) return;
+      fimRot[fila] = cx + meia;
+      svg.appendChild(texto(sb.rot, { x: cx, y: L.y0 + fsSomb * (0.9 + fila * 1.15), "font-size": fsSomb,
+                                      "font-weight": "bold", "text-anchor": "middle",
+                                      fill: sb.cor ? corNoTema(sb.cor, pal) : pal.suave }));
     });
 
     // grade e eixo Y (dos dois lados, como nos slides)
@@ -1729,16 +1743,28 @@
         x1: x, x2: x, y1: L.y0, y2: L.y1, stroke: pal.suave, "stroke-width": 1.5, "stroke-dasharray": "6 6"
       }));
       var titulo = rotuloX(g, i, true);
-      var w = Math.max(largura(titulo, fs, "bold"), Math.max.apply(null, linhas.map(function (l) {
+      // a faixa de fundo sob o mouse, se ela tiver o que dizer ("dica")
+      var somb = (g.sombras || []).filter(function (sb) {
+        return sb.dica && idxDe(g, sb.de) <= i && i <= idxDe(g, sb.ate);
+      })[0];
+      var extra = somb ? 1 : 0;
+      var w = Math.max(largura(titulo, fs, "bold"), somb ? largura(somb.dica, fs) : 0,
+                       Math.max.apply(null, linhas.map(function (l) {
         return largura(l.s.nome + "  " + valorTip(l.v, l.s), fs) + fs * 1.1;
       }))) + pad * 2;
-      var h = (linhas.length + 1) * fs * 1.3 + pad;
+      var h = (linhas.length + 1 + extra) * fs * 1.3 + pad;
       var bx = x + 22; if (bx + w > L.x1) bx = x - 22 - w;
+      // caixa larga que não cabe de nenhum lado fica presa dentro do gráfico
+      if (bx < L.x0) bx = Math.max(L.x0, L.x1 - w);
       var by = Math.max(L.y0 + 8, Math.min(p.y - h / 2, L.y1 - h - 8));
       camada.appendChild(el("rect", { x: bx, y: by, width: w, height: h, rx: 8, fill: pal.tipBg, stroke: pal.tipBorda, "stroke-width": 1.5 }));
       camada.appendChild(texto(titulo, { x: bx + pad, y: by + pad + fs * 0.8, "font-size": fs, "font-weight": "bold", fill: pal.texto }));
+      if (somb) {
+        camada.appendChild(texto(somb.dica, { x: bx + pad, y: by + pad + fs * 0.8 + fs * 1.3, "font-size": fs,
+                                              fill: somb.cor ? corNoTema(somb.cor, pal) : pal.suave }));
+      }
       linhas.forEach(function (l, k) {
-        var ty = by + pad + fs * 0.8 + (k + 1) * fs * 1.3;
+        var ty = by + pad + fs * 0.8 + (k + 1 + extra) * fs * 1.3;
         camada.appendChild(el("rect", { x: bx + pad, y: ty - fs * 0.62, width: fs * 0.7, height: fs * 0.7, rx: 2, fill: corNoTema(l.s.cor, pal) }));
         camada.appendChild(texto(l.s.nome, { x: bx + pad + fs * 1.1, y: ty, "font-size": fs, fill: pal.suave }));
         camada.appendChild(texto(valorTip(l.v, l.s), { x: bx + w - pad, y: ty, "font-size": fs, "font-weight": "bold", fill: pal.texto, "text-anchor": "end" }));
