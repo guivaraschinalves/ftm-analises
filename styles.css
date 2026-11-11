@@ -254,6 +254,25 @@ ul.artigo-texto ul li { margin: 0 0 4px; }
 /* respiro entre a prosa e o gráfico que ela introduz, e depois dele */
 .artigo-secao > .card { margin: 28px 0 32px; }
 
+/* ---------- mudar os gráficos de lugar (assuntos com "reordenar") ---------- */
+.ordem-controles { display: flex; gap: 8px; align-items: center; justify-content: flex-end; margin: 0 0 -18px; }
+.ordem-controles .btn { padding: 4px 10px; font-size: 13px; }
+.ordem-alca {
+  cursor: grab; user-select: none; padding: 4px 10px; font-size: 13px; color: var(--ink-2);
+  border: 1px dashed var(--border); border-radius: 8px; touch-action: none;
+}
+.ordem-alca:active { cursor: grabbing; }
+.artigo-secao.arrastando { opacity: .45; }
+.artigo-secao.alvo-antes { box-shadow: 0 -3px 0 var(--accent); }
+.artigo-secao.alvo-depois { box-shadow: 0 3px 0 var(--accent); }
+.ordem-barra {
+  position: sticky; top: 64px; z-index: 30; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  margin: 16px 0; padding: 10px 14px; border: 1px solid var(--accent); border-radius: 10px;
+  background: var(--bg, #111); color: var(--ink);
+}
+.ordem-barra[hidden] { display: none; }
+.ordem-aviso { flex: 1 1 200px; font-size: 14px; }
+
 /* ---------- figura: imagem de terceiro no meio do texto ----------
    Fundo claro sempre, porque as tabelas e gráficos que a gente cita vêm
    desenhados em branco: num tema escuro, sem a moldura, eles pareceriam um

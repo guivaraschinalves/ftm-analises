@@ -419,6 +419,32 @@
     for (var i = 0; i < cands.length; i++) if (cands[i] * mag >= bruto) return cands[i] * mag;
     return 10 * mag;
   }
+  // Escala do eixo da direita (séries com "dir", noutra unidade): o mesmo
+  // número de intervalos da esquerda, para cada número cair numa linha da
+  // grade. Vem do ftm-dados.
+  var DEGRAUS_DIR = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
+  function escalaCasada(mn, mx, eixo, n) {
+    eixo = eixo || {};
+    var baixo = mn, alto = mx;
+    if (eixo.zero !== false && mn >= 0 && mn <= mx * 0.6) baixo = 0;
+    if (eixo.min !== undefined) baixo = eixo.min;
+    if (eixo.max !== undefined) alto = eixo.max;
+    if (alto - baixo <= 0) alto = baixo + 1;
+    var base = Math.pow(10, Math.floor(Math.log10((alto - baixo) / n)) - 1), degraus = [];
+    for (var d = 0; d < 4; d++) {
+      for (var c = 0; c < DEGRAUS_DIR.length; c++) degraus.push(DEGRAUS_DIR[c] * base * Math.pow(10, d));
+    }
+    var passo = degraus[degraus.length - 1], min = 0;
+    for (var i = 0; i < degraus.length; i++) {
+      var p = degraus[i];
+      var m = eixo.min !== undefined ? eixo.min : Math.floor(baixo / p + 1e-9) * p;
+      if (m + n * p >= alto - 1e-9) { passo = p; min = m; break; }
+    }
+    var ticks = [];
+    for (var k = 0; k <= n; k++) ticks.push(+(min + k * passo).toFixed(6));
+    return { min: min, max: min + n * passo, passo: passo, ticks: ticks };
+  }
+
   function escalaY(mn, mx, eixo) {
     eixo = eixo || {};
     var baixo = mn, alto = mx;
@@ -1287,9 +1313,14 @@
 
     // extremos: barras entram empilhadas (positivas e negativas em separado)
     var mn = Infinity, mx = -Infinity, pilhaPos = {}, pilhaNeg = {};
+    // série com "dir" mede noutra unidade: escala própria, no eixo da direita
+    var mnD = Infinity, mxD = -Infinity, naDireita = g.series.filter(function (s) { return s.dir; });
     g.series.forEach(function (s, k) {
       vis[k].forEach(function (p) {
-        if (s.tipo === "barra" && g.agrupadas) {
+        if (s.dir) {
+          if (p.v < mnD) mnD = p.v;
+          if (p.v > mxD) mxD = p.v;
+        } else if (s.tipo === "barra" && g.agrupadas) {
           // lado a lado: cada barra vale por si, e o zero entra na escala
           mn = Math.min(mn, p.v, 0); mx = Math.max(mx, p.v, 0);
         } else if (s.tipo === "barra") {
@@ -1341,6 +1372,9 @@
       mx = mn + (mx - mn) / (1 - Math.min(0.45, folga));
     }
     var esc = escalaY(mn, mx, g.eixo);
+    var escDir = mnD === Infinity ? null : escalaCasada(mnD, mxD, g.eixo2, esc.ticks.length - 1);
+    var FD = escDir ? (UNIDADES[g.unidade2] || F) : F;
+    var twD = escDir ? Math.max.apply(null, escDir.ticks.map(function (t) { return largura(FD.eixo(t, escDir.passo), L.tick); })) : 0;
 
     var tw = Math.max.apply(null, esc.ticks.map(function (t) { return largura(F.eixo(t, esc.passo), L.tick); }));
     var rotulos = [];
@@ -1355,11 +1389,13 @@
     var F2 = g.eixoDireita ? UNIDADES[g.eixoDireita] : F, duplo = L.eixoDuplo || !!g.eixoDireita;
     var tw2 = Math.max.apply(null, esc.ticks.map(function (t) { return largura(F2.eixo(t, esc.passo), L.tick); }));
     L.x0 = 26 + tw + 14;
-    L.x1 = L.W - (22 + Math.max(duplo ? tw2 + 14 : 0, rw + L.rotuloX + 10));
+    L.x1 = L.W - (22 + Math.max(escDir ? twD + 14 : duplo ? tw2 + 14 : 0, rw + L.rotuloX + 10));
     L.y0 = y0;
     var pw = L.x1 - L.x0, ph = L.y1 - L.y0;
     var X = function (i) { return L.x0 + (i - d0) / (d1 - d0) * pw; };
     var Y = function (v) { return L.y1 - (v - esc.min) / (esc.max - esc.min) * ph; };
+    var YD = escDir ? function (v) { return L.y1 - (v - escDir.min) / (escDir.max - escDir.min) * ph; } : Y;
+    var yDe = function (s) { return s.dir && escDir ? YD : Y; };
     var pxMes = pw / (d1 - d0);
 
     var svg = el("svg", {
@@ -1374,7 +1410,7 @@
     // Onde cada rótulo do último ponto vai ficar, afastando os que se
     // encostam. Fica antes do eixo porque o eixo da direita só imprime o
     // número onde não houver rótulo — e o que vale é a posição final dele.
-    var rotY = rotulos.map(function (r) { return Math.min(Math.max(Y(r.p.v), L.y0), L.y1); });
+    var rotY = rotulos.map(function (r) { return Math.min(Math.max(yDe(r.s)(r.p.v), L.y0), L.y1); });
     var ordem = rotulos.map(function (r, k) { return { r: r, y: rotY[k] }; }).sort(function (a, b) { return a.y - b.y; });
     var passoRot = L.rotulo * 1.08;
     for (var a = 1; a < ordem.length; a++) {
@@ -1418,7 +1454,17 @@
       }));
       var at = { y: y, "font-size": L.tick, fill: pal.eixo, "dominant-baseline": "central" };
       svg.appendChild(texto(F.eixo(t, esc.passo), Object.assign({ x: L.x0 - 14, "text-anchor": "end" }, at)));
-      if (duplo && ordem.every(function (o) { return Math.abs(o.y - y) > L.rotulo * 0.9; })) {
+      var livre = ordem.every(function (o) { return Math.abs(o.y - y) > L.rotulo * 0.9; });
+      if (escDir) {
+        // a mesma marca na unidade da direita; com uma série só ali, o número
+        // sai na cor dela, que é o que diz a quem a escala pertence
+        var tD = escDir.ticks[esc.ticks.indexOf(t)];
+        if (tD !== undefined && livre) {
+          svg.appendChild(texto(FD.eixo(tD, escDir.passo), Object.assign({}, at, {
+            x: L.x1 + 14, "text-anchor": "start",
+            fill: naDireita.length === 1 ? corNoTema(naDireita[0].cor, pal) : pal.eixo })));
+        }
+      } else if (duplo && livre) {
         svg.appendChild(texto(F2.eixo(t, esc.passo), Object.assign({ x: L.x1 + 14, "text-anchor": "start" }, at)));
       }
     });
@@ -1595,9 +1641,9 @@
     var buracoMax = g.buracoMax || (g.intradiario ? 8 : g.diario ? 6 : 1);
     g.series.forEach(function (s, k) {
       if (s.tipo === "barra" || s.tipo === "faixa" || !vis[k].length) return;
-      var d = "", ant = null, bm = s.buracoMax || buracoMax;  // série anual num eixo mensal liga de 12 em 12
+      var d = "", ant = null, bm = s.buracoMax || buracoMax, YS = yDe(s);  // série anual num eixo mensal liga de 12 em 12
       vis[k].forEach(function (p) {
-        d += (ant === null || p.i - ant > bm ? "M" : "L") + X(p.i + 0.5).toFixed(1) + " " + Y(p.v).toFixed(1);
+        d += (ant === null || p.i - ant > bm ? "M" : "L") + X(p.i + 0.5).toFixed(1) + " " + YS(p.v).toFixed(1);
         ant = p.i;
       });
       var w = s.largura || L.linha;
@@ -1611,7 +1657,7 @@
 
     ordem.forEach(function (o) {
       var cor = corNoTema(o.r.s.cor, pal);
-      var px = X(o.r.p.i + 0.5), py = Y(o.r.p.v), lx = L.x1 + L.rotuloX;
+      var px = X(o.r.p.i + 0.5), py = yDe(o.r.s)(o.r.p.v), lx = L.x1 + L.rotuloX;
       svg.appendChild(el("polyline", {
         points: px + "," + py + " " + (lx - 4) + "," + o.y, fill: "none", stroke: pal.suave, "stroke-width": 1.2
       }));
@@ -1665,7 +1711,7 @@
 
     rotulosEventos.forEach(function (t) { svg.appendChild(t); });
 
-    return { svg: svg, L: L, pal: pal, X: X, Y: Y, d0: d0, d1: d1, vis: vis, esc: esc };
+    return { svg: svg, L: L, pal: pal, X: X, Y: Y, yDe: yDe, d0: d0, d1: d1, vis: vis, esc: esc };
   }
 
   // ---------- passar o mouse ----------
@@ -1771,7 +1817,7 @@
         camada.appendChild(texto(l.s.nome, { x: bx + pad + fs * 1.1, y: ty, "font-size": fs, fill: pal.suave }));
         camada.appendChild(texto(valorTip(l.v, l.s), { x: bx + w - pad, y: ty, "font-size": fs, "font-weight": "bold", fill: pal.texto, "text-anchor": "end" }));
         if (desenho.vis[g.series.indexOf(l.s)] && l.s.tipo !== "barra") {
-          camada.appendChild(el("circle", { cx: x, cy: desenho.Y(l.v), r: 6, fill: corNoTema(l.s.cor, pal), stroke: pal.bg, "stroke-width": 2 }));
+          camada.appendChild(el("circle", { cx: x, cy: (desenho.yDe ? desenho.yDe(l.s) : desenho.Y)(l.v), r: 6, fill: corNoTema(l.s.cor, pal), stroke: pal.bg, "stroke-width": 2 }));
         }
       });
     }
@@ -3375,6 +3421,172 @@
   // meio. Serve a uma análise, onde o leitor precisa ser levado na ordem e
   // obrigá-lo a abrir capítulo é atrito. Os cartões continuam retráteis, mas
   // nascem abertos.
+  // ---------- mudar os gráficos de lugar ----------
+  // Só nos assuntos com "reordenar" no JSON (hoje, o Missão Global Miami). A
+  // ordem é uma lista de ids de gráfico num arquivo do repositório, gravado
+  // pela mesma chave do GitHub dos comentários, e vale para todos. Cada seção
+  // anda inteira (título e gráfico); a divisória de "parte" fica no alto. Os
+  // gráficos que o arquivo não cita (novos) ficam no fim, na ordem do JSON.
+  var CHAVE_ORDEM = "ftm_analises_ordem_pendente";
+
+  function gravarArquivo(arquivo, conteudo, mensagem, tentativa) {
+    var token = chaveGitHub(tentativa === "nova-chave");
+    if (!token) return Promise.reject(new Error("sem chave"));
+    var url = "https://api.github.com/repos/" + REPO + "/contents/" + arquivo;
+    var cab = { Authorization: "Bearer " + token, Accept: "application/vnd.github+json" };
+    return fetch(url + "?ref=" + RAMO + "&t=" + Date.now(), { headers: cab, cache: "no-store" }).then(function (r) {
+      if (r.status === 401 || r.status === 403) throw { chave: true };
+      if (r.status === 404) return null;
+      if (!r.ok) throw new Error("GitHub respondeu " + r.status);
+      return r.json().then(function (j) { return j.sha; });
+    }).then(function (sha) {
+      var corpo = { message: mensagem, content: textoParaB64(conteudo), branch: RAMO };
+      if (sha) corpo.sha = sha;
+      return fetch(url, { method: "PUT", headers: cab, body: JSON.stringify(corpo) });
+    }).then(function (r) {
+      if (r.status === 401 || r.status === 403) throw { chave: true };
+      if ((r.status === 409 || r.status === 422) && !tentativa) return gravarArquivo(arquivo, conteudo, mensagem, "de-novo");
+      if (!r.ok) throw new Error("GitHub respondeu " + r.status);
+    }).catch(function (e) {
+      if (e && e.chave && tentativa !== "nova-chave") {
+        window.alert("A chave do GitHub não foi aceita. Cole outra.");
+        return gravarArquivo(arquivo, conteudo, mensagem, "nova-chave");
+      }
+      throw e;
+    });
+  }
+
+  function ligarReordenar(art, arquivo, assunto) {
+    function idDe(sec) { var c = sec.querySelector(".card"); return c ? c.id : null; }
+    var secoes = [].slice.call(art.children).filter(function (el) {
+      return el.classList.contains("artigo-secao") && idDe(el);
+    });
+    if (secoes.length < 2) return;
+    var porId = {}, original = secoes.map(idDe);
+    secoes.forEach(function (sec) { porId[idDe(sec)] = sec; });
+    // uma marca invisível no lugar de cada seção: as vagas não mudam, só quem as ocupa
+    var vagas = secoes.map(function (sec) {
+      var m = document.createComment("vaga");
+      art.insertBefore(m, sec);
+      return m;
+    });
+    var gravada = original.slice(), atual = original.slice();
+
+    var barra = html("div", { "class": "ordem-barra", hidden: "" });
+    var aviso = html("span", { "class": "ordem-aviso", texto: "A ordem dos gráficos mudou." });
+    var btnGravar = html("button", { type: "button", "class": "btn btn-forte", texto: "Gravar ordem" });
+    var btnDesfazer = html("button", { type: "button", "class": "btn", texto: "Desfazer" });
+    barra.appendChild(aviso); barra.appendChild(btnGravar); barra.appendChild(btnDesfazer);
+    art.insertBefore(barra, vagas[0]);
+
+    function completar(lista) {
+      var fora = (lista || []).filter(function (id, i, l) { return porId[id] && l.indexOf(id) === i; });
+      original.forEach(function (id) { if (fora.indexOf(id) < 0) fora.push(id); });
+      return fora;
+    }
+    function igual(a, b) { return a.join("|") === b.join("|"); }
+    function atualizarBarra(msg) {
+      var mudou = !igual(atual, gravada);
+      barra.hidden = !mudou && !msg;
+      btnGravar.hidden = btnDesfazer.hidden = !mudou;
+      aviso.textContent = msg || "A ordem dos gráficos mudou.";
+    }
+    function aplicar(lista) {
+      atual = completar(lista);
+      atual.forEach(function (id, i) { art.insertBefore(porId[id], vagas[i].nextSibling); });
+      // a primeira vaga leva o título da seção que chegou nela; o espaçamento
+      // de "sem título" vale para onde a seção estiver
+      atualizarBarra();
+    }
+    function mover(id, destino) {
+      var lista = atual.slice(), de = lista.indexOf(id);
+      if (de < 0 || destino < 0 || destino >= lista.length || destino === de) return;
+      lista.splice(de, 1);
+      lista.splice(destino, 0, id);
+      aplicar(lista);
+      porId[id].scrollIntoView({ block: "nearest" });
+    }
+
+    // os controles de cada seção: subir, descer e a alça de arrastar
+    var arrastado = null;
+    secoes.forEach(function (sec) {
+      var id = idDe(sec);
+      var ctl = html("div", { "class": "ordem-controles" });
+      var alca = html("span", { "class": "ordem-alca", title: "Arraste para mudar o gráfico de lugar",
+                                 texto: "\u2807 Mover" });
+      var sobe = html("button", { type: "button", "class": "btn", title: "Subir este gráfico", texto: "\u2191 Subir" });
+      var desce = html("button", { type: "button", "class": "btn", title: "Descer este gráfico", texto: "\u2193 Descer" });
+      sobe.addEventListener("click", function () { mover(id, atual.indexOf(id) - 1); });
+      desce.addEventListener("click", function () { mover(id, atual.indexOf(id) + 1); });
+      ctl.appendChild(alca); ctl.appendChild(sobe); ctl.appendChild(desce);
+      sec.insertBefore(ctl, sec.firstChild);
+
+      // arrastar com eventos de ponteiro (mouse, caneta e dedo), sem o
+      // arrastar nativo do navegador, que não existe no toque
+      alca.addEventListener("pointerdown", function (e) {
+        if (e.button !== undefined && e.button !== 0) return;
+        e.preventDefault();
+        arrastado = { id: id, alvo: null, lado: null };
+        sec.classList.add("arrastando");
+        try { alca.setPointerCapture(e.pointerId); } catch (x) {}
+      });
+      alca.addEventListener("pointermove", function (e) {
+        if (!arrastado) return;
+        secoes.forEach(function (s2) { s2.classList.remove("alvo-antes", "alvo-depois"); });
+        var sob = document.elementFromPoint(e.clientX, e.clientY);
+        var alvo = sob && sob.closest ? sob.closest(".artigo-secao") : null;
+        if (!alvo || secoes.indexOf(alvo) < 0 || alvo === sec) { arrastado.alvo = null; return; }
+        var r = alvo.getBoundingClientRect();
+        arrastado.alvo = idDe(alvo);
+        arrastado.lado = e.clientY < r.top + r.height / 2 ? "antes" : "depois";
+        alvo.classList.add(arrastado.lado === "antes" ? "alvo-antes" : "alvo-depois");
+        // perto da borda da janela, a página rola sozinha
+        if (e.clientY < 60) window.scrollBy(0, -24);
+        else if (e.clientY > window.innerHeight - 60) window.scrollBy(0, 24);
+      });
+      function soltar() {
+        if (!arrastado) return;
+        var a = arrastado;
+        arrastado = null;
+        secoes.forEach(function (s2) { s2.classList.remove("arrastando", "alvo-antes", "alvo-depois"); });
+        if (!a.alvo) return;
+        var lista = atual.filter(function (x) { return x !== a.id; });
+        lista.splice(lista.indexOf(a.alvo) + (a.lado === "depois" ? 1 : 0), 0, a.id);
+        aplicar(lista);
+      }
+      alca.addEventListener("pointerup", soltar);
+      alca.addEventListener("pointercancel", function () { arrastado = null; soltar(); });
+    });
+
+    btnDesfazer.addEventListener("click", function () { aplicar(gravada); });
+    btnGravar.addEventListener("click", function () {
+      var lista = atual.slice();
+      btnGravar.disabled = btnDesfazer.disabled = true;
+      aviso.textContent = "Gravando…";
+      gravarArquivo(arquivo, JSON.stringify({ assunto: assunto, ordem: lista }, null, 2) + "\n",
+                    "Ordem dos gráficos: " + assunto).then(function () {
+        gravada = lista;
+        var todas = lerLocal(CHAVE_ORDEM, {});
+        todas[arquivo] = { ordem: lista, em: Date.now() };
+        gravarLocal(CHAVE_ORDEM, todas);
+        atualizarBarra("Ordem gravada. Aparece para todos em cerca de um minuto.");
+      }).catch(function (e) {
+        atualizarBarra(e && e.message === "sem chave" ? "Sem a chave do GitHub, não dá para gravar."
+          : "Não gravou: " + ((e && e.message) || "erro") + ".");
+      }).then(function () { btnGravar.disabled = btnDesfazer.disabled = false; });
+    });
+
+    // a ordem gravada; logo depois de gravar, o arquivo no ar ainda pode ser o
+    // antigo (o Pages leva um minuto): vale a gravada aqui por até uma hora
+    fetch(arquivo + "?t=" + Date.now(), { cache: "no-store" }).then(function (r) {
+      return r.ok ? r.json() : null;
+    }).catch(function () { return null; }).then(function (j) {
+      var lista = j && j.ordem, pend = lerLocal(CHAVE_ORDEM, {})[arquivo];
+      if (pend && Date.now() - pend.em < 60 * 60 * 1000 && !(lista && igual(lista, pend.ordem))) lista = pend.ordem;
+      if (lista) { gravada = completar(lista); aplicar(gravada); }
+    });
+  }
+
   function montarArtigo(dados, host) {
     var art = html("article", { "class": "artigo", id: idAssunto(dados) });
     ligarRealce(art);
@@ -3434,6 +3646,7 @@
     });
 
     host.appendChild(art);
+    if (dados.reordenar) ligarReordenar(art, dados.reordenar, dados.assunto);
     // No quadro seguinte, não agora: desenhar() desiste se o frame ainda tem
     // largura zero (veja o clientWidth lá embaixo), e logo depois do
     // appendChild o navegador pode não ter feito o layout. Com o rAF o

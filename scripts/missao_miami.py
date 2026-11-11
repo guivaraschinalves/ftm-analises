@@ -84,14 +84,15 @@ def ciclos(selic):
 
 
 # ================================================================ ciclo
-# Atividade, confiança e mercado de trabalho: os gráficos que ainda não
-# existiam em nenhum dos sites. O resto do ciclo (PMS, PIB, crédito, Caged)
-# está no ftm-dados e entra aqui quando ele pedir.
+# O item 1 do roteiro (o ciclo), na ordem pedida por ele em 11/11/2026:
+# atividade (PMS e PMC), PIB, crédito, confiança e emprego. PIB e crédito são
+# cópias dos cartões do ftm-dados (como estão no GitHub); o resto sai daqui.
 
 BRANCO, AZUL_CLARO, AZUL_ESCURO, CINZA = cf.BRANCO, "#8EB4E3", cf.AZUL_ESCURO, "#8a8a86"
 SIDRA_UA = {"User-Agent": "Mozilla/5.0 (ftm-analises)"}
-FONTE_PMC = "IBGE (Pesquisa Mensal de Comércio) e FtM"
+FONTE_ATIV = "IBGE (Pesquisa Mensal de Serviços e Pesquisa Mensal de Comércio) e FtM"
 FONTE_PNAD = "IBGE (PNAD Contínua) e FtM"
+INICIO_ATIV = "2012-01"      # a PMS começa em 2011; a variação em 12 meses, em 2012
 
 
 def sidra(caminho):
@@ -116,80 +117,134 @@ def rot_m(m):
     return "%s/%s" % (MESES[int(m[5:7]) - 1], m[2:4])
 
 
-def graficos_varejo():
-    """PMC: volume com ajuste sazonal (varejo e ampliado) e as variações, no
-    molde da PMS do ftm-dados, sem a inflação implícita."""
-    d = {}
-    for tab, nome, cod in ((8880, "Varejo", "56734"), (8881, "Varejo ampliado", "56736")):
-        for l in sidra("t/%d/n1/all/v/7170,11708,11709,11711/p/all/c11046/%s" % (tab, cod)):
-            d.setdefault((nome, l["D2C"]), {})[mes(l["D3C"])] = l["v"]
-    variantes = []
-    for nome in ("Varejo", "Varejo ampliado"):
-        sa = d[(nome, "7170")]
-        rec = max(sa, key=sa.get)
-        linha = lambda v: {m: v for m in sa}                               # noqa: E731
-        variantes.append(dict(rot=nome, subtitulo="Índice com ajuste sazonal, 2022 = 100; pontilhado: fevereiro "
-                                                  "de 2020, antes da pandemia, e o recorde (%s)" % rot_m(rec),
-                              series=[cf.serie("Volume de vendas", BRANCO, sa, 1, largura=5, rotulo=True),
-                                      cf.serie("Fevereiro de 2020", AZUL_CLARO, linha(sa["2020-02"]), 1,
-                                               traco="pontilhado", largura=3, rotulo=True),
-                                      cf.serie("Recorde (%s)" % rot_m(rec), VERMELHO, linha(sa[rec]), 1,
-                                               traco="pontilhado", largura=3, rotulo=True)]))
-        ult = max(sa)
-        print("  %s: %s %.1f, recorde %s %.1f (%.1f%% abaixo); 12 meses %.1f%%"
-              % (nome, ult, sa[ult], rec, sa[rec], 100 * (sa[ult] / sa[rec] - 1), d[(nome, "11711")][ult]))
-    # o app daqui não usa o subtítulo do recorte: o geral vale para os dois
-    g_vol = dict(id="pmc-volume", titulo="Volume de vendas no varejo", unidade="ind", fonte=FONTE_PMC,
-                 subtitulo="Índice com ajuste sazonal, 2022 = 100; pontilhado: fevereiro de 2020, antes da "
-                           "pandemia, e o recorde; o ampliado soma veículos, material de construção e atacado "
-                           "de alimentos",
-                 eixo={"zero": False}, variantes=variantes)
+def desde(d, ini):
+    return {k: v for k, v in d.items() if k >= ini}
 
-    # 3 meses anualizado: média dos últimos 3 meses sobre a dos 3 anteriores,
-    # anualizada, com ajuste sazonal (como na PMS)
-    sa = d[("Varejo", "7170")]
-    ks = sorted(sa)
-    media3 = lambda i: sum(sa[ks[j]] for j in range(i - 2, i + 1)) / 3     # noqa: E731
-    ritmo = {ks[i]: 100 * ((media3(i) / media3(i - 3)) ** 4 - 1) for i in range(5, len(ks))}
-    # desde 2022: com a pandemia (de −40% a +80%) o resto vira uma linha reta
-    ritmo = {m: v for m, v in ritmo.items() if m >= "2022-01"}
-    doze = {m: v for m, v in d[("Varejo", "11711")].items() if m >= "2022-01"}
-    g_var = dict(id="pmc-variacoes", titulo="Volume de vendas no varejo: variações",
-                 subtitulo="Em %; varejo, e o ampliado em 12 meses; no mês e em 3 meses anualizado, com ajuste "
-                           "sazonal",
-                 unidade="%", fonte=FONTE_PMC, variantes=[
-                     dict(rot="No mês", subtitulo="Varejo, variação sobre o mês anterior, com ajuste sazonal, em %",
-                          series=[cf.serie("Variação no mês", AZUL, d[("Varejo", "11708")], 1, tipo="barra",
-                                           rotulo=True)]),
-                     dict(rot="Sobre o mesmo mês do ano anterior", subtitulo="Varejo, variação interanual, em %",
-                          series=[cf.serie("Variação interanual", AZUL, d[("Varejo", "11709")], 1, tipo="barra",
-                                           rotulo=True)]),
-                     dict(rot="Em 12 meses", subtitulo="Variação em 12 meses sobre os 12 anteriores, em %",
-                          series=[cf.serie("Varejo", AZUL, d[("Varejo", "11711")], 1, largura=5, rotulo=True),
-                                  cf.serie("Varejo ampliado", VERMELHO, d[("Varejo ampliado", "11711")], 1,
-                                           largura=5, rotulo=True)]),
-                     dict(rot="3 meses, anualizado", subtitulo="Varejo, com ajuste sazonal, em %",
-                          series=[cf.serie("3 meses, anualizado", VERMELHO, ritmo, 1, largura=3, rotulo=True),
-                                  cf.serie("Variação em 12 meses", AZUL, doze, 1, largura=5, rotulo=True)])])
-    print("  varejo: 3 meses anualizado %.1f%% em %s" % (ritmo[max(ritmo)], max(ritmo)))
-    return [g_vol, g_var]
+
+def graficos_ftm_dados(arq):
+    """{id: cartão} de um JSON do ftm-dados."""
+    gs = {}
+
+    def anda(secs):
+        for s in secs:
+            for g in s.get("graficos", []):
+                gs[g["id"]] = g
+            anda(s.get("subsecoes", []))
+    anda(cn.json_ftm_dados(arq)["secoes"])
+    return gs
+
+
+def sem_trimestral(g):
+    """O app daqui não tem eixo trimestral: "AAAA-Qn" vira o mês em que o
+    trimestre termina, e a linha liga de 3 em 3 meses."""
+    g = json.loads(json.dumps(g))
+    if not g.pop("trimestral", False):
+        return g
+    for grupo in [g] + g.get("variantes", []):
+        for s in grupo.get("series", []):
+            s["dados"] = [["%s-%02d" % (k[:4], 3 * int(k[-1])), v] for k, v in s["dados"]]
+    g["buracoMax"] = 3
+    return g
+
+
+def direita(g):
+    """Série no eixo da direita formata o número (rótulo e caixa do mouse)
+    pela unidade dele; e o app daqui lê o unidade2 no gráfico, não no recorte."""
+    for grupo in [g] + g.get("variantes", []):
+        u2 = grupo.get("unidade2") or g.get("unidade2")
+        if u2:
+            g.setdefault("unidade2", u2)
+        for s in grupo.get("series", []):
+            if s.get("dir"):
+                s["unidade"] = u2
+    return g
+
+
+def graficos_atividade():
+    """Volume de serviços (PMS) e de vendas no varejo (PMC): variação em 12
+    meses dos dois num gráfico; o nível (com ajuste sazonal) em outro, com os
+    dois juntos ou cada um."""
+    def tab(caminho):
+        d = {}
+        for l in sidra(caminho):
+            d.setdefault(l["D2C"], {})[mes(l["D3C"])] = l["v"]
+        return d
+    pms = tab("t/5906/n1/all/v/7168,11626/p/all/c11046/56726")
+    pmc = tab("t/8880/n1/all/v/7170,11711/p/all/c11046/56734")
+    nomes = (("Serviços (PMS)", pms, "7168", "11626", AZUL), ("Varejo (PMC)", pmc, "7170", "11711", VERMELHO))
+    for nome, d, nivel, doze, _ in nomes:
+        ult, rec = max(d[nivel]), max(d[nivel], key=d[nivel].get)
+        print("  %s: %s nível %.1f (recorde %s %.1f); 12 meses %.1f%%"
+              % (nome, ult, d[nivel][ult], rec, d[nivel][rec], d[doze][max(d[doze])]))
+    g12 = dict(id="atividade-12m", titulo="Volume de serviços e de vendas no varejo em 12 meses",
+               subtitulo="Variação do volume acumulado em 12 meses sobre os 12 meses anteriores, em %",
+               unidade="%", fonte=FONTE_ATIV,
+               series=[cf.serie(n, c, desde(d[dz], INICIO_ATIV), 1, largura=5, rotulo=True)
+                       for n, d, _, dz, c in nomes])
+
+    def sozinho(nome, sa, cor):
+        rec = max(sa, key=sa.get)
+        linha = {m: v for m, v in ((m, None) for m in sa)}
+        return dict(rot=nome, series=[
+            cf.serie("Volume", cor, sa, 1, largura=5, rotulo=True),
+            cf.serie("Fevereiro de 2020", AZUL_CLARO, {m: sa["2020-02"] for m in linha}, 1, traco="pontilhado",
+                     largura=3, rotulo=True),
+            cf.serie("Recorde (%s)" % rot_m(rec), CINZA, {m: sa[rec] for m in linha}, 1, traco="pontilhado",
+                     largura=3, rotulo=True)])
+    niveis = {n: desde(d[nv], "2011-01") for n, d, nv, _, _ in nomes}
+    g_nivel = dict(id="atividade-nivel", titulo="Volume de serviços e de vendas no varejo",
+                   subtitulo="Índice com ajuste sazonal, 2022 = 100; sozinhos, com fevereiro de 2020 (antes da "
+                             "pandemia) e o recorde pontilhados",
+                   unidade="ind", eixo={"zero": False}, fonte=FONTE_ATIV, variantes=[
+                       dict(rot="Os dois", series=[cf.serie(n, c, niveis[n], 1, largura=5, rotulo=True)
+                                                   for n, _, _, _, c in nomes]),
+                       sozinho("Serviços (PMS)", niveis["Serviços (PMS)"], AZUL),
+                       sozinho("Varejo (PMC)", niveis["Varejo (PMC)"], VERMELHO)])
+    return [g12, g_nivel]
+
+
+IDS_PIB = ["pib-familias-trimestral", "pib-familias-4tri", "pib-participacao"]
+IDS_CREDITO = ["credito-concessoes-pf-pj", "credito-inadimplencia", "credito-servico-divida",
+               "credito-endividamento", "credito-juros-selic", "credito-direcionado-livre"]
+# o ftm-dados não põe fonte em alguns cartões
+FONTES_COPIA = {"credito-inadimplencia": "Banco Central (SGS 21082, 21083 e 21084)",
+                "credito-servico-divida": "Banco Central (SGS 29033, 29034 e 29036)",
+                "credito-endividamento": "Banco Central (SGS 29037 e 29038)",
+                "credito-juros-selic": "Banco Central (SGS 432 e 29033)"}
+UNIDADES_COPIA = {"x2": "x"}       # unidades do ftm-dados que o app daqui chama por outro nome
+
+
+def graficos_pib_credito():
+    out = []
+    for arq, ids in (("dados/pib.json", IDS_PIB), ("dados/credito.json", IDS_CREDITO)):
+        gs = graficos_ftm_dados(arq)
+        for i in ids:
+            g = direita(sem_trimestral(gs[i]))
+            g.pop("nota", None)
+            g["fonte"] = g.get("fonte") or FONTES_COPIA[i]
+            g["unidade"] = UNIDADES_COPIA.get(g.get("unidade"), g.get("unidade"))
+            # o número em cima da barra: no ftm-dados é "valores" na série; aqui,
+            # no gráfico, e só com "agrupadas" (com uma série de barras, dá no mesmo)
+            if any(x.get("valores") for x in g.get("series", [])):
+                g.update(agrupadas=True, valores=True)
+            ult = max(k for grupo in [g] + g.get("variantes", []) for s in grupo.get("series", [])
+                      for k, _ in s["dados"])
+            print("  %-28s até %s" % (i, ult if not g.get("categorias") else g["categorias"][int(ult)]))
+            out.append(g)
+    return out
 
 
 def graficos_confianca():
     """ICEI (CNI, geral: o Ipeadata não tem o dessazonalizado), ICEC ajustado
     (CNC) e ICC (Fecomercio SP), do Ipeadata."""
-    indices = [("Indústria (ICEI)", "CNI12_ICEIGER12", 50, "Índice de Confiança do Empresário Industrial, da CNI, "
-                "geral; de 0 a 100, acima de 50 = confiança"),
-               ("Comércio (ICEC)", "CNC12_ICECAJ12", 100, "Índice de Confiança do Empresário do Comércio, da CNC, "
-                "com ajuste sazonal; de 0 a 200, acima de 100 = confiança"),
-               ("Consumidor (ICC)", "FCESP12_IIC12", 100, "Índice de Confiança do Consumidor, da Fecomercio SP; "
-                "de 0 a 200, acima de 100 = otimismo")]
+    indices = [("Indústria (ICEI)", "CNI12_ICEIGER12", 50), ("Comércio (ICEC)", "CNC12_ICECAJ12", 100),
+               ("Consumidor (ICC)", "FCESP12_IIC12", 100)]
     variantes = []
-    for rot, cod, neutro, sub in indices:
+    for rot, cod, neutro in indices:
         s = cn.ipea(cod)
         ult = max(s)
-        print("  %s: %s %.1f (12 meses antes %.1f)" % (rot, ult, s[ult], s.get(cf.mes_mais(ult, -12), float("nan"))))
-        variantes.append(dict(rot=rot, subtitulo=sub, series=[
+        print("  %s: %s %.1f" % (rot, ult, s[ult]))
+        variantes.append(dict(rot=rot, series=[
             cf.serie(rot, AZUL, s, 1, largura=5, rotulo=True),
             cf.serie("Neutro (%d)" % neutro, CINZA, {m: neutro for m in s}, 0, traco="pontilhado", largura=3)]))
     return [dict(id="confianca", titulo="Índices de confiança", unidade="ind", eixo={"zero": False},
@@ -198,96 +253,44 @@ def graficos_confianca():
                  fonte="CNI, CNC e Fecomercio SP (via Ipeadata)", variantes=variantes)]
 
 
-def trimestres(d):
-    """Série da PNAD por trimestre móvel ("AAAA-MM") → trimestres civis ("AAAA-Qn"):
-    os trimestres móveis que terminam em mar, jun, set e dez."""
-    return {"%s-Q%d" % (m[:4], int(m[5:7]) // 3): v for m, v in d.items() if m[5:7] in ("03", "06", "09", "12")}
-
-
-def menos4(q):
-    return "%d-%s" % (int(q[:4]) - 1, q[5:])
-
-
-def acum4(d, media=False):
-    """Variação em 4 trimestres sobre os 4 anteriores, em %."""
-    def janela(q):
-        a, n = int(q[:4]), int(q[-1])
-        qs = []
-        for _ in range(4):
-            qs.append("%d-Q%d" % (a, n))
-            n -= 1
-            if n == 0:
-                a, n = a - 1, 4
-        return qs
-    out = {}
-    for q in d:
-        j, j0 = janela(q), janela(menos4(q))
-        if all(x in d for x in j + j0):
-            out[q] = 100 * (sum(d[x] for x in j) / sum(d[x] for x in j0) - 1)
-    return out
-
-
-def graficos_trabalho():
-    """Desemprego (PNAD) e Caged; rendimento real e produtividade; atividade e emprego."""
+def graficos_emprego():
+    """Taxa de desemprego e taxa de participação (PNAD, trimestre móvel) e o
+    Caged de setembro de cada ano (o do Relatório de Novembro)."""
     taxa = {mes(l["D3C"]): l["v"] for l in sidra("t/6381/n1/all/v/4099/p/all")}
-    ocup = {mes(l["D3C"]): l["v"] for l in sidra("t/6320/n1/all/v/4090/p/all/c11913/96165")}
-    ocup_var = {mes(l["D3C"]): l["v"] for l in sidra("t/6320/n1/all/v/8435/p/all/c11913/96165")}
-    rend = {mes(l["D3C"]): l["v"] for l in sidra("t/6390/n1/all/v/5933/p/all")}
-    pib = {"%s-Q%d" % (l["D3C"][:4], int(l["D3C"][4:])): l["v"]
-           for l in sidra("t/1620/n1/all/v/583/p/all/c11255/90707")}
+    pop = {}
+    for l in sidra("t/6318/n1/all/v/1641/p/all/c629/32385,32386"):
+        pop.setdefault(l["D4C"], {})[mes(l["D3C"])] = l["v"]
+    part = {m: 100 * v / pop["32385"][m] for m, v in pop["32386"].items() if m in pop["32385"]}
+    # confere com a taxa trimestral que o IBGE publica (tabela 6461)
+    pub = {"%s-%02d" % (l["D3C"][:4], 3 * int(l["D3C"][4:])): l["v"] for l in sidra("t/6461/n1/all/v/4096/p/all")}
+    erro = max(abs(part[m] - v) for m, v in pub.items() if m in part)
+    if erro > 0.15:
+        raise RuntimeError("taxa de participação longe da publicada (%.2f p.p.)" % erro)
+    ut, up = max(taxa), max(part)
+    print("  desemprego %s %.1f%% (mínimo %s %.1f%%); participação %s %.1f%% (máximo %s %.1f%%); "
+          "diferença para a trimestral publicada até %.2f p.p."
+          % (ut, taxa[ut], min(taxa, key=taxa.get), min(taxa.values()), up, part[up],
+             max(part, key=part.get), max(part.values()), erro))
+    g_taxa = dict(id="desemprego", titulo="Taxa de desemprego",
+                  subtitulo="Desocupados em % da força de trabalho, trimestre móvel terminado no mês, sem ajuste "
+                            "sazonal", unidade="pct1", fonte=FONTE_PNAD,
+                  series=[cf.serie("Taxa de desemprego", AZUL, taxa, 1, largura=5, rotulo=True)])
+    g_part = dict(id="participacao", titulo="Taxa de participação na força de trabalho",
+                  subtitulo="Pessoas na força de trabalho (ocupadas ou procurando trabalho) em % das pessoas de 14 "
+                            "anos ou mais, trimestre móvel terminado no mês, sem ajuste sazonal",
+                  unidade="pct1", eixo={"zero": False}, fonte=FONTE_PNAD,
+                  series=[cf.serie("Taxa de participação", AZUL, part, 1, largura=5, rotulo=True)])
+    return [g_taxa, g_part, cn.graficos_caged()[1]]
 
-    # desemprego e Caged
-    ut = max(taxa)
-    minimo = min(taxa, key=taxa.get)
-    caged = cn.graficos_caged()[0]
-    print("  desemprego: %s %.1f%% (mínimo da série: %s %.1f%%; 12 meses antes %.1f%%)"
-          % (ut, taxa[ut], minimo, taxa[minimo], taxa[cf.mes_mais(ut, -12)]))
-    g_desemp = dict(id="desemprego-caged", titulo="Desemprego e emprego formal",
-                    subtitulo="Taxa de desemprego da PNAD, em % da força de trabalho, trimestre móvel, sem ajuste "
-                              "sazonal; saldo do Caged em 12 meses, em mil vagas",
-                    fonte="IBGE (PNAD Contínua) e Ministério do Trabalho (Caged, via Ipeadata)", variantes=[
-                        dict(rot="Taxa de desemprego (PNAD)", unidade="pct1",
-                             subtitulo="Desocupados em % da força de trabalho, trimestre móvel terminado no mês, "
-                                       "sem ajuste sazonal",
-                             series=[cf.serie("Taxa de desemprego", AZUL, taxa, 1, largura=5, rotulo=True)]),
-                        dict(rot="Saldo do Caged em 12 meses", unidade="mil", subtitulo=caged["subtitulo"],
-                             eventos=caged.get("eventos"), series=caged["series"])])
 
-    # rendimento médio real e produtividade (PIB real por pessoa ocupada)
-    oq, rq = trimestres(ocup), trimestres(rend)
-    prod = {q: pib[q] / oq[q] for q in pib if q in oq}
-    v_prod, v_rend = acum4(prod), acum4(rq)
-    # o app daqui não tem eixo trimestral: o trimestre vai no mês em que termina
-    fim_tri = lambda d: {"%s-%02d" % (q[:4], 3 * int(q[-1])): v for q, v in d.items()}   # noqa: E731
-    qp, qr = max(v_prod), max(v_rend)
-    print("  produtividade em 4 tri: %s %.1f%%; rendimento real: %s %.1f%% (%s %.1f%%)"
-          % (qp, v_prod[qp], qr, v_rend[qr], qp, v_rend[qp]))
-    g_prod = dict(id="rendimento-produtividade", titulo="Rendimento médio real e produtividade do trabalho",
-                  subtitulo="Variação acumulada em 4 trimestres sobre os 4 anteriores, em %; produtividade = PIB "
-                            "real ÷ pessoas ocupadas; rendimento = rendimento médio real habitual (PNAD)",
-                  unidade="pct1", buracoMax=3, fonte="IBGE (Contas Nacionais Trimestrais e PNAD Contínua) e FtM",
-                  series=[cf.serie("Rendimento médio real", VERMELHO, fim_tri(v_rend), 1, largura=5, rotulo=True),
-                          cf.serie("Produtividade do trabalho", AZUL, fim_tri(v_prod), 1, largura=5, rotulo=True)])
-
-    # atividade e emprego: IBC-Br e ocupação, trimestre móvel contra o mesmo do ano anterior
-    ibc = cn.mensal(cn.sgs(24363, "01/01/2011"))
-    ks = sorted(ibc)
-    ibc_var = {}
-    for m in ks:
-        a = [cf.mes_mais(m, -k) for k in range(3)]
-        b = [cf.mes_mais(x, -12) for x in a]
-        if all(x in ibc for x in a + b):
-            ibc_var[m] = 100 * (sum(ibc[x] for x in a) / sum(ibc[x] for x in b) - 1)
-    ibc_var = {m: v for m, v in ibc_var.items() if m >= min(ocup_var)}
-    um, uo = max(ibc_var), max(ocup_var)
-    print("  IBC-Br trimestre móvel: %s %.1f%%; ocupação: %s %.1f%%" % (um, ibc_var[um], uo, ocup_var[uo]))
-    g_ae = dict(id="atividade-emprego", titulo="Atividade e emprego",
-                subtitulo="Trimestre móvel terminado no mês contra o mesmo trimestre do ano anterior, em %; "
-                          "atividade = IBC-Br, a prévia do PIB do Banco Central; emprego = pessoas ocupadas (PNAD)",
-                unidade="pct1", fonte="Banco Central (SGS 24363), IBGE (PNAD Contínua) e FtM",
-                series=[cf.serie("Atividade (IBC-Br)", BRANCO, ibc_var, 1, largura=5, rotulo=True),
-                        cf.serie("Pessoas ocupadas", VERDE, ocup_var, 1, largura=5, rotulo=True)])
-    return [g_desemp, g_prod, g_ae]
+# um gráfico por seção (cada seção anda inteira quando ele muda a ordem); o
+# título só na primeira de cada grupo
+CICLO = [("Atividade", "atividade-12m"), ("", "atividade-nivel"),
+         ("PIB", "pib-familias-trimestral"), ("", "pib-familias-4tri"), ("", "pib-participacao"),
+         ("Crédito", "credito-concessoes-pf-pj"), ("", "credito-inadimplencia"), ("", "credito-servico-divida"),
+         ("", "credito-endividamento"), ("", "credito-juros-selic"), ("", "credito-direcionado-livre"),
+         ("Confiança", "confianca"),
+         ("Emprego", "desemprego"), ("", "participacao"), ("", "br-caged-setembro")]
 
 
 def main():
@@ -330,15 +333,16 @@ def main():
                     series=[dict(serie)])
 
     secoes = [dict(titulo="Selic", texto="", fontes=[], figuras=[], graficos=[g_rec]),
-              dict(titulo="", texto="", fontes=[], figuras=[], graficos=[g_ciclos]),
-              dict(titulo="Objetivos do Banco Central", texto="", fontes=[], figuras=[], graficos=[])]
-    ciclo = {g["id"]: g for f in (graficos_varejo, graficos_confianca, graficos_trabalho) for g in f()}
-    for titulo, gid in [("Varejo", "pmc-volume"), ("", "pmc-variacoes"), ("Confiança", "confianca"),
-                        ("Mercado de trabalho", "desemprego-caged"), ("", "rendimento-produtividade"),
-                        ("", "atividade-emprego")]:
+              dict(titulo="", texto="", fontes=[], figuras=[], graficos=[g_ciclos])]
+    ciclo = {g["id"]: g for f in (graficos_atividade, graficos_pib_credito, graficos_confianca, graficos_emprego)
+             for g in f()}
+    for titulo, gid in CICLO:
         secoes.append(dict(titulo=titulo, texto="", fontes=[], figuras=[], graficos=[ciclo[gid]]))
     hoje = datetime.date.today().isoformat()
     doc = dict(atualizado=hoje, referencia=hoje, formato="artigo", assunto="Missão Global Miami",
+               # a ordem dos gráficos é escolhida na página (botões Subir/Descer e
+               # arrastar) e gravada neste arquivo; o app aplica ao abrir
+               reordenar="dados/ordens/missao-global-miami.json",
                fonte="Banco Central, CODACE/FGV, IBGE, CNI, CNC, Fecomercio SP e Ministério do Trabalho",
                secoes=secoes)
     with open(SAIDA, "w", encoding="utf-8") as f:
