@@ -277,6 +277,8 @@
     "usd-mil": { eixo: function (v) { return nf(0).format(v); }, valor: function (v) { return "US$ " + nf(0).format(v) + " mil"; } },
     // contagem (cadeiras, eleições): número inteiro, sem unidade
     n: { eixo: function (v) { return nf(0).format(v); }, valor: function (v) { return nf(0).format(v); } },
+    // número-índice (volume de vendas, 2022 = 100; índices de confiança)
+    ind: { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); }, valor: function (v) { return nf(1).format(v); } },
     "%": { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v) + "%"; },
            valor: function (v) { return pct(v, 2); } },
     // variação de uma casa (rankings de alta e queda)

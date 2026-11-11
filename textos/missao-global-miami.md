@@ -26,3 +26,30 @@ Pela [Lei Complementar 179, de 2021](fonte:lc179), a lei da autonomia do Banco C
   - fomentar o pleno emprego.
 
 As metas são fixadas pelo Conselho Monetário Nacional, e cabe só ao Banco Central conduzir a política monetária para cumpri-las. Desde 2025, pelo [Decreto 12.079](fonte:d12079), a meta de inflação é contínua: a inflação de 12 meses é conferida mês a mês, e a meta é descumprida quando ela fica fora do intervalo de tolerância por seis meses seguidos. Nesse caso, o Banco Central explica as causas, as medidas e o prazo em nota no Relatório de Política Monetária e em carta aberta ao ministro da Fazenda.
+
+## Varejo
+fonte: pmc | IBGE, Pesquisa Mensal de Comércio | https://www.ibge.gov.br/estatisticas/economicas/comercio/9227-pesquisa-mensal-de-comercio.html
+
+O varejo bateu o recorde em março e desde então recua. Com ajuste sazonal, o volume de vendas da [Pesquisa Mensal de Comércio](fonte:pmc) estava em agosto 1,3% abaixo de março; no varejo ampliado, que soma veículos, material de construção e atacado de alimentos, a distância é de 2,1%.
+
+##
+
+Em 12 meses o varejo ainda cresce 1,6%, mas o ritmo dos últimos três meses, anualizado, já é negativo: −1,8%. Contra agosto de 2025, a alta foi de só 0,4%.
+
+## Confiança
+fonte: ipea | Ipeadata, séries da CNI, da CNC e da Fecomercio SP | http://www.ipeadata.gov.br
+
+A confiança dos empresários piora. O índice da indústria (ICEI) está abaixo de 50, a linha que separa confiança de falta de confiança, desde janeiro de 2025; em outubro, 46,2. O do comércio (ICEC) caiu de 104,9 em abril para 100,0 em setembro, exatamente na linha de neutralidade. O consumidor (ICC) segue otimista, em 118,6, mas abaixo dos 124,1 de junho.
+
+## Mercado de trabalho
+fonte: pnad | IBGE, PNAD Contínua | https://www.ibge.gov.br/estatisticas/sociais/trabalho/9171-pesquisa-nacional-por-amostra-de-domicilios-continua-mensal.html
+
+O desemprego segue perto da mínima da série, que começa em 2012: 5,2% no trimestre até setembro, contra 5,6% um ano antes; a mínima foi 5,1%, em dezembro de 2025. O emprego formal, porém, já desacelera: o Caged registrou 798 mil vagas em 12 meses, pouco mais da metade de 1,41 milhão um ano antes.
+
+##
+
+Os salários crescem muito acima da produtividade. Nos quatro trimestres até o segundo de 2026, o rendimento médio real subiu 4,3% e a produtividade do trabalho (PIB real por pessoa ocupada), 0,7%. Entre 2013 e 2019, a diferença média entre os dois foi de 1,2 ponto; hoje é de 3,6. É o custo do trabalho por unidade produzida subindo, e ele pesa sobretudo nos serviços.
+
+##
+
+O emprego reage à atividade com atraso. Em 2014, o IBC-Br, a prévia do PIB do Banco Central, passou a cair contra o ano anterior em junho; o número de pessoas ocupadas só caiu em setembro de 2015, mais de um ano depois. Hoje a atividade cresce 1,6% e a ocupação, 1,2%.
