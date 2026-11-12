@@ -203,7 +203,7 @@ def graficos_atividade():
     return [g12, g_nivel]
 
 
-IDS_PIB = ["pib-familias-trimestral", "pib-familias-4tri", "pib-participacao"]
+IDS_PIB = ["pib-familias-4tri", "pib-participacao"]
 IDS_CREDITO = ["credito-concessoes-pf-pj", "credito-inadimplencia", "credito-servico-divida",
                "credito-endividamento", "credito-juros-selic", "credito-direcionado-livre"]
 # o ftm-dados não põe fonte em alguns cartões
@@ -214,6 +214,61 @@ FONTES_COPIA = {"credito-inadimplencia": "Banco Central (SGS 21082, 21083 e 2108
 UNIDADES_COPIA = {"x2": "x"}       # unidades do ftm-dados que o app daqui chama por outro nome
 
 
+OLINDA_TRI = ("https://olinda.bcb.gov.br/olinda/servico/Expectativas/versao/v1/odata/"
+              "ExpectativasMercadoTrimestrais?$filter=Indicador%20eq%20'PIB%20Total'%20and%20baseCalculo%20eq%200"
+              "&$orderby=Data%20desc&$top=40&$format=json")
+OLINDA_ANO = ("https://olinda.bcb.gov.br/olinda/servico/Expectativas/versao/v1/odata/"
+              "ExpectativasMercadoAnuais?$filter=Indicador%20eq%20'PIB%20Total'%20and%20baseCalculo%20eq%200"
+              "&$orderby=Data%20desc&$top=10&$format=json")
+
+
+def focus_pib_4tri():
+    """PIB acumulado em 4 trimestres pela mediana do Focus, do último trimestre
+    do IBGE até o 4º trimestre do ano seguinte. O Focus dá cada trimestre
+    contra o mesmo trimestre do ano anterior; isso vira nível em cima do índice
+    encadeado do IBGE (sem ajuste sazonal) e daí sai o acumulado em 4
+    trimestres, que no 4º trimestre tem de bater com a mediana anual (a do
+    boletim). Devolve ({"AAAA-MM": %}, data do Focus); o mês é o do fim do
+    trimestre, como em sem_trimestral, e o primeiro ponto é o último oficial
+    (para a linha pontilhada sair dele)."""
+    nivel = {"%s-%02d" % (l["D3C"][:4], 3 * int(l["D3C"][4:])): l["v"]
+             for l in sidra("t/1620/n1/all/v/583/p/all/c11255/90707")}
+    oficial = max(nivel)
+    tri = json.loads(cf.baixar(OLINDA_TRI))["value"]
+    data = tri[0]["Data"]
+    for x in sorted((x for x in tri if x["Data"] == data), key=lambda x: x["DataReferencia"].split("/")[::-1]):
+        t, a = x["DataReferencia"].split("/")
+        m = "%s-%02d" % (a, 3 * int(t))
+        if m > oficial:
+            nivel[m] = nivel["%d-%02d" % (int(a) - 1, 3 * int(t))] * (1 + x["Mediana"] / 100)
+    ks = sorted(nivel)
+    fim = "%d-12" % (int(oficial[:4]) + 1)
+    acum = {ks[i]: 100 * (sum(nivel[j] for j in ks[i - 3:i + 1]) / sum(nivel[j] for j in ks[i - 7:i - 3]) - 1)
+            for i in range(7, len(ks)) if oficial <= ks[i] <= fim}
+    anual = {x["DataReferencia"]: x["Mediana"] for x in json.loads(cf.baixar(OLINDA_ANO))["value"]
+             if x["Data"] == data}
+    for k, v in acum.items():
+        if k[5:] == "12" and k > oficial and abs(v - anual[k[:4]]) > 0.1:
+            raise RuntimeError("Focus de %s: o trimestral dá %.2f%% em %s; o anual, %.2f%%"
+                               % (data, v, k[:4], anual[k[:4]]))
+    print("  Focus do PIB (%s): %s" % (data, ", ".join("%s %.2f%%" % kv for kv in sorted(acum.items()))))
+    return acum, data
+
+
+def com_focus(g):
+    """Cartão do PIB em 4 trimestres com a mediana do Focus pontilhada."""
+    acum, data = focus_pib_4tri()
+    pib = next(s for s in g["series"] if s["nome"] == "PIB")
+    if pib["dados"][-1][0] != min(acum):
+        raise RuntimeError("PIB do ftm-dados até %s, o do SIDRA até %s" % (pib["dados"][-1][0], min(acum)))
+    g["series"].insert(1, cf.serie("PIB, mediana do Focus", pib["cor"], acum, 1, traco="pontilhado",
+                                   largura=3, rotulo=True))
+    d = datetime.date.fromisoformat(data)
+    g["subtitulo"] += "; pontilhado = mediana do Focus para o PIB (%d/%s)" % (d.day, MESES[d.month - 1].lower())
+    g["fonte"] = "IBGE (Contas Nacionais Trimestrais), Banco Central (Focus) e FtM"
+    return g
+
+
 def graficos_pib_credito():
     out = []
     for arq, ids in (("dados/pib.json", IDS_PIB), ("dados/credito.json", IDS_CREDITO)):
@@ -221,6 +276,10 @@ def graficos_pib_credito():
         for i in ids:
             g = direita(sem_trimestral(gs[i]))
             g.pop("nota", None)
+            if i == "pib-familias-4tri":
+                g = com_focus(g)
+            if i == "credito-endividamento":       # só o total, sem a linha "exceto habitacional"
+                g["series"] = [x for x in g["series"] if x["nome"] == "Endividamento das famílias"]
             g["fonte"] = g.get("fonte") or FONTES_COPIA[i]
             g["unidade"] = UNIDADES_COPIA.get(g.get("unidade"), g.get("unidade"))
             # o número em cima da barra: no ftm-dados é "valores" na série; aqui,
@@ -286,7 +345,7 @@ def graficos_emprego():
 # um gráfico por seção (cada seção anda inteira quando ele muda a ordem); o
 # título só na primeira de cada grupo
 CICLO = [("Atividade", "atividade-12m"), ("", "atividade-nivel"),
-         ("PIB", "pib-familias-trimestral"), ("", "pib-familias-4tri"), ("", "pib-participacao"),
+         ("PIB", "pib-familias-4tri"), ("", "pib-participacao"),
          ("Crédito", "credito-concessoes-pf-pj"), ("", "credito-inadimplencia"), ("", "credito-servico-divida"),
          ("", "credito-endividamento"), ("", "credito-juros-selic"), ("", "credito-direcionado-livre"),
          ("Confiança", "confianca"),
