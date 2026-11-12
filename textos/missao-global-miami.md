@@ -14,9 +14,11 @@ parte: Cenário econômico brasileiro
 
 ##
 
+## Crédito
+
 ##
 
-## Crédito
+##
 
 ##
 

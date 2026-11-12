@@ -117,6 +117,11 @@ def rot_m(m):
     return "%s/%s" % (MESES[int(m[5:7]) - 1], m[2:4])
 
 
+def mes_menos(m, k):
+    t = int(m[:4]) * 12 + int(m[5:7]) - 1 - k
+    return "%d-%02d" % (t // 12, t % 12 + 1)
+
+
 def desde(d, ini):
     return {k: v for k, v in d.items() if k >= ini}
 
@@ -178,7 +183,7 @@ def graficos_atividade():
               % (nome, ult, d[nivel][ult], rec, d[nivel][rec], d[doze][max(d[doze])]))
     g12 = dict(id="atividade-12m", titulo="Volume de serviços e de vendas no varejo em 12 meses",
                subtitulo="Variação do volume acumulado em 12 meses sobre os 12 meses anteriores, em %",
-               unidade="%", fonte=FONTE_ATIV,
+               unidade="pct1", fonte=FONTE_ATIV,
                series=[cf.serie(n, c, desde(d[dz], INICIO_ATIV), 1, largura=5, rotulo=True)
                        for n, d, _, dz, c in nomes])
 
@@ -293,6 +298,45 @@ def graficos_pib_credito():
     return out
 
 
+def graficos_cartao():
+    """Cartão de crédito das pessoas físicas (recursos livres, SGS): saldo em
+    12 meses descontado o IPCA (rotativo, cartão total e todo o crédito livre
+    às famílias) e inadimplência (atraso acima de 90 dias). O rotativo é a
+    parte cara: a fatura que não foi paga inteira."""
+    def m(c):
+        return cn.mensal(cn.sgs(c, "01/03/2011"))
+    ipca = cn.mensal(cn.sgs(433, "01/01/2011"))
+    ix, f = {}, 1.0
+    for k in sorted(ipca):
+        f *= 1 + ipca[k] / 100
+        ix[k] = f
+
+    def real12(d):
+        return {k: 100 * ((v / ix[k]) / (d[a] / ix[a]) - 1) for k, v in d.items()
+                for a in [mes_menos(k, 12)] if a in d and k in ix}
+    saldo = [("Cartão rotativo", 20587, VERMELHO), ("Cartão de crédito total", 20590, AZUL),
+             ("Crédito livre às famílias", 20570, CINZA)]
+    inad = [("Cartão rotativo", 21127, VERMELHO), ("Cartão de crédito total", 21129, AZUL),
+            ("Crédito livre às famílias", 21112, CINZA)]
+    s12 = {n: real12(m(c)) for n, c, _ in saldo}
+    ina = {n: m(c) for n, c, _ in inad}
+    for n, _, _ in saldo:
+        u = max(s12[n])
+        print("  %-26s saldo real em 12 meses %s %.1f%%; inadimplência %.1f%%" % (n, u, s12[n][u], ina[n][max(ina[n])]))
+    g_saldo = dict(id="credito-cartao-saldo", titulo="Saldo do cartão de crédito das famílias",
+                   subtitulo="Variação do saldo em 12 meses, descontado o IPCA, em %; recursos livres",
+                   unidade="pct1", fonte="Banco Central (SGS 20587, 20590 e 20570; IPCA: SGS 433) e FtM",
+                   series=[cf.serie(n, c, s12[n], 1, largura=5, rotulo=True) for n, _, c in saldo])
+    g_inad = dict(id="credito-cartao-inadimplencia", titulo="Inadimplência do cartão de crédito das famílias",
+                  subtitulo="Atrasos acima de 90 dias, em % do saldo; recursos livres", unidade="pct1",
+                  fonte="Banco Central (SGS 21127, 21129 e 21112)", variantes=[
+                      dict(rot="Rotativo", series=[cf.serie(inad[0][0], VERMELHO, ina[inad[0][0]], 2, largura=5,
+                                                            rotulo=True)]),
+                      dict(rot="Cartão total e crédito livre", series=[
+                          cf.serie(n, c, ina[n], 2, largura=5, rotulo=True) for n, _, c in inad[1:]])])
+    return [g_saldo, g_inad]
+
+
 def graficos_confianca():
     """ICEI (CNI, geral: o Ipeadata não tem o dessazonalizado), ICEC ajustado
     (CNC) e ICC (Fecomercio SP), do Ipeadata."""
@@ -347,7 +391,8 @@ def graficos_emprego():
 CICLO = [("Atividade", "atividade-12m"), ("", "atividade-nivel"),
          ("PIB", "pib-familias-4tri"), ("", "pib-participacao"),
          ("Crédito", "credito-concessoes-pf-pj"), ("", "credito-inadimplencia"), ("", "credito-servico-divida"),
-         ("", "credito-endividamento"), ("", "credito-juros-selic"), ("", "credito-direcionado-livre"),
+         ("", "credito-endividamento"), ("", "credito-cartao-saldo"), ("", "credito-cartao-inadimplencia"),
+         ("", "credito-juros-selic"), ("", "credito-direcionado-livre"),
          ("Confiança", "confianca"),
          ("Emprego", "desemprego"), ("", "participacao"), ("", "br-caged-setembro")]
 
@@ -393,7 +438,8 @@ def main():
 
     secoes = [dict(titulo="Selic", texto="", fontes=[], figuras=[], graficos=[g_rec]),
               dict(titulo="", texto="", fontes=[], figuras=[], graficos=[g_ciclos])]
-    ciclo = {g["id"]: g for f in (graficos_atividade, graficos_pib_credito, graficos_confianca, graficos_emprego)
+    ciclo = {g["id"]: g for f in (graficos_atividade, graficos_pib_credito, graficos_cartao, graficos_confianca,
+                       graficos_emprego)
              for g in f()}
     for titulo, gid in CICLO:
         secoes.append(dict(titulo=titulo, texto="", fontes=[], figuras=[], graficos=[ciclo[gid]]))
@@ -410,6 +456,14 @@ def main():
     print("gravado %s (%.0f KB)" % (SAIDA, os.path.getsize(SAIDA) / 1024))
     import aplicar_texto
     aplicar_texto.aplicar(NOME + ".md", NOME + ".json")
+    # o texto casa as seções sem título pela posição: se o .md não tiver uma
+    # seção por gráfico, na ordem de CICLO, gráfico some ou sai repetido
+    with open(SAIDA, encoding="utf-8") as f:
+        ids = [g["id"] for s in json.load(f)["secoes"] for g in s["graficos"]]
+    esperado = ["selic-recessoes", "selic-ciclos"] + [gid for _, gid in CICLO]
+    if ids != esperado:
+        raise RuntimeError("textos/%s.md fora do lugar: o JSON saiu com %s; tinha de ser %s"
+                           % (NOME, ids, esperado))
 
 
 if __name__ == "__main__":

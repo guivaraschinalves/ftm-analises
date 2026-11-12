@@ -1410,6 +1410,13 @@
     // Onde cada rótulo do último ponto vai ficar, afastando os que se
     // encostam. Fica antes do eixo porque o eixo da direita só imprime o
     // número onde não houver rótulo — e o que vale é a posição final dele.
+    // Série que acaba antes do fim do eixo (o PIB, quando o Focus segue
+    // pontilhado) leva o número ao lado do próprio último ponto, não na
+    // coluna da direita com um fio: o fio levava o número para longe da linha
+    // e, olhando rápido, parecia que ela ia até lá.
+    var fimEixo = d1 - 1, folgaFim = Math.max(1, (d1 - d0) * 0.015);
+    var dentro = rotulos.filter(function (r) { return fimEixo - r.p.i > folgaFim; });
+    rotulos = rotulos.filter(function (r) { return dentro.indexOf(r) < 0; });
     var rotY = rotulos.map(function (r) { return Math.min(Math.max(yDe(r.s)(r.p.v), L.y0), L.y1); });
     var ordem = rotulos.map(function (r, k) { return { r: r, y: rotY[k] }; }).sort(function (a, b) { return a.y - b.y; });
     var passoRot = L.rotulo * 1.08;
@@ -1420,6 +1427,43 @@
       var teto = b2 === ordem.length - 1 ? L.y1 : ordem[b2 + 1].y - passoRot;
       if (ordem[b2].y > teto) ordem[b2].y = teto;
     }
+
+    // Os de dentro: à direita do último ponto, na altura dele; se ali passa
+    // outra linha (ou já há um número), tenta logo acima, logo abaixo, e
+    // assim por diante, ficando com a altura que esbarra em menos coisa.
+    var trilhas = g.series.map(function (s, k) {
+      if (s.tipo === "barra" || s.tipo === "faixa") return [];
+      var YS = yDe(s), pts = [];
+      vis[k].forEach(function (p) {
+        var x = X(p.i + 0.5), y = YS(p.v), a = pts[pts.length - 1];
+        if (a) {
+          var n = Math.ceil(Math.max(Math.abs(x - a[0]), Math.abs(y - a[1])) / 3);
+          for (var t = 1; t < n; t++) pts.push([a[0] + (x - a[0]) * t / n, a[1] + (y - a[1]) * t / n]);
+        }
+        pts.push([x, y]);
+      });
+      return pts;
+    });
+    var caixas = ordem.map(function (o) {
+      var x = L.x1 + L.rotuloX;
+      return [x, x + largura(o.r.txt, L.rotulo, "bold"), o.y - L.rotulo * 0.6, o.y + L.rotulo * 0.6];
+    });
+    var noMeio = dentro.map(function (r) {
+      var w = largura(r.txt, L.rotulo, "bold"), h = L.rotulo, py = yDe(r.s)(r.p.v);
+      var x = Math.min(X(r.p.i + 0.5) + 10, L.W - 10 - w), melhor = null;
+      [0, -1, 1, -2, 2].forEach(function (m, k) {
+        var y = Math.min(Math.max(py + m * h, L.y0), L.y1);
+        var cx = [x - 4, x + w + 4, y - h * 0.6, y + h * 0.6], bate = 0;
+        trilhas.forEach(function (pts) {
+          pts.forEach(function (p) { if (p[0] >= cx[0] && p[0] <= cx[1] && p[1] >= cx[2] && p[1] <= cx[3]) bate++; });
+        });
+        caixas.forEach(function (c) { if (c[0] < cx[1] && cx[0] < c[1] && c[2] < cx[3] && cx[2] < c[3]) bate += 100; });
+        var custo = bate * 10 + k;
+        if (!melhor || custo < melhor.custo) melhor = { y: y, custo: custo, cx: cx };
+      });
+      caixas.push(melhor.cx);
+      return { r: r, x: x, y: melhor.y };
+    });
 
     // Faixas de fundo ("sombras": [{de, ate}]), como as recessões: um
     // retângulo translúcido do primeiro ao último período de cada uma, atrás
@@ -1664,6 +1708,12 @@
       svg.appendChild(texto(o.r.txt, {
         x: lx, y: o.y, "font-size": L.rotulo, "font-weight": "bold", fill: cor, "dominant-baseline": "central"
       }));
+    });
+    noMeio.forEach(function (o) {
+      var at = { x: o.x, y: o.y, "font-size": L.rotulo, "font-weight": "bold", "dominant-baseline": "central" };
+      svg.appendChild(texto(o.r.txt, Object.assign({}, at, { fill: "none", stroke: pal.bg, "stroke-width": 6,
+                                                             "stroke-linejoin": "round" })));
+      svg.appendChild(texto(o.r.txt, Object.assign({}, at, { fill: corNoTema(o.r.s.cor, pal) })));
     });
 
     // legenda
