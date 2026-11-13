@@ -209,11 +209,10 @@ def graficos_atividade():
 
 
 IDS_PIB = ["pib-familias-4tri", "pib-participacao"]
-IDS_CREDITO = ["credito-concessoes-pf-pj", "credito-inadimplencia", "credito-servico-divida",
-               "credito-endividamento", "credito-juros-selic", "credito-direcionado-livre", "credito-gap-bis"]
+IDS_CREDITO = ["credito-direcionado-livre"]
 # outros cartões do ftm-dados que fecham o roteiro do ciclo: a inflação implícita
 # dos serviços (volume × preço) e os serviços subjacentes, a ponte para a inflação
-IDS_OUTROS = [("dados/pms.json", ["pms-inflacao-implicita"]), ("dados/ipca.json", ["ex3-servicos"])]
+IDS_OUTROS = [("dados/ipca.json", ["ex3-servicos"])]
 # o ftm-dados não põe fonte em alguns cartões
 FONTES_COPIA = {"credito-inadimplencia": "Banco Central (SGS 21082, 21083 e 21084)",
                 "credito-servico-divida": "Banco Central (SGS 29033, 29034 e 29036)",
@@ -632,17 +631,14 @@ CICLO = [("Atividade", "atividade-12m"), ("", "atividade-nivel"), ("", "pms-infl
 # ftm-dados e de outras páginas daqui; o que não existia é feito abaixo.
 
 COPIAS_RESTO = [
-    ("dados/ipca.json", ["ipca-distancia-meta", "ipca-mensal-focus", "contribuicao-12m", "ipca-alimentacao-itens",
-                         "administrados-livres", "ipca-difusao-grupos", "ipca-projecoes-focus"]),
-    ("dados/fiscal.json", ["fiscal-primario-pib", "fiscal-nominal-pib", "fiscal-juros-nominais", "fiscal-divida-bruta",
-                           "fiscal-divida-condicionantes"]),
+    ("dados/ipca.json", ["ipca-distancia-meta", "ipca-mensal-focus", "ipca-alimentacao-contribuicao",
+                         "ipca-alimentacao-itens", "administrados-livres", "ipca-difusao-grupos"]),
     ("dados/divida.json", ["divida-composicao", "divida-detentores"]),
-    ("dados/credito.json", ["credito-ampliado-contribuicoes-total"]),
-    ("dados/juros.json", ["juros-longo"]),
-    ("dados/bp.json", ["bp-cc-12m", "bp-ied-12m", "bp-acoes-fundos"]),
-    ("dados/moedas.json", ["moedas-pp-real", "moedas-cambio-ppc", "moedas-sobrevalorizacao", "moedas-fmi-avaliacao"]),
+    ("dados/bp.json", ["bp-12m", "bp-cc-12m", "bp-reservas-composicao", "bp-reservas-divida", "bp-reservas-moeda",
+                       "bp-necessidade-curto-prazo", "bp-carteira-dom-3m", "bp-criptos-12m"]),
+    ("dados/moedas.json", ["moedas-pp-real", "moedas-cambio-ppc"]),
 ]
-COPIAS_LOCAIS = [("defasagem-combustiveis.json", ["ipca-12m"]), ("petroleo.json", ["saldo-comercial-petroleo"])]
+COPIAS_LOCAIS = [("petroleo.json", ["petroleo-derivados-12m"])]
 FONTES_RESTO = {
     "ipca-distancia-meta": "IBGE e Banco Central (SGS 13522 e 13521)",
     "contribuicao-12m": "IBGE (IPCA, tabela 7060) e FtM",
@@ -654,6 +650,10 @@ FONTES_RESTO = {
     "divida-detentores": "Tesouro Nacional (Relatório Mensal da Dívida)",
     "bp-cc-12m": "Banco Central (balanço de pagamentos) e Comex Stat",
     "bp-ied-12m": "Banco Central (balanço de pagamentos)", "bp-acoes-fundos": "Banco Central (balanço de pagamentos)",
+    "bp-12m": "Banco Central (balanço de pagamentos)", "bp-reservas-composicao": "Banco Central",
+    "bp-reservas-divida": "Banco Central", "bp-reservas-moeda": "Banco Central",
+    "bp-necessidade-curto-prazo": "Banco Central (balanço de pagamentos)",
+    "bp-carteira-dom-3m": "Banco Central (balanço de pagamentos)", "bp-criptos-12m": "Banco Central (balanço de pagamentos)",
 }
 # ids que já existem na página com outro conteúdo: a cópia ganha um id próprio
 IDS_NOVOS = {"ipca-12m": "ipca-12m-defasagem"}
@@ -1002,6 +1002,7 @@ def graficos_resto():
 # (cenario_novembro), rodadas de novo aqui, com o dado de hoje; as páginas
 # daquelas análises ficam como estavam, datadas.
 
+YARDENI_PL = "assets/missao/sp500-pl-yardeni.png"
 PE_EUA = os.path.join(os.path.dirname(RAIZ), "pe-eua", "dados", "sp500_pl.csv")
 
 
@@ -1088,7 +1089,20 @@ def graficos_eua():
         if g.get("tipo") == "estados" and not g.get("formas"):
             g["formas"] = formas
         out.append(g)
-    out += [grafico_pl_sp500(), grafico_deficit_eua()]
+    # o P/L: se a imagem da Yardeni estiver no repositório, ela entra no lugar do
+    # gráfico feito aqui (pedido dele em 13/11/2026)
+    if os.path.exists(os.path.join(RAIZ, YARDENI_PL)):
+        out.append(dict(id="sp500-pl", tipo="figura", imagem=YARDENI_PL,
+                        titulo="P/L do S&P 500: 12 meses e projetado",
+                        subtitulo="Lucro operacional; 12 meses = média trimestral do preço ÷ lucro dos 4 trimestres "
+                                  "anteriores; projetado = preço ÷ lucro esperado pelos analistas para os próximos 12 "
+                                  "meses; faixas cinza = recessões",
+                        fonte="LSEG Datastream e Yardeni Research; Standard & Poor's e I/B/E/S",
+                        link="https://yardeni.com/charts/stock-market-p-e-ratios/", rotuloLink="Ver na Yardeni"))
+    else:
+        print("  AVISO: sem %s; vale o P/L feito aqui (FactSet e Shiller)" % YARDENI_PL)
+        out.append(grafico_pl_sp500())
+    out.append(grafico_deficit_eua())
     vistos, fora = set(), []
     for g in out:
         if g["id"] not in vistos:
@@ -1310,13 +1324,149 @@ def graficos_cripto_bp():
 
 AMARELO_BTC = "#FFFF00"
 CRIPTO = [("Bitcoin", "btc-preco"), ("", "btc-ciclos"), ("", "btc-mvrv"), ("", "btc-mayer"), ("", "btc-ouro"),
-          ("Stablecoins", "stablecoins-total"), ("", "stablecoins-emissores"),
-          ("Cripto no balanço de pagamentos", "bp-criptos-12m"), ("", "bp-criptos-mensal")]
+          ("Stablecoins", "stablecoins-total"), ("", "stablecoins-emissores")]
 PARTE_CRIPTO = "Bitcoin e stablecoins"
 
 
 def graficos_cripto():
-    return graficos_bitcoin() + graficos_stablecoins() + graficos_cripto_bp()
+    return graficos_bitcoin() + graficos_stablecoins()
+
+
+# ================================================================ parte Brasil enxuta
+# Pedido dele em 13/11/2026: a parte Brasil só com estes gráficos, nesta ordem,
+# e a Selic com o comunicado do Copom no fim.
+
+def tri_yoy(nivel):
+    """Trimestre móvel (soma de 3 meses) contra os mesmos 3 meses do ano anterior, em %."""
+    fora = {}
+    for m in sorted(nivel):
+        a = [cf.mes_mais(m, -k) for k in range(3)]
+        b = [cf.mes_mais(x, -12) for x in a]
+        if all(x in nivel for x in a + b):
+            fora[m] = 100 * (sum(nivel[x] for x in a) / sum(nivel[x] for x in b) - 1)
+    return fora
+
+
+def graficos_atividade_tri():
+    """PMC e PMS no trimestre contra o mesmo trimestre do ano anterior (índices
+    sem ajuste sazonal: SIDRA 8880 v7169 e 5906 v7167); a PMS também com a
+    inflação implícita (receita nominal ÷ volume, no mesmo recorte); e a
+    produção industrial (PIM-PF, SIDRA 8888, indústria geral)."""
+    def idx(tab, var, cls):
+        return {mes(l["D3C"]): l["v"] for l in sidra("t/%d/n1/all/v/%s/p/all/c11046/%s" % (tab, var, cls))}
+    pms_vol, pms_rec = idx(5906, "7167", "56726"), idx(5906, "7167", "56725")
+    pmc = idx(8880, "7169", "56734")
+    pmca = idx(8881, "7169", "56736")
+    v_pms, v_pmc, v_pmca = tri_yoy(pms_vol), tri_yoy(pmc), tri_yoy(pmca)
+    defl = {m: pms_rec[m] / pms_vol[m] for m in pms_vol if m in pms_rec}
+    v_defl = tri_yoy(defl)
+    print("  trimestre contra o do ano anterior: PMS %s %.1f%% (inflação implícita %.1f%%); PMC %s %.1f%%"
+          % (max(v_pms), v_pms[max(v_pms)], v_defl[max(v_defl)], max(v_pmc), v_pmc[max(v_pmc)]))
+    sub = "Volume, trimestre (3 meses até o mês) contra o mesmo trimestre do ano anterior, em %"
+    g1 = dict(id="pmc-pms-trimestre", titulo="Serviços e varejo: trimestre contra o mesmo trimestre do ano anterior",
+              subtitulo=sub + "; índices sem ajuste sazonal", unidade="%", fonte=FONTE_ATIV,
+              series=[cf.serie("Serviços (PMS)", AZUL, desde(v_pms, "2013-01"), 1, largura=5, rotulo=True),
+                      cf.serie("Varejo (PMC)", VERMELHO, desde(v_pmc, "2013-01"), 1, largura=5, rotulo=True),
+                      cf.serie("Varejo ampliado (PMC)", AZUL_CLARO, desde(v_pmca, "2013-01"), 1, largura=3,
+                               rotulo=True)])
+    g2 = dict(id="pms-volume-inflacao-tri", titulo="Serviços: volume e inflação implícita",
+              subtitulo="Trimestre (3 meses até o mês) contra o mesmo trimestre do ano anterior, em %; inflação "
+                        "implícita = receita nominal ÷ volume", unidade="%",
+              fonte="IBGE (Pesquisa Mensal de Serviços) e FtM",
+              series=[cf.serie("Volume", AZUL, desde(v_pms, "2013-01"), 1, largura=5, rotulo=True),
+                      cf.serie("Inflação implícita", VERMELHO, desde(v_defl, "2013-01"), 1, largura=5, rotulo=True)])
+    pim = {}
+    for l in sidra("t/8888/n1/all/v/12606,12607,11604/p/all/c544/129314"):
+        pim.setdefault(l["D2C"], {})[mes(l["D3C"])] = l["v"]
+    v_pim, sa, doze = tri_yoy(pim["12606"]), pim["12607"], pim["11604"]
+    rec = max(sa, key=sa.get)
+    print("  produção industrial %s: trimestre %.1f%%, 12 meses %.1f%%; índice %.1f (recorde %s %.1f)"
+          % (max(v_pim), v_pim[max(v_pim)], doze[max(doze)], sa[max(sa)], rec, sa[rec]))
+    g3 = dict(id="producao-industrial", titulo="Produção industrial",
+              subtitulo="Indústria geral (PIM-PF); o trimestre contra o mesmo trimestre do ano anterior vira antes "
+                        "do acumulado em 12 meses, que carrega os meses antigos",
+              unidade="%", fonte="IBGE (Pesquisa Industrial Mensal, SIDRA 8888) e FtM", variantes=[
+                  dict(rot="Trimestre e 12 meses", series=[
+                      cf.serie("Trimestre contra o do ano anterior", AZUL, desde(v_pim, "2010-01"), 1, largura=5,
+                               rotulo=True),
+                      cf.serie("Acumulado em 12 meses", BRANCO, desde(doze, "2010-01"), 1, largura=3,
+                               rotulo=True)]),
+                  dict(rot="Índice com ajuste sazonal", unidade="ind", eixo={"zero": False}, series=[
+                      cf.serie("Produção industrial (2022 = 100)", AZUL, desde(sa, "2010-01"), 1, largura=5,
+                               rotulo=True)])])
+    return [g1, g2, g3]
+
+
+def graficos_fiscal_brasil():
+    """Primário e nominal em R$ bilhões e em % do PIB (12 meses); a dívida bruta
+    pelas duas metodologias, com o quanto subiu desde jan/23; e a despesa do
+    governo central por presidente, real (do painel de colunas do ftm-dados)."""
+    gs = graficos_ftm_dados("dados/fiscal.json")
+
+    def ser(gid, rot=None, nome=None):
+        g = gs[gid]
+        grupos = g.get("variantes") or [dict(rot=None, series=g.get("series", []))]
+        for v in grupos:
+            if rot is None or v.get("rot") == rot:
+                for x in v.get("series", []):
+                    if nome is None or x["nome"] == nome:
+                        return dict(map(tuple, x["dados"]))
+        raise KeyError((gid, rot, nome))
+    out = []
+    for chave, rot_bi, nome in (("primario", "Resultado primário", "primário"), ("nominal", "Resultado nominal", "nominal")):
+        bi = ser("fiscal-%s-bi" % chave, "Acumulado em 12 meses")
+        pib = ser("fiscal-%s-pib" % chave)
+        u = max(bi)
+        print("  resultado %s %s: R$ %.0f bi, %.2f%% do PIB" % (nome, u, bi[u], pib.get(u, float("nan"))))
+        out.append(dict(id="resultado-%s" % chave, titulo="Resultado %s do setor público consolidado" % nome,
+                        subtitulo="Acumulado em 12 meses; negativo = déficit", unidade="bi",
+                        fonte="Banco Central (estatísticas fiscais)" , variantes=[
+                            dict(rot="R$ bilhões", series=[cf.serie(rot_bi, BRANCO if chave == "primario" else
+                                                                     VERMELHO, bi, 1, largura=5, rotulo=True)]),
+                            dict(rot="% do PIB", unidade="%", series=[
+                                cf.serie(rot_bi + " (% do PIB)", BRANCO if chave == "primario" else VERMELHO, pib, 2,
+                                         largura=5, rotulo=True)])]))
+    antiga = ser("fiscal-divida-bruta", "Metodologia até 2007", "Dívida bruta")
+    nova = ser("fiscal-divida-bruta", "Metodologia a partir de 2008", "Dívida bruta")
+    u = max(nova)
+    d_ant, d_nov = antiga[u] - antiga["2023-01"], nova[u] - nova["2023-01"]
+    rot = "%s/%s" % (MESES[int(u[5:7]) - 1], u[2:4])
+    print("  dívida bruta desde jan/23: metodologia até 2007 %+.1f p.p.; de 2008 %+.1f p.p." % (d_ant, d_nov))
+    out.append(dict(id="divida-duas-metodologias", titulo="Dívida bruta do governo geral pelas duas metodologias",
+                    subtitulo="Em %% do PIB; de jan/23 a %s, +%s p.p. pela metodologia até 2007 (com toda a carteira "
+                              "de títulos do Tesouro no BC, a do FMI) e +%s p.p. pela de 2008"
+                              % (rot, cf.br(d_ant, 1), cf.br(d_nov, 1)),
+                    unidade="%", fonte="Banco Central (SGS 4502, 4382 e 13762) e FtM",
+                    eventos=[dict(em="2023-01", rot="jan/23")],
+                    series=[cf.serie("Metodologia até 2007 (FMI)", VERMELHO, antiga, 1, largura=5, rotulo=True),
+                            cf.serie("Metodologia a partir de 2008", BRANCO, nova, 1, largura=5, rotulo=True)]))
+    d = gs["fiscal-despesa-governo-central"]
+    v = next(x for x in d["variantes"] if x["rot"] == "Por presidente, real")
+    cats = v["periodos"]
+    series = []
+    for x in v["series"]:
+        dados = [[str(i), round(val, 1)] for i, val in enumerate(x["v"]) if val is not None]
+        series.append(dict(nome=x["nome"], cor=x["cor"], tipo="barra", dados=dados))
+    out.append(dict(id="despesa-por-presidente", titulo="Despesa primária do governo central por presidente",
+                    subtitulo=v["subtitulo"], unidade="bi", categorias=cats, fonte=d["fonte"], series=series))
+    return out
+
+
+BRASIL = [("Atividade", "pmc-pms-trimestre"), ("", "pms-volume-inflacao-tri"), ("", "pib-familias-4tri"),
+          ("", "pib-participacao"), ("", "producao-industrial"),
+          ("Crédito", "credito-direcionado-livre"),
+          ("Confiança", "confianca"),
+          ("Emprego", "desemprego"), ("", "participacao"), ("", "br-caged-setembro"),
+          ("Inflação", "ipca-mensal-focus"), ("", "ipca-distancia-meta"), ("", "ipca-alimentacao-contribuicao"),
+          ("", "ipca-alimentacao-itens"), ("", "ipca-difusao-grupos"), ("", "ex3-servicos"),
+          ("", "administrados-livres"),
+          ("Fiscal", "resultado-primario"), ("", "resultado-nominal"), ("", "divida-duas-metodologias"),
+          ("", "despesa-por-presidente"), ("", "divida-composicao"), ("", "divida-detentores"),
+          ("Setor externo e câmbio", "bp-12m"), ("", "bp-cc-12m"), ("", "petroleo-derivados-12m"),
+          ("", "bp-reservas-composicao"), ("", "bp-reservas-divida"), ("", "bp-reservas-moeda"),
+          ("", "bp-necessidade-curto-prazo"), ("", "bp-carteira-dom-3m"), ("", "bp-criptos-12m"),
+          ("", "moedas-pp-real"), ("", "moedas-cambio-ppc"),
+          ("Selic", "selic-recessoes"), ("", "selic-ciclos"), ("", "copom-comunicados")]
 
 
 def main():
@@ -1358,14 +1508,15 @@ def main():
                     fonte="Banco Central (SGS 432) e FtM",
                     series=[dict(serie)])
 
-    secoes = [dict(titulo="Selic", texto="", fontes=[], figuras=[], graficos=[g_rec]),
-              dict(titulo="", texto="", fontes=[], figuras=[], graficos=[g_ciclos])]
-    ciclo = {g["id"]: g for f in (graficos_atividade, graficos_pib_credito, graficos_cartao, graficos_confianca,
-                       graficos_emprego, graficos_trabalho_ponte, graficos_recuperacoes,
-                       graficos_resto)
-             for g in f()}
-    for titulo, gid in CICLO + RESTO:
-        secoes.append(dict(titulo=titulo, texto="", fontes=[], figuras=[], graficos=[ciclo[gid]]))
+    brasil = {g["id"]: g for f in (graficos_atividade_tri, graficos_pib_credito, graficos_confianca,
+                                   graficos_emprego, graficos_copiados_resto, graficos_fiscal_brasil,
+                                   cn.graficos_copom)
+              for g in f()}
+    brasil.update({g_rec["id"]: g_rec, g_ciclos["id"]: g_ciclos})
+    faltam = [gid for _, gid in BRASIL if gid not in brasil]
+    if faltam:
+        raise RuntimeError("gráficos do Brasil que ninguém gerou: %s" % faltam)
+    secoes = [dict(titulo=titulo, texto="", fontes=[], figuras=[], graficos=[brasil[gid]]) for titulo, gid in BRASIL]
     eua = {g["id"]: g for g in graficos_eua()}
     faltam = [gid for _, gid in EUA if gid not in eua]
     if faltam:
@@ -1395,7 +1546,7 @@ def main():
     # seção por gráfico, na ordem de CICLO, gráfico some ou sai repetido
     with open(SAIDA, encoding="utf-8") as f:
         ids = [g["id"] for s in json.load(f)["secoes"] for g in s["graficos"]]
-    esperado = ["selic-recessoes", "selic-ciclos"] + [gid for _, gid in CICLO + RESTO + EUA + CRIPTO]
+    esperado = [gid for _, gid in BRASIL + EUA + CRIPTO]
     if ids != esperado:
         raise RuntimeError("textos/%s.md fora do lugar: o JSON saiu com %s; tinha de ser %s"
                            % (NOME, ids, esperado))

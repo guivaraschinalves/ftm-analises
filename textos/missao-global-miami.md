@@ -1,39 +1,17 @@
 # Missão Global Miami
 
-## Selic
+## Atividade
 parte: Cenário econômico brasileiro
 
 ##
 
-
-
-## Atividade
-
 ##
 
 ##
-
-## PIB
 
 ##
 
 ## Crédito
-
-##
-
-##
-
-##
-
-##
-
-##
-
-##
-
-##
-
-##
 
 ## Confiança
 
@@ -42,14 +20,6 @@ parte: Cenário econômico brasileiro
 ##
 
 ##
-
-##
-
-##
-
-##
-
-## Recuperações judiciais
 
 ## Inflação
 
@@ -65,23 +35,7 @@ parte: Cenário econômico brasileiro
 
 ##
 
-##
-
-##
-
-##
-
 ## Fiscal
-
-##
-
-##
-
-##
-
-##
-
-##
 
 ##
 
@@ -108,6 +62,14 @@ parte: Cenário econômico brasileiro
 ##
 
 ##
+
+##
+
+##
+
+##
+
+## Selic
 
 ##
 
@@ -184,9 +146,5 @@ parte: Bitcoin e stablecoins
 ##
 
 ## Stablecoins
-
-##
-
-## Cripto no balanço de pagamentos
 
 ##
