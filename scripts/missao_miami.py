@@ -1679,6 +1679,9 @@ def main():
         secoes.append(dict(titulo=titulo, texto="", fontes=[], figuras=[], graficos=[cripto[gid]]))
     hoje = datetime.date.today().isoformat()
     doc = dict(atualizado=hoje, referencia=hoje, formato="artigo", assunto="Missão Global Miami",
+               # a identidade dos slides do evento (styles.css, :root[data-marca="missao"])
+               marca="missao", capa="assets/missao/capa.jpg",
+               assinatura="Missão Global Miami · Liberta Investimentos",
                # a ordem dos gráficos é escolhida na página (botões Subir/Descer e
                # arrastar) e gravada neste arquivo; o app aplica ao abrir
                reordenar="dados/ordens/missao-global-miami.json",

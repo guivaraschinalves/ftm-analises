@@ -788,3 +788,87 @@ body.visor-aberto { overflow: hidden; }
   display: block; padding: 4px 10px; font-size: 11.5px; font-weight: 700; letter-spacing: .08em;
   text-transform: uppercase; color: var(--accent); text-decoration: none;
 }
+
+/* ---------- Missão Global ("marca": "missao" no JSON) ----------
+   A identidade dos slides do evento: azul-marinho com o brilho azul em cima,
+   títulos em letra condensada caixa-alta (Bebas Neue), a arte do evento como
+   capa, as partes como o slide de título e o filete verde-azul do rodapé. */
+:root[data-marca="missao"] {
+  --bg: #061630;
+  --surface: rgba(10, 34, 70, .72);
+  --border: rgba(120, 180, 240, .18);
+  --accent: #36A9F0;
+  --accent-wash: rgba(54, 169, 240, .16);
+  --chart-bg: #061630 url("assets/missao/fundo-grafico.jpg") center / cover no-repeat;
+  --glow: rgba(20, 110, 190, .34);
+  --glow-2: rgba(30, 140, 210, .22);
+  --missao-filete: linear-gradient(90deg, #7AC943, #36A9F0 45%, #1F6FB8);
+  --titulo-missao: "Bebas Neue", "Oswald", Impact, "Arial Narrow", sans-serif;
+}
+:root[data-marca="missao"][data-theme="light"] {
+  --bg: #eef3f9; --surface: #ffffff; --border: #d3deea; --accent: #1F6FB8;
+  --accent-wash: rgba(31, 111, 184, .12); --chart-bg: #ffffff;
+  --glow: rgba(31, 111, 184, .12); --glow-2: rgba(122, 201, 67, .10);
+}
+:root[data-marca="missao"] .topo { background: rgba(6, 22, 48, .78); }
+:root[data-marca="missao"][data-theme="light"] .topo { background: rgba(238, 243, 249, .85); }
+:root[data-marca="missao"] .topo::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--missao-filete);
+}
+/* o cabeçalho genérico das Análises dá lugar à capa do evento */
+:root[data-marca="missao"] .sobrancelha,
+:root[data-marca="missao"] .titulo-pagina,
+:root[data-marca="missao"] .lede { display: none; }
+.logo-missao { display: none; }
+:root[data-marca="missao"] .logo-missao {
+  display: flex; align-items: center; flex: none; padding-left: 14px; border-left: 1px solid var(--border);
+}
+.logo-missao img { height: 30px; width: auto; display: block; }
+@media (max-width: 600px) { .logo-missao img { height: 22px; } }
+
+.missao-capa {
+  position: relative; margin: 0 0 34px; border-radius: 14px; overflow: hidden; line-height: 0;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .45);
+}
+.missao-capa img { width: 100%; height: auto; display: block; }
+.missao-capa::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: var(--missao-filete); }
+:root[data-marca="missao"] .artigo { border-top: 0; padding-top: 0; }
+:root[data-marca="missao"] .artigo-titulo,
+:root[data-marca="missao"] .artigo-secao-titulo {
+  font-family: var(--titulo-missao); font-weight: 400; text-transform: uppercase; letter-spacing: .02em;
+}
+:root[data-marca="missao"] .artigo-titulo { font-size: 46px; line-height: 1; }
+:root[data-marca="missao"] .artigo-secao-titulo { font-size: 34px; line-height: 1.05; }
+
+/* a parte é o slide de título: a foto do evento ao fundo, o nome no meio */
+:root[data-marca="missao"] .artigo-parte {
+  position: relative; margin: 80px 0 10px; padding: 0; border-top: 0; border-radius: 14px; overflow: hidden;
+  min-height: 190px; display: flex; align-items: center; justify-content: center; text-align: center;
+  background: #061630 url("assets/missao/parte.jpg") center / cover no-repeat;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, .4);
+}
+:root[data-marca="missao"] .artigo-parte::before {
+  content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(6, 22, 48, .25), rgba(6, 22, 48, .7));
+}
+:root[data-marca="missao"] .artigo-parte::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: var(--missao-filete);
+}
+:root[data-marca="missao"] .artigo-parte span {
+  position: relative; padding: 24px 20px; font-family: var(--titulo-missao); font-weight: 400;
+  font-size: 64px; line-height: 1; letter-spacing: .02em; color: #fff; text-shadow: 0 2px 18px rgba(0, 0, 0, .5);
+}
+@media (max-width: 600px) {
+  :root[data-marca="missao"] .artigo-parte { min-height: 130px; }
+  :root[data-marca="missao"] .artigo-parte span { font-size: 40px; }
+  :root[data-marca="missao"] .artigo-titulo { font-size: 36px; }
+  :root[data-marca="missao"] .artigo-secao-titulo { font-size: 28px; }
+}
+:root[data-marca="missao"] .il-parte a { font-family: var(--titulo-missao); font-weight: 400; font-size: 15px; letter-spacing: .06em; }
+
+/* o rodapé dos slides: filete verde-azul, a assinatura à esquerda e o logo */
+.missao-rodape {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  margin: 0 0 18px; padding: 14px 18px; border-radius: 10px; background: #04102b; color: #fff; font-size: 14px;
+  border-top: 3px solid transparent; border-image: var(--missao-filete) 1; border-image-slice: 1 0 0 0;
+}
+.missao-rodape img { height: 34px; width: auto; display: block; }

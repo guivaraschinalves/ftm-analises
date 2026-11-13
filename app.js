@@ -3459,6 +3459,12 @@
     var rodape = document.getElementById("rodape");
     rodape.innerHTML = "";
     lista.forEach(function (dados) {
+      if (dados.marca === "missao" && dados.assinatura) {
+        var faixa = html("div", { "class": "missao-rodape" });
+        faixa.appendChild(html("span", { texto: dados.assinatura }));
+        faixa.appendChild(html("img", { src: "assets/missao/logo-missao.png", alt: "Missão Global" }));
+        rodape.appendChild(faixa);
+      }
       var at = dados.atualizado.split("-");
       rodape.appendChild(html("p", { style: "margin:0 0 6px",
         texto: dados.assunto + " até " + rotuloRef(dados.referencia) +
@@ -3646,6 +3652,12 @@
   function montarArtigo(dados, host) {
     var art = html("article", { "class": "artigo", id: idAssunto(dados) });
     ligarRealce(art);
+    // a capa do evento (a arte dos slides) antes de tudo
+    if (dados.marca === "missao" && dados.capa) {
+      var capa = html("figure", { "class": "missao-capa" });
+      capa.appendChild(html("img", { src: dados.capa, alt: dados.assunto }));
+      art.appendChild(capa);
+    }
     if (dados.grupo) art.appendChild(html("p", { "class": "artigo-grupo", texto: dados.grupo }));
     art.appendChild(html("h2", { "class": "artigo-titulo", texto: dados.assunto }));
     paragrafos(dados.apresentacao, "artigo-lede").forEach(function (p) {
@@ -3866,6 +3878,24 @@
     }
   }
 
+  // A Missão Global tem identidade própria: a letra dos títulos (Bebas Neue,
+  // carregada só quando ela abre) e o fundo azul do slide nos gráficos, na
+  // tela (CSS) e no arquivo baixado (aqui, pela paleta escura).
+  var PALETA_ESCURA = Object.assign({}, PALETAS.dark);
+  function marcaNosGraficos(marca) {
+    if (marca === "missao") {
+      if (!document.getElementById("fonte-missao")) {
+        document.head.appendChild(html("link", { id: "fonte-missao", rel: "stylesheet",
+          href: "https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" }));
+      }
+      PALETAS.dark.bg = "#061630";
+      PALETAS.dark.tipBg = "rgba(6,22,48,.94)";
+      PALETAS.dark.fundo = "assets/missao/fundo-grafico.jpg";
+    } else {
+      Object.assign(PALETAS.dark, PALETA_ESCURA);
+    }
+  }
+
   // Um assunto por vez. Trocar desmonta o anterior inteiro, inclusive a lista
   // de cartões — ela é quem o resize e o irPara percorrem, e deixar nela
   // cartão que saiu do DOM faria os dois desenharem no vazio.
@@ -3879,6 +3909,7 @@
     // a marca do assunto (hoje só "wealth") troca o acento e põe o logo do parceiro no topo
     if (docs[i].marca) document.documentElement.setAttribute("data-marca", docs[i].marca);
     else document.documentElement.removeAttribute("data-marca");
+    marcaNosGraficos(docs[i].marca);
     montarAssunto(docs[i], host);
     montarIndiceLateral(docs[i]);
     montarNav(docs, document.getElementById("nav"), i);

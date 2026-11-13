@@ -147,7 +147,7 @@ def graficos_eua_externo(pib):
                  unidade="%", unidade2="ind", buracoMax=3, fonte="BEA e Federal Reserve via FRED e FtM",
                  series=[linha("Conta corrente / PIB", AZUL, cc, 2),
                          linha("Dólar real amplo, só bens (dir.)", VERDE, broad, 1, largura=3, dir=True,
-                               unidade="ind"),
+                               unidade="ind", rotulo=False),         # acabou em 2019: sem número na ponta
                          linha("Dólar real contra emergentes (dir.)", VERMELHO, eme, 1, largura=3, dir=True,
                                unidade="ind")])
     man, tot = cf.fred("MANEMP"), cf.fred("PAYEMS")
