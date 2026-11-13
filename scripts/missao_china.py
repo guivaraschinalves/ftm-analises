@@ -391,7 +391,8 @@ CHINA = [("Déficit externo dos EUA", "eua-cc-pib"), ("", "eua-bp-pib"), ("", "e
          ("", "china-cc"),
          ("Balanço de pagamentos dos EUA", "eua-cc-componentes"), ("", "eua-bp"), ("", "eua-conta-financeira"),
          ("", "eua-comercio-paises"),
-         ("Dólar e tarifas", "dxy"), ("", "eua-tarifa-efetiva")]
+         ("Dólar e tarifas", "dxy"), ("", "eua-tarifa-efetiva"),
+         ("Ouro nas reservas", "reservas-ouro-tesouros")]      # copiado do ftm-dados (reservas.json)
 PARTE_CHINA = "China e desequilíbrios globais"
 
 

@@ -104,6 +104,7 @@
   }
 
   var docs = [], atual = 0;
+  var IMAGENS = {};     // {caminho: "data:image/jpeg;base64,…"} (a nota do real), embutida para o PNG baixado
   var logoSvg = null;   // {viewBox, nos}
 
   // ---------- utilidades ----------
@@ -1666,10 +1667,14 @@
         if (!p.v) return;
         var b = p.v >= 0 ? baseP : baseN, antes = b[p.i] || 0, depois = antes + p.v;
         b[p.i] = depois;
-        var ya = Y(antes), yb = Y(depois);
-        area.appendChild(el("rect", {
-          x: X(p.i + 0.5) - bw / 2, y: Math.min(ya, yb), width: bw, height: Math.max(0.6, Math.abs(yb - ya)), fill: cor,
-          opacity: s.opacidade || null
+        var ya = Y(antes), yb = Y(depois), h = Math.max(0.6, Math.abs(yb - ya)), xb = X(p.i + 0.5) - bw / 2;
+        // "contorno" (vem do ftm-dados): só a borda, vazada, como as reservas
+        // no slide do balanço de pagamentos; o traço entra meio traço para dentro
+        area.appendChild(el("rect", s.contorno ? {
+          x: xb + 0.6, y: Math.min(ya, yb) + 0.6, width: Math.max(0.6, bw - 1.2), height: Math.max(0.6, h - 1.2),
+          fill: "none", stroke: cor, "stroke-width": 1.2
+        } : {
+          x: xb, y: Math.min(ya, yb), width: bw, height: h, fill: cor, opacity: s.opacidade || null
         }));
       });
     });
@@ -1692,10 +1697,42 @@
     g.series.forEach(function (s, k) {
       if (s.tipo === "barra" || s.tipo === "faixa" || !vis[k].length) return;
       var d = "", ant = null, bm = s.buracoMax || buracoMax, YS = yDe(s);  // série anual num eixo mensal liga de 12 em 12
+      var trechos = [], atualT = [];
       vis[k].forEach(function (p) {
-        d += (ant === null || p.i - ant > bm ? "M" : "L") + X(p.i + 0.5).toFixed(1) + " " + YS(p.v).toFixed(1);
+        var corta = ant === null || p.i - ant > bm;
+        if (corta && atualT.length) { trechos.push(atualT); atualT = []; }
+        atualT.push([X(p.i + 0.5), YS(p.v)]);
+        d += (corta ? "M" : "L") + X(p.i + 0.5).toFixed(1) + " " + YS(p.v).toFixed(1);
         ant = p.i;
       });
+      if (atualT.length) trechos.push(atualT);
+      // "area" (vem do ftm-dados): fecha cada trecho contínuo até o zero e
+      // pinta; com "imagem", a área é o recorte de uma figura que cobre o
+      // quadro (a nota de R$ 100 na perda de poder de compra do real)
+      if (s.area) {
+        var yz = YS(0), formas = [];
+        trechos.forEach(function (tr) {
+          if (tr.length < 2) return;
+          var da = "M" + tr[0][0].toFixed(1) + " " + yz.toFixed(1);
+          tr.forEach(function (q) { da += "L" + q[0].toFixed(1) + " " + q[1].toFixed(1); });
+          formas.push(da + "L" + tr[tr.length - 1][0].toFixed(1) + " " + yz.toFixed(1) + "Z");
+        });
+        var fonteImg = s.imagem && IMAGENS[s.imagem];
+        if (fonteImg && formas.length) {
+          var idImg = idClip + "-nota-" + k;
+          svg.insertBefore(el("defs", {}, [el("clipPath", { id: idImg },
+            formas.map(function (d2) { return el("path", { d: d2 }); }))]), svg.firstChild);
+          area.appendChild(el("image", {
+            href: fonteImg, x: L.x0, y: L.y0, width: pw, height: ph,
+            preserveAspectRatio: "none", "clip-path": "url(#" + idImg + ")", opacity: s.opacidadeImagem || 1
+          }));
+        } else {
+          formas.forEach(function (d2) {
+            area.appendChild(el("path", { d: d2, fill: corNoTema(s.cor, pal), opacity: s.opacidadeArea || 0.5,
+                                          stroke: "none" }));
+          });
+        }
+      }
       var w = s.largura || L.linha;
       area.appendChild(el("path", {
         d: d, fill: "none", stroke: corNoTema(s.cor, pal), "stroke-width": w,
@@ -1725,7 +1762,10 @@
     // legenda
     legenda.pos.forEach(function (it) {
       var y = topoLegenda + it.linha * L.legenda.passo, s = it.s, cor = corNoTema(s.cor, pal);
-      if (s.tipo === "barra" || s.tipo === "faixa") {
+      if (s.tipo === "barra" && s.contorno) {
+        svg.appendChild(el("rect", { x: it.x + 7, y: y - 9, width: 20, height: 18, fill: "none", stroke: cor,
+                                     "stroke-width": 2 }));
+      } else if (s.tipo === "barra" || s.tipo === "faixa") {
         svg.appendChild(el("rect", { x: it.x + 6, y: y - 10, width: 22, height: 20, fill: cor,
                                      opacity: s.tipo === "faixa" ? (s.opacidade || 0.3) * 1.6 : (s.opacidade || null) }));
       } else {
@@ -4015,10 +4055,41 @@
       if (!docs.length) throw new Error("nenhum arquivo de dados foi carregado");
       var alvo = location.hash.length > 1 ? assuntoDoHash(location.hash.slice(1)) : null;
       mostrar(alvo ? alvo[0] : 0, alvo ? alvo[1] : null);
+      // as imagens das séries vêm depois do primeiro desenho: o gráfico aparece
+      // na hora, com a área lisa, e ganha a nota quando ela chega
+      carregarImagens(docs).then(function () {
+        if (Object.keys(IMAGENS).length) cartoes.forEach(function (c) { desenhar(c, true); });
+      });
     }).catch(function (e) {
       host.innerHTML = "";
       host.appendChild(html("p", { "class": "estado erro", texto: "Não foi possível carregar os dados. " + e.message }));
     });
+  }
+
+  function carregarImagens(lista) {
+    var caminhos = {};
+    lista.forEach(function (d) {
+      (d.secoes || []).forEach(function (sec) {
+        (sec.graficos || []).forEach(function (g) {
+          (g.variantes || [{ series: g.series }]).concat([{ series: g.series }]).forEach(function (v) {
+            (v.series || []).forEach(function (s) { if (s.imagem) caminhos[s.imagem] = 1; });
+          });
+        });
+      });
+    });
+    return Promise.all(Object.keys(caminhos).map(function (url) {
+      return fetch(url).then(function (r) {
+        if (!r.ok) throw new Error(r.status);
+        return r.blob();
+      }).then(function (b) {
+        return new Promise(function (ok, erro) {
+          var fr = new FileReader();
+          fr.onload = function () { IMAGENS[url] = fr.result; ok(); };
+          fr.onerror = erro;
+          fr.readAsDataURL(b);
+        });
+      }).catch(function () {});
+    }));
   }
 
   function iniciar() {

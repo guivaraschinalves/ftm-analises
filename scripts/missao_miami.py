@@ -148,7 +148,8 @@ def sem_trimestral(g):
     for grupo in [g] + g.get("variantes", []):
         for s in grupo.get("series", []):
             s["dados"] = [["%s-%02d" % (k[:4], 3 * int(k[-1])), v] for k, v in s["dados"]]
-    g["buracoMax"] = 3
+    # o buraco do ftm-dados é em trimestres (4 = liga a série anual); aqui é em meses
+    g["buracoMax"] = 3 * g.get("buracoMax", 1)
     return g
 
 
@@ -684,8 +685,6 @@ def adaptar(g):
         novas = []
         for x in grupo.get("series", []):
             x.pop("hover", None)
-            x.pop("area", None)
-            x.pop("imagem", None)
             if x.get("tipo") == "vela":
                 o = x.get("ohlc") or []
                 if o and all(len(set(r[1:])) == 1 for r in o):
@@ -1672,6 +1671,8 @@ def main():
         secoes.append(dict(titulo=titulo, texto="", fontes=[], figuras=[], graficos=[juros[gid]]))
     import missao_china
     china = {g["id"]: g for g in missao_china.graficos()}
+    ouro = adaptar(json.loads(json.dumps(graficos_ftm_dados("dados/reservas.json")["reservas-ouro-tesouros"])))
+    china[ouro["id"]] = ouro
     for titulo, gid in missao_china.CHINA:
         secoes.append(dict(titulo=titulo, texto="", fontes=[], figuras=[], graficos=[china[gid]]))
     cripto = {g["id"]: g for g in graficos_cripto()}
