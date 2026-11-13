@@ -210,7 +210,7 @@ def graficos_atividade():
 
 
 IDS_PIB = ["pib-familias-4tri", "pib-participacao"]
-IDS_CREDITO = ["credito-direcionado-livre"]
+IDS_CREDITO = ["credito-direcionado-livre", "credito-ampliado-contribuicoes-empresas", "credito-juros-selic", "credito-controle-razao", "credito-poupanca-moeda"]
 # outros cartões do ftm-dados que fecham o roteiro do ciclo: a inflação implícita
 # dos serviços (volume × preço) e os serviços subjacentes, a ponte para a inflação
 IDS_OUTROS = [("dados/ipca.json", ["servicos"])]
@@ -1482,7 +1482,7 @@ def graficos_fiscal_brasil():
 
 BRASIL = [("Atividade", "pmc-pms-trimestre"), ("", "pms-volume-inflacao-tri"), ("", "pib-familias-4tri"),
           ("", "pib-participacao"),
-          ("Crédito", "credito-direcionado-livre"),
+          ("Crédito", "credito-direcionado-livre"), ("", "credito-ampliado-contribuicoes-empresas"), ("", "credito-juros-selic"), ("", "credito-controle-razao"), ("", "credito-poupanca-moeda"),
           ("Confiança", "confianca"),
           ("Emprego", "desemprego"), ("", "participacao"), ("", "br-caged-setembro"),
           ("Inflação", "ipca-mensal-focus"), ("", "ipca-distancia-meta"), ("", "ipca-alimentacao-contribuicao"),
