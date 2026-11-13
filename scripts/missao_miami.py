@@ -994,6 +994,126 @@ def graficos_resto():
                grafico_fluxo_residentes(), tabela_2014()])
 
 
+# ================================================================ ciclo dos EUA
+# Pelo pedido dele de 13/11/2026: "o assunto aqui é IA, não tem outra", com
+# crédito (spreads e CDS), inflação e componentes, o comunicado do FOMC, P/L
+# de 12 meses contra o projetado, déficit fiscal e midterms. Os gráficos vêm
+# das funções das análises do FOMC (cenario_fomc) e do Relatório de Novembro
+# (cenario_novembro), rodadas de novo aqui, com o dado de hoje; as páginas
+# daquelas análises ficam como estavam, datadas.
+
+PE_EUA = os.path.join(os.path.dirname(RAIZ), "pe-eua", "dados", "sp500_pl.csv")
+
+
+def grafico_pl_sp500():
+    """P/L do S&P 500, de 12 meses e projetado (próximos 12 meses), do projeto
+    local pe-eua: FactSet Earnings Insight (projetado desde mar/2017, 12 meses
+    desde set/2021; um relatório por mês, o da última sexta) e Robert Shiller
+    (12 meses com lucro contábil, GAAP, desde 1871). Atualizar: rodar
+    factset.py e montar.py no pe-eua."""
+    import csv
+    linhas = list(csv.DictReader(open(PE_EUA, encoding="utf-8")))
+    col = lambda c: {l["mes"]: float(l[c]) for l in linhas if l.get(c)}               # noqa: E731
+    proj, doze, shiller = col("pl_projetado_factset"), col("pl_12m_factset"), col("pl_12m_shiller")
+    rel = max(l["data_relatorio_factset"] for l in linhas if l.get("data_relatorio_factset"))
+    media10 = sum(proj[m] for m in sorted(proj)[-120:]) / len(sorted(proj)[-120:])
+    u = max(proj)
+    print("  P/L S&P 500 (FactSet de %s): projetado %.1f, 12 meses %.1f; Shiller (GAAP) %s %.1f"
+          % (rel, proj[u], doze.get(u, float("nan")), max(shiller), shiller[max(shiller)]))
+    d = "%s/%s/%s" % (rel[8:], rel[5:7], rel[:4])
+    return dict(id="sp500-pl", titulo="P/L do S&P 500: 12 meses e projetado",
+                subtitulo="Preço ÷ lucro por ação, em vezes; projetado = lucro esperado para os próximos 12 meses "
+                          "(FactSet, relatório de %s); 12 meses = lucro dos últimos 12 meses" % d,
+                unidade="x", fonte="FactSet (Earnings Insight), Robert Shiller e FtM", variantes=[
+                    dict(rot="Desde 2017 (FactSet)", series=[
+                        cf.serie("12 meses", VERMELHO, doze, 1, largura=5, rotulo=True),
+                        cf.serie("Projetado", AZUL, proj, 1, largura=5, rotulo=True)]),
+                    dict(rot="Desde 1990 (Shiller e FactSet)", series=[
+                        cf.serie("12 meses, lucro contábil (Shiller)", VERMELHO, desde(shiller, "1990-01"), 1,
+                                 largura=4, rotulo=True),
+                        cf.serie("Projetado (FactSet)", AZUL, proj, 1, largura=4, rotulo=True)])])
+
+
+def grafico_deficit_eua():
+    """Resultado do governo federal americano: Monthly Treasury Statement
+    (FRED MTSDS133FMS, US$ milhões no mês) somado em 12 meses, em % do PIB
+    nominal (FRED GDP, trimestral anualizado, o último trimestre conhecido em
+    cada mês); e a série anual do ano fiscal desde 1929 (FYFSGDA188S)."""
+    mts = cf.fred("MTSDS133FMS")
+    pib = cf.fred("GDP", mensal=False)
+    tri = sorted(pib)
+    doze = {}
+    ks = sorted(mts)
+    for i in range(11, len(ks)):
+        m = ks[i]
+        if cf.mes_mais(ks[i - 11], 11) != m:
+            continue
+        q = [t for t in tri if t[:7] <= m]
+        if not q:
+            continue
+        doze[m] = 100 * sum(mts[k] for k in ks[i - 11:i + 1]) / (pib[q[-1]] * 1000)
+    anual = {k[:4] + "-09": v for k, v in cf.fred("FYFSGDA188S", mensal=False).items()}
+    u = max(doze)
+    print("  déficit federal dos EUA em 12 meses: %s %.1f%% do PIB; ano fiscal %s %.1f%%"
+          % (u, doze[u], max(anual)[:4], anual[max(anual)]))
+    return dict(id="eua-deficit", titulo="Resultado do governo federal dos EUA",
+                subtitulo="Em % do PIB; negativo = déficit", unidade="%",
+                fonte="Tesouro dos EUA (Monthly Treasury Statement) e BEA, via FRED", variantes=[
+                    dict(rot="Em 12 meses, desde 2000", series=[
+                        cf.serie("Resultado em 12 meses", VERMELHO, desde(doze, "2000-01"), 1, largura=5,
+                                 rotulo=True)]),
+                    dict(rot="Por ano fiscal, desde 1929", buracoMax=12, series=[
+                        cf.serie("Resultado do ano fiscal", VERMELHO, anual, 1, largura=4, rotulo=True)])])
+
+
+def graficos_eua():
+    out = []
+    novembro = cn.fomc()
+    for k in ("comunicados", "pmi", "datacenters", "pce", "payroll", "u6", "participacao", "treasuries"):
+        out.append(novembro[k])
+    out += cn.graficos_ftm_dados_eua().get("pib") and [cn.graficos_ftm_dados_eua()["pib"]] or []
+    out += cn.graficos_ia()
+    out.append(cf.dissidentes_fomc())
+    out += cf.graficos_inflacao()
+    out += cf.graficos_trabalho()
+    out += cf.graficos_governo()
+    out += cf.graficos_credito()
+    out += cf.graficos_datacenters()
+    out += [adaptar(json.loads(json.dumps(graficos_ftm_dados("dados/pib-eua.json")["pib-eua-investimento-ti"])))]
+    # o mapa dos estados usa o desenho dos estados, que fica no alto do arquivo das midterms
+    with open(os.path.join(RAIZ, "dados", "midterms-2026.json"), encoding="utf-8") as f:
+        formas = json.load(f).get("formas")
+    for g in cn.copiar("midterms-2026.json", MIDTERMS_IDS):
+        g = json.loads(json.dumps(g))
+        if g.get("tipo") == "estados" and not g.get("formas"):
+            g["formas"] = formas
+        out.append(g)
+    out += [grafico_pl_sp500(), grafico_deficit_eua()]
+    vistos, fora = set(), []
+    for g in out:
+        if g["id"] not in vistos:
+            vistos.add(g["id"])
+            fora.append(g)
+    return fora
+
+
+MIDTERMS_IDS = ["midterms-historia-aprovacao", "midterms-resultado-camara", "midterms-resultado-senado",
+                "midterms-resultado-mapa-senado"]
+
+EUA = [("Atividade e emprego", "pib-eua-contribuicoes"), ("", "ism-pmi"), ("", "payroll-setores"),
+       ("", "eua-u3-u6"), ("", "jolts"),
+       ("Inteligência artificial", "pib-eua-investimento-ti"), ("", "construcao-datacenters-fabricas"),
+       ("", "datacenters-participacao"), ("", "ia-indices"), ("", "ia-vix"),
+       ("Bolsa", "sp500-pl"),
+       ("Crédito corporativo", "spreads-credito"), ("", "ia-divida"), ("", "ia-cds-bloomberg"), ("", "ia-cds-reuters"),
+       ("Inflação nos EUA", "cpi-cheio-nucleo"), ("", "cpi-componentes"), ("", "pce-nucleos"), ("", "pce-componentes"),
+       ("Fed", "fomc-comunicados"), ("", "fomc-dissidentes"), ("", "treasuries-5-10-30"),
+       ("Déficit fiscal", "eua-deficit"), ("", "governo-receita-despesa"), ("", "despesa-contribuicao"),
+       ("Midterms", "midterms-historia-aprovacao"), ("", "midterms-resultado-camara"),
+       ("", "midterms-resultado-senado"), ("", "midterms-resultado-mapa-senado")]
+PARTE_EUA = "Cenário econômico dos EUA"
+
+
 def main():
     selic = cn.sgs(432, "05/03/1999")
     ult = max(selic)
@@ -1041,6 +1161,15 @@ def main():
              for g in f()}
     for titulo, gid in CICLO + RESTO:
         secoes.append(dict(titulo=titulo, texto="", fontes=[], figuras=[], graficos=[ciclo[gid]]))
+    eua = {g["id"]: g for g in graficos_eua()}
+    faltam = [gid for _, gid in EUA if gid not in eua]
+    if faltam:
+        raise RuntimeError("gráficos dos EUA que ninguém gerou: %s" % faltam)
+    for k, (titulo, gid) in enumerate(EUA):
+        sec = dict(titulo=titulo, texto="", fontes=[], figuras=[], graficos=[eua[gid]])
+        if k == 0:
+            sec["parte"] = PARTE_EUA
+        secoes.append(sec)
     hoje = datetime.date.today().isoformat()
     doc = dict(atualizado=hoje, referencia=hoje, formato="artigo", assunto="Missão Global Miami",
                # a ordem dos gráficos é escolhida na página (botões Subir/Descer e
@@ -1058,7 +1187,7 @@ def main():
     # seção por gráfico, na ordem de CICLO, gráfico some ou sai repetido
     with open(SAIDA, encoding="utf-8") as f:
         ids = [g["id"] for s in json.load(f)["secoes"] for g in s["graficos"]]
-    esperado = ["selic-recessoes", "selic-ciclos"] + [gid for _, gid in CICLO + RESTO]
+    esperado = ["selic-recessoes", "selic-ciclos"] + [gid for _, gid in CICLO + RESTO + EUA]
     if ids != esperado:
         raise RuntimeError("textos/%s.md fora do lugar: o JSON saiu com %s; tinha de ser %s"
                            % (NOME, ids, esperado))

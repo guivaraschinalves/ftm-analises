@@ -114,3 +114,62 @@ parte: Cenário econômico brasileiro
 ##
 
 ##
+
+## Atividade e emprego
+parte: Cenário econômico dos EUA
+
+##
+
+##
+
+##
+
+##
+
+## Inteligência artificial
+
+##
+
+##
+
+##
+
+##
+
+## Bolsa
+
+## Crédito corporativo
+
+##
+
+##
+
+##
+
+## Inflação nos EUA
+
+##
+
+##
+
+##
+
+## Fed
+
+##
+
+##
+
+## Déficit fiscal
+
+##
+
+##
+
+## Midterms
+
+##
+
+##
+
+##
