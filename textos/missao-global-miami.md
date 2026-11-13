@@ -93,8 +93,6 @@ parte: Cenário econômico brasileiro
 
 ##
 
-##
-
 ## Setor externo e câmbio
 
 ##
@@ -171,5 +169,24 @@ parte: Cenário econômico dos EUA
 ##
 
 ##
+
+##
+
+## Bitcoin
+parte: Bitcoin e stablecoins
+
+##
+
+##
+
+##
+
+##
+
+## Stablecoins
+
+##
+
+## Cripto no balanço de pagamentos
 
 ##

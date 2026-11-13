@@ -657,7 +657,7 @@ FONTES_RESTO = {
 }
 # ids que já existem na página com outro conteúdo: a cópia ganha um id próprio
 IDS_NOVOS = {"ipca-12m": "ipca-12m-defasagem"}
-UNIDADES_RESTO = {"x2": "x", "brl-usd": "brl", "p.p.": "pp"}
+UNIDADES_RESTO = {"x2": "x", "brl-usd": "brl", "p.p.": "pp", "usd-bi2": "usd-bi"}
 
 
 def adaptar(g):
@@ -979,7 +979,7 @@ RESTO = [("Inflação", "ipca-distancia-meta"), ("", "ipca-mensal-focus"), ("", 
          ("", "el-nino-alimentos"), ("", "ipca-12m-defasagem"), ("", "atividade-inflacao"),
          ("", "ipca-projecoes-focus"),
          ("Fiscal", "fiscal-primario-pib"), ("", "fiscal-nominal-pib"), ("", "fiscal-juros-nominais"),
-         ("", "juro-crescimento"), ("", "fiscal-divida-bruta"), ("", "fiscal-divida-condicionantes"),
+         ("", "fiscal-divida-bruta"), ("", "fiscal-divida-condicionantes"),
          ("", "primario-estabilizador"), ("", "divida-composicao"),
          ("", "divida-detentores"), ("", "credito-ampliado-contribuicoes-total"), ("", "juros-longo"),
          ("", "deficits-gemeos"),
@@ -1114,6 +1114,211 @@ EUA = [("Atividade e emprego", "pib-eua-contribuicoes"), ("", "ism-pmi"), ("", "
 PARTE_EUA = "Cenário econômico dos EUA"
 
 
+# ================================================================ bitcoin e stablecoins
+# Pedido dele em 13/11/2026: preço do bitcoin, ciclos (desde cada halving),
+# MVRV, múltiplo de Mayer, valor de mercado do bitcoin ÷ o do ouro, valor de
+# mercado das stablecoins (todas e as lastreadas em dólar), Tether × Circle
+# (USDC) e o fluxo de cripto no balanço de pagamentos do Brasil. Fontes
+# abertas, sem chave: Coin Metrics (community API), DefiLlama, World Bank
+# (ouro, via datasets/gold-prices) e o estoque de ouro do ftm-dados (WGC).
+
+COINMETRICS = ("https://community-api.coinmetrics.io/v4/timeseries/asset-metrics?assets=btc"
+               "&metrics=PriceUSD,CapMrktCurUSD,CapMVRVCur&frequency=1d&page_size=10000&start_time=2010-07-18")
+HALVINGS = ["2012-11-28", "2016-07-09", "2020-05-11", "2024-04-20"]
+ONCAS_POR_TONELADA = 32150.7466
+OURO_PRECO = "https://raw.githubusercontent.com/datasets/gold-prices/main/data/monthly.csv"
+LLAMA = "https://stablecoins.llama.fi/stablecoincharts/all"
+
+
+def coinmetrics():
+    """{"AAAA-MM-DD": {"preco", "mcap", "mvrv"}} diário do bitcoin."""
+    url, fora = COINMETRICS, {}
+    while url:
+        j = json.loads(cf.baixar(url, headers=SIDRA_UA))
+        for l in j.get("data", []):
+            d = l["time"][:10]
+            fora[d] = {k: float(l[c]) for k, c in (("preco", "PriceUSD"), ("mcap", "CapMrktCurUSD"),
+                                                   ("mvrv", "CapMVRVCur")) if l.get(c)}
+        url = j.get("next_page_url")
+    return fora
+
+
+def fim_do_mes(diario):
+    """Último valor de cada mês, chave "AAAA-MM"."""
+    fora = {}
+    for d in sorted(diario):
+        fora[d[:7]] = diario[d]
+    return fora
+
+
+def linha_fixa(nome, cor, valor, chaves):
+    """Linha de referência horizontal com dois pontos só (o primeiro e o último dia)."""
+    ks = sorted(chaves)
+    return dict(nome=nome, cor=cor, dados=[[ks[0], valor], [ks[-1], valor]], traco="pontilhado", largura=2,
+                buracoMax=100000)
+
+
+def graficos_bitcoin():
+    cm = coinmetrics()
+    dias = sorted(d for d in cm if "preco" in cm[d])
+    preco = {d: cm[d]["preco"] for d in dias}
+    u = dias[-1]
+    # múltiplo de Mayer: preço ÷ média dos últimos 200 dias
+    mayer, soma = {}, 0.0
+    for i, d in enumerate(dias):
+        soma += preco[d]
+        if i >= 200:
+            soma -= preco[dias[i - 200]]
+        if i >= 199:
+            mayer[d] = preco[d] / (soma / 200)
+    mvrv = {d: cm[d]["mvrv"] for d in dias if "mvrv" in cm[d]}
+    print("  bitcoin %s: US$ %.0f; MVRV %.2f; Mayer %.2f" % (u, preco[u], mvrv.get(u, float("nan")), mayer[u]))
+    sem = lambda d0: {d: v for d, v in preco.items() if d >= d0}                     # noqa: E731
+    tres = "%d%s" % (int(u[:4]) - 3, u[4:])
+    g_preco = dict(id="btc-preco", titulo="Preço do bitcoin", subtitulo="US$, fechamento diário",
+                   unidade="usd", diario=True, fonte="Coin Metrics (community data)", variantes=[
+                       dict(rot="Desde 2017", series=[cf.serie("Bitcoin", AMARELO_BTC, sem("2017-01-01"), 0,
+                                                               largura=3, rotulo=True)]),
+                       dict(rot="Últimos 3 anos", series=[cf.serie("Bitcoin", AMARELO_BTC, sem(tres), 0,
+                                                                   largura=3, rotulo=True)])])
+    # ciclos: preço ÷ preço no dia do halving, mês a mês (a cada 30 dias) até 4 anos
+    ciclos = []
+    import datetime as dt
+    for k, h in enumerate(HALVINGS):
+        h0 = dt.date.fromisoformat(h)
+        base = preco.get(h)
+        if base is None:
+            continue
+        pts = []
+        for mes in range(0, 49):
+            d = (h0 + dt.timedelta(days=30 * mes)).isoformat()
+            if d in preco:
+                pts.append([str(mes), round(preco[d] / base, 3)])
+        ciclos.append((h[:4], pts))
+    cores_ciclo = {"2012": CINZA, "2016": AZUL_CLARO, "2020": AZUL, "2024": AMARELO_BTC}
+    ult = ciclos[-1][1][-1]
+    print("  ciclo atual (halving 2024): mês %s, %.2f× o preço do halving" % (ult[0], ult[1]))
+    g_ciclos = dict(id="btc-ciclos", titulo="Bitcoin: os ciclos desde cada halving",
+                    subtitulo="Preço ÷ preço no dia do halving, em vezes, mês a mês (a cada 30 dias) depois do "
+                              "halving; linha forte = o ciclo atual",
+                    unidade="x", categorias=["%d" % m for m in range(0, 49)], passoX=6,
+                    fonte="Coin Metrics (community data) e FtM", variantes=[
+                        dict(rot="2016, 2020 e 2024", series=[
+                            dict(nome="Halving de %s" % a, cor=cores_ciclo[a], dados=pts,
+                                 largura=5 if a == "2024" else 3, rotulo=True) for a, pts in ciclos if a != "2012"]),
+                        dict(rot="Todos os ciclos", series=[
+                            dict(nome="Halving de %s" % a, cor=cores_ciclo[a], dados=pts,
+                                 largura=5 if a == "2024" else 3, rotulo=True) for a, pts in ciclos])])
+    g_mvrv = dict(id="btc-mvrv", titulo="Bitcoin: MVRV",
+                  subtitulo="Valor de mercado ÷ valor realizado (cada moeda pelo preço da última vez que se moveu); "
+                            "acima de 3,5 marcou topos de ciclo e abaixo de 1, fundos",
+                  unidade="x", diario=True, fonte="Coin Metrics (community data)",
+                  series=[cf.serie("MVRV", AMARELO_BTC, {d: v for d, v in mvrv.items() if d >= "2012-01-01"}, 2,
+                                   largura=3, rotulo=True),
+                          linha_fixa("3,5", VERMELHO, 3.5, [d for d in mvrv if d >= "2012-01-01"]),
+                          linha_fixa("1", AZUL, 1.0, [d for d in mvrv if d >= "2012-01-01"])])
+    g_mayer = dict(id="btc-mayer", titulo="Bitcoin: múltiplo de Mayer",
+                   subtitulo="Preço ÷ média dos 200 dias anteriores; acima de 2,4 marcou euforia e abaixo de 1, "
+                             "preço abaixo da tendência",
+                   unidade="x", diario=True, fonte="Coin Metrics (community data) e FtM",
+                   series=[cf.serie("Múltiplo de Mayer", AMARELO_BTC, {d: v for d, v in mayer.items()
+                                                                       if d >= "2012-01-01"}, 2, largura=3,
+                                    rotulo=True),
+                           linha_fixa("2,4", VERMELHO, 2.4, [d for d in mayer if d >= "2012-01-01"]),
+                           linha_fixa("1", AZUL, 1.0, [d for d in mayer if d >= "2012-01-01"])])
+    # bitcoin ÷ ouro: valor de mercado do ouro = estoque acima do solo (WGC, anual, do
+    # ftm-dados, interpolado entre os anos) × preço mensal (World Bank)
+    import csv
+    import io
+    ouro_px = {}
+    for l in csv.DictReader(io.StringIO(cf.baixar(OURO_PRECO, headers=SIDRA_UA).decode("utf-8"))):
+        try:
+            ouro_px[l["Date"][:7]] = float(l["Price"])
+        except (KeyError, ValueError):
+            pass
+    est = graficos_ftm_dados("dados/reservas.json")["ouro-estoque"]
+    cats = est["categorias"]
+    tot = next(x for v in [est] + est.get("variantes", []) for x in v.get("series", []) if x["nome"] == "Estoque total")
+    anos = {int(cats[int(k)][:4]): v for k, v in tot["dados"]}
+    def estoque(m):
+        a, mm = int(m[:4]), int(m[5:7])
+        a0 = max(x for x in anos if x <= a) if any(x <= a for x in anos) else min(anos)
+        a1 = a0 + 1 if a0 + 1 in anos else a0
+        return anos[a0] + (anos[a1] - anos[a0]) * mm / 12
+    btc_mes = fim_do_mes({d: cm[d]["mcap"] for d in dias if "mcap" in cm[d]})
+    razao = {m: 100 * v / (estoque(m) * ONCAS_POR_TONELADA * ouro_px[m]) for m, v in btc_mes.items()
+             if m in ouro_px and m >= "2013-01"}
+    um = max(razao)
+    print("  bitcoin ÷ ouro %s: %.1f%% (ouro US$ %.0f/oz)" % (um, razao[um], ouro_px[um]))
+    g_ouro = dict(id="btc-ouro", titulo="Valor de mercado do bitcoin em % do valor de mercado do ouro",
+                  subtitulo="Fim do mês; ouro = estoque acima do solo (World Gold Council, interpolado) × preço "
+                            "médio do mês",
+                  unidade="%", fonte="Coin Metrics, World Bank (preço do ouro), World Gold Council e FtM",
+                  series=[cf.serie("Bitcoin ÷ ouro", AMARELO_BTC, razao, 1, largura=5, rotulo=True)])
+    return [g_preco, g_ciclos, g_mvrv, g_mayer, g_ouro]
+
+
+def graficos_stablecoins():
+    def llama(url):
+        fora = {}
+        for l in json.loads(cf.baixar(url, headers=SIDRA_UA)):
+            d = datetime.date.fromtimestamp(int(l["date"])).isoformat()
+            fora[d] = l.get("totalCirculatingUSD") or {}
+        return fora
+    todas = llama(LLAMA)
+    total = fim_do_mes({d: sum(v.values()) / 1e9 for d, v in todas.items() if v})
+    usd = fim_do_mes({d: v.get("peggedUSD", 0) / 1e9 for d, v in todas.items() if v})
+    usdt = fim_do_mes({d: v.get("peggedUSD", 0) / 1e9 for d, v in llama(LLAMA + "?stablecoin=1").items() if v})
+    usdc = fim_do_mes({d: v.get("peggedUSD", 0) / 1e9 for d, v in llama(LLAMA + "?stablecoin=2").items() if v})
+    u = max(total)
+    print("  stablecoins %s: US$ %.0f bi (em dólar %.0f bi, %.1f%%); USDT %.0f bi, USDC %.0f bi"
+          % (u, total[u], usd[u], 100 * usd[u] / total[u], usdt.get(u, 0), usdc.get(u, 0)))
+    pct = lambda d: {m: 100 * v / total[m] for m, v in d.items() if total.get(m)}      # noqa: E731
+    g_total = dict(id="stablecoins-total", titulo="Valor de mercado das stablecoins",
+                   subtitulo="US$ bilhões em circulação, fim do mês; lastreadas em dólar = as que acompanham o "
+                             "dólar americano", unidade="usd-bi", fonte="DefiLlama (stablecoins)", variantes=[
+                       dict(rot="US$ bilhões", series=[
+                           cf.serie("Todas as stablecoins", BRANCO, desde(total, "2019-01"), 1, largura=5,
+                                    rotulo=True),
+                           cf.serie("Lastreadas em dólar", AZUL, desde(usd, "2019-01"), 1, largura=4, rotulo=True)]),
+                       dict(rot="Participação do dólar", unidade="%", series=[
+                           cf.serie("Lastreadas em dólar, em % do total", AZUL, desde(pct(usd), "2019-01"), 1,
+                                    largura=5, rotulo=True)])])
+    g_emissores = dict(id="stablecoins-emissores", titulo="Tether (USDT) e Circle (USDC)",
+                       subtitulo="US$ bilhões em circulação, fim do mês; a Circle, emissora do USDC, abriu capital "
+                                 "em junho de 2025", unidade="usd-bi", fonte="DefiLlama (stablecoins)", variantes=[
+                           dict(rot="US$ bilhões", series=[
+                               cf.serie("Tether (USDT)", VERDE, desde(usdt, "2019-01"), 1, largura=5, rotulo=True),
+                               cf.serie("Circle (USDC)", AZUL, desde(usdc, "2019-01"), 1, largura=5, rotulo=True)]),
+                           dict(rot="Participação no total", unidade="%", series=[
+                               cf.serie("Tether (USDT)", VERDE, desde(pct(usdt), "2019-01"), 1, largura=5,
+                                        rotulo=True),
+                               cf.serie("Circle (USDC)", AZUL, desde(pct(usdc), "2019-01"), 1, largura=5,
+                                        rotulo=True)])])
+    return [g_total, g_emissores]
+
+
+def graficos_cripto_bp():
+    gs = graficos_ftm_dados("dados/bp.json")
+    out = []
+    for i in ("bp-criptos-12m", "bp-criptos-mensal"):
+        g = adaptar(json.loads(json.dumps(gs[i])))
+        g["fonte"] = g.get("fonte") or "Banco Central (balanço de pagamentos)"
+        out.append(g)
+    return out
+
+
+AMARELO_BTC = "#FFFF00"
+CRIPTO = [("Bitcoin", "btc-preco"), ("", "btc-ciclos"), ("", "btc-mvrv"), ("", "btc-mayer"), ("", "btc-ouro"),
+          ("Stablecoins", "stablecoins-total"), ("", "stablecoins-emissores"),
+          ("Cripto no balanço de pagamentos", "bp-criptos-12m"), ("", "bp-criptos-mensal")]
+PARTE_CRIPTO = "Bitcoin e stablecoins"
+
+
+def graficos_cripto():
+    return graficos_bitcoin() + graficos_stablecoins() + graficos_cripto_bp()
+
+
 def main():
     selic = cn.sgs(432, "05/03/1999")
     ult = max(selic)
@@ -1170,6 +1375,9 @@ def main():
         if k == 0:
             sec["parte"] = PARTE_EUA
         secoes.append(sec)
+    cripto = {g["id"]: g for g in graficos_cripto()}
+    for titulo, gid in CRIPTO:
+        secoes.append(dict(titulo=titulo, texto="", fontes=[], figuras=[], graficos=[cripto[gid]]))
     hoje = datetime.date.today().isoformat()
     doc = dict(atualizado=hoje, referencia=hoje, formato="artigo", assunto="Missão Global Miami",
                # a ordem dos gráficos é escolhida na página (botões Subir/Descer e
@@ -1187,7 +1395,7 @@ def main():
     # seção por gráfico, na ordem de CICLO, gráfico some ou sai repetido
     with open(SAIDA, encoding="utf-8") as f:
         ids = [g["id"] for s in json.load(f)["secoes"] for g in s["graficos"]]
-    esperado = ["selic-recessoes", "selic-ciclos"] + [gid for _, gid in CICLO + RESTO + EUA]
+    esperado = ["selic-recessoes", "selic-ciclos"] + [gid for _, gid in CICLO + RESTO + EUA + CRIPTO]
     if ids != esperado:
         raise RuntimeError("textos/%s.md fora do lugar: o JSON saiu com %s; tinha de ser %s"
                            % (NOME, ids, esperado))
