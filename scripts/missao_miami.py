@@ -213,13 +213,14 @@ IDS_PIB = ["pib-familias-4tri", "pib-participacao"]
 IDS_CREDITO = ["credito-direcionado-livre"]
 # outros cartões do ftm-dados que fecham o roteiro do ciclo: a inflação implícita
 # dos serviços (volume × preço) e os serviços subjacentes, a ponte para a inflação
-IDS_OUTROS = [("dados/ipca.json", ["ex3-servicos"])]
+IDS_OUTROS = [("dados/ipca.json", ["servicos"])]
 # o ftm-dados não põe fonte em alguns cartões
 FONTES_COPIA = {"credito-inadimplencia": "Banco Central (SGS 21082, 21083 e 21084)",
                 "credito-servico-divida": "Banco Central (SGS 29033, 29034 e 29036)",
                 "credito-endividamento": "Banco Central (SGS 29037 e 29038)",
                 "credito-juros-selic": "Banco Central (SGS 432 e 29033)",
-                "ex3-servicos": "IBGE e Banco Central (SGS 13522, 433 e 29683)"}
+                "ex3-servicos": "IBGE e Banco Central (SGS 13522, 433 e 29683)",
+                "servicos": "IBGE e Banco Central (SGS 10844 e 29683)"}
 # cores trocadas na cópia (paleta para daltonismo: ciano × verde não)
 CORES_COPIA = {"ex3-servicos": {"IPCA": "#8a8a86", "EX3": AZUL}}
 UNIDADES_COPIA = {"x2": "x"}       # unidades do ftm-dados que o app daqui chama por outro nome
@@ -706,6 +707,23 @@ def adaptar(g):
     return g
 
 
+def so_difusao(g):
+    """Na Missão, a difusão fica só com as duas linhas, no mês: o índice
+    inteiro e o sem alimentação e bebidas (sem as barras dos grupos)."""
+    v = next(v for v in g["variantes"] if v["rot"] == "Sem alimentação, no mês")
+    quero = ["Índice de difusão", "Índice sem alimentação e bebidas"]
+    cores = {"Índice de difusão": BRANCO, "Índice sem alimentação e bebidas": AZUL}
+    series = [dict(nome=x["nome"], cor=cores[x["nome"]], dados=x["dados"], largura=4, rotulo=True)
+              for x in v["series"] if x["nome"] in quero]
+    if len(series) != 2:
+        raise RuntimeError("difusão: faltam as linhas %s" % quero)
+    g = dict(g, series=series, subtitulo="Percentual dos subitens do IPCA com alta no mês, com e sem os de "
+                                         "alimentação e bebidas")
+    g.pop("variantes", None)
+    g.pop("selecao", None)
+    return g
+
+
 def graficos_copiados_resto():
     out = []
     for arq, ids in COPIAS_RESTO:
@@ -713,6 +731,8 @@ def graficos_copiados_resto():
         for i in ids:
             g = adaptar(json.loads(json.dumps(gs[i])))
             g["fonte"] = g.get("fonte") or FONTES_RESTO.get(i, "FtM")
+            if i == "ipca-difusao-grupos":
+                g = so_difusao(g)
             out.append(g)
     for arq, ids in COPIAS_LOCAIS:
         for g in cn.copiar(arq, ids):
@@ -1466,9 +1486,9 @@ BRASIL = [("Atividade", "pmc-pms-trimestre"), ("", "pms-volume-inflacao-tri"), (
           ("Confiança", "confianca"),
           ("Emprego", "desemprego"), ("", "participacao"), ("", "br-caged-setembro"),
           ("Inflação", "ipca-mensal-focus"), ("", "ipca-distancia-meta"), ("", "ipca-alimentacao-contribuicao"),
-          ("", "ipca-alimentacao-itens"), ("", "ipca-difusao-grupos"), ("", "ex3-servicos"),
+          ("", "ipca-alimentacao-itens"), ("", "ipca-difusao-grupos"), ("", "servicos"),
           ("", "administrados-livres"),
-          ("Fiscal", "resultado-primario"), ("", "resultado-nominal"), ("", "divida-duas-metodologias"),
+          ("Fiscal", "resultado-primario"), ("", "resultado-nominal"), ("", "receita-rfb-pib"), ("", "despesa-juros-pib"), ("", "divida-duas-metodologias"),
           ("", "despesa-por-presidente"), ("", "divida-composicao"), ("", "divida-detentores"),
           ("Setor externo e câmbio", "bp-12m"), ("", "bp-cc-12m"), ("", "petroleo-derivados-12m"),
           ("", "bp-reservas-composicao"), ("", "bp-reservas-divida"), ("", "bp-reservas-moeda"),
@@ -1653,6 +1673,8 @@ def main():
                                    cn.graficos_copom)
               for g in f()}
     brasil.update({g_rec["id"]: g_rec, g_ciclos["id"]: g_ciclos})
+    import missao_fiscal
+    brasil.update({g["id"]: g for g in missao_fiscal.graficos()})
     faltam = [gid for _, gid in BRASIL if gid not in brasil]
     if faltam:
         raise RuntimeError("gráficos do Brasil que ninguém gerou: %s" % faltam)
