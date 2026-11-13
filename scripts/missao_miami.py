@@ -348,23 +348,172 @@ def graficos_cartao():
     return [g_saldo, g_inad]
 
 
+FGV_COLUNAS = {1: "ICE", 2: "ISA-E", 3: "IE-E", 4: "ICST", 5: "IE-CST", 6: "ISA-CST", 8: "ICC", 9: "ISA-C",
+               10: "IE-C"}
+
+
+def fgv_confianca():
+    """Os índices de confiança da FGV, com ajuste sazonal, da exportação do
+    FGV Dados que ele sobe no ftm-dados (dados/xgvxConsulta*.xls, a mais nova
+    pelo nome). Ele confirmou em 13/11/2026 que pode publicar. Colunas pela
+    legenda da planilha: 1 ICE, 2 ISA-E, 3 IE-E, 4 ICST, 5 IE-CST, 6 ISA-CST,
+    7 NUCI da construção (fora), 8 ICC, 9 ISA do consumidor, 10 IE do consumidor."""
+    import subprocess
+    import xls
+    subprocess.run(["git", "-C", cn.FTM_DADOS, "fetch", "-q", "origin"], check=True)
+    nomes = subprocess.run(["git", "-C", cn.FTM_DADOS, "ls-tree", "--name-only", "origin/main", "dados/"],
+                           check=True, capture_output=True, text=True).stdout.split("\n")
+    arq = sorted(n for n in nomes if "xgvxConsulta" in n)[-1]
+    corpo = subprocess.run(["git", "-C", cn.FTM_DADOS, "show", "origin/main:" + arq], check=True,
+                           capture_output=True).stdout
+    cel = list(xls.abas(corpo).values())[0]
+    # confere a legenda: as colunas mudam se ele exportar outras séries
+    legenda = {int(float(cel[(r, 0)])): str(cel.get((r, 1), "")) for r in range(11, 22)
+               if str(cel.get((r, 0), "")).strip().replace(".0", "").isdigit()}
+    for col, sigla in FGV_COLUNAS.items():
+        nome = legenda.get(col, "")
+        esperado = {"ICE": "ICE ", "ISA-E": "ISA-E", "IE-E": "IE-E", "ICST": "ICST", "IE-CST": "IE-CST",
+                    "ISA-CST": "ISA-CST", "ICC": "Confiança do Consumidor com", "ISA-C": "Situação Presente",
+                    "IE-C": "Expectativas com"}[sigla]
+        if esperado not in nome:
+            raise RuntimeError("planilha da FGV: coluna %d não é %s (%s)" % (col, sigla, nome))
+    ser = {sigla: {} for sigla in FGV_COLUNAS.values()}
+    for (r, k), v in cel.items():
+        if k in FGV_COLUNAS:
+            d = str(cel.get((r, 0), ""))
+            if len(d) == 7 and d[2] == "/":
+                try:
+                    ser[FGV_COLUNAS[k]]["%s-%s" % (d[3:], d[:2])] = float(v)
+                except (TypeError, ValueError):
+                    pass
+    return arq, ser
+
+
 def graficos_confianca():
-    """ICEI (CNI, geral: o Ipeadata não tem o dessazonalizado), ICEC ajustado
-    (CNC) e ICC (Fecomercio SP), do Ipeadata."""
-    indices = [("Indústria (ICEI)", "CNI12_ICEIGER12", 50), ("Comércio (ICEC)", "CNC12_ICECAJ12", 100),
-               ("Consumidor (ICC)", "FCESP12_IIC12", 100)]
+    """Índices de confiança da FGV (com ajuste sazonal): empresarial (ICE, que
+    junta indústria, serviços, comércio e construção pelo valor adicionado),
+    consumidor (ICC) e construção (ICST), cada um com a situação atual e as
+    expectativas. Padronizados: média 100 e desvio-padrão 10 entre jul/2010 e
+    jun/2015 (100 é a média daquele período, não um ponto neutro)."""
+    arq, s = fgv_confianca()
+    grupos = [("Empresarial", "ICE", "ISA-E", "IE-E"), ("Consumidor", "ICC", "ISA-C", "IE-C"),
+              ("Construção", "ICST", "ISA-CST", "IE-CST")]
     variantes = []
-    for rot, cod, neutro in indices:
-        s = cn.ipea(cod)
-        ult = max(s)
-        print("  %s: %s %.1f" % (rot, ult, s[ult]))
+    for rot, ic, isa, ie in grupos:
+        u = max(s[ic])
+        print("  FGV %s (%s): %s %.1f; situação atual %.1f; expectativas %.1f (%s)"
+              % (rot, ic, u, s[ic][u], s[isa][u], s[ie][u], arq))
         variantes.append(dict(rot=rot, series=[
-            cf.serie(rot, AZUL, s, 1, largura=5, rotulo=True),
-            cf.serie("Neutro (%d)" % neutro, CINZA, {m: neutro for m in s}, 0, traco="pontilhado", largura=3)]))
-    return [dict(id="confianca", titulo="Índices de confiança", unidade="ind", eixo={"zero": False},
-                 subtitulo="Indústria (CNI, geral): de 0 a 100, neutro = 50; comércio (CNC, com ajuste sazonal) e "
-                           "consumidor (Fecomercio SP): de 0 a 200, neutro = 100",
-                 fonte="CNI, CNC e Fecomercio SP (via Ipeadata)", variantes=variantes)]
+            cf.serie("Confiança (%s)" % ic, BRANCO, s[ic], 1, largura=5, rotulo=True),
+            cf.serie("Situação atual", AZUL, s[isa], 1, largura=3, rotulo=True),
+            cf.serie("Expectativas", VERMELHO, s[ie], 1, largura=3, rotulo=True),
+            cf.serie("Média de 2010 a 2015 (100)", CINZA, {m: 100 for m in s[ic]}, 0, traco="pontilhado",
+                     largura=3)]))
+    return [dict(id="confianca", titulo="Índices de confiança da FGV", unidade="ind", eixo={"zero": False},
+                 subtitulo="Com ajuste sazonal; padronizados com média 100 e desvio-padrão 10 entre jul/2010 e "
+                           "jun/2015 (cada 10 pontos = um desvio-padrão)",
+                 fonte="FGV IBRE (Sondagens), via FGV Dados", variantes=variantes)]
+
+
+SERASA_PAGINA = "https://www.serasaexperian.com.br/conteudos/indicadores-economicos/"
+SERASA_UA = {"User-Agent": "Mozilla/5.0 (ftm-analises)"}
+
+
+def xlsx_celulas(corpo, aba):
+    """{(linha, coluna): texto} de uma aba de .xlsx (linha e coluna a partir de 1)."""
+    import io
+    import re
+    import zipfile
+    import xml.etree.ElementTree as ET
+    ns = {"m": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+    z = zipfile.ZipFile(io.BytesIO(corpo))
+    sst = []
+    if "xl/sharedStrings.xml" in z.namelist():
+        for si in ET.fromstring(z.read("xl/sharedStrings.xml")).findall("m:si", ns):
+            sst.append("".join(t.text or "" for t in si.iter("{%s}t" % ns["m"])))
+    wb = ET.fromstring(z.read("xl/workbook.xml"))
+    rels = ET.fromstring(z.read("xl/_rels/workbook.xml.rels"))
+    alvo = {r.get("Id"): r.get("Target") for r in rels}
+    rid = next(sh.get("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id")
+               for sh in wb.find("m:sheets", ns) if sh.get("name") == aba)
+    caminho = "xl/" + alvo[rid].lstrip("/").replace("xl/", "")
+    fora = {}
+    for c in ET.fromstring(z.read(caminho)).iter("{%s}c" % ns["m"]):
+        ref, v = c.get("r"), c.find("m:v", ns)
+        if v is None:
+            continue
+        letras = re.match(r"[A-Z]+", ref).group(0)
+        col = 0
+        for ch in letras:
+            col = col * 26 + ord(ch) - 64
+        fora[(int(ref[len(letras):]), col)] = sst[int(v.text)] if c.get("t") == "s" else v.text
+    return fora
+
+
+def graficos_recuperacoes():
+    """Recuperações judiciais requeridas (Serasa Experian), mensal. A Serasa só
+    abre os dois anos mais recentes (desde jan/2024): série mais longa é paga.
+    A planilha muda de nome a cada mês (falencias-e-recuperacoes-<mês><ano>.xlsx)
+    e é achada pelo link na página de indicadores. Abas "Total de Processos"
+    (pedidos) e "Total de CNPJs Setor" (empresas envolvidas, por setor)."""
+    import re
+    pagina = cf.baixar(SERASA_PAGINA, headers=SERASA_UA).decode("utf-8", "replace")
+    links = sorted(set(re.findall(r'/content/dam/[^"\' ]*falencias-e-recuperacoes-[^"\' ]*\.xlsx', pagina)))
+    if not links:
+        raise RuntimeError("Serasa: link da planilha de falências e recuperações não encontrado")
+    url = "https://www.serasaexperian.com.br" + links[-1]
+    corpo = cf.baixar(url, headers=SERASA_UA)
+
+    def mes_excel(v):
+        d = datetime.date(1899, 12, 30) + datetime.timedelta(days=int(float(v)))
+        return d.strftime("%Y-%m")
+    proc = xlsx_celulas(corpo, "Total de Processos")
+    rj, fal = {}, {}
+    for r in range(5, 200):
+        if (r, 1) in proc and (r, 4) in proc and str(proc[(r, 1)]).replace(".", "").isdigit():
+            m = mes_excel(proc[(r, 1)])
+            rj[m] = float(proc[(r, 4)])
+            if (r, 2) in proc:
+                fal[m] = float(proc[(r, 2)])
+    setor = xlsx_celulas(corpo, "Total de CNPJs Setor")
+    # colunas das recuperações judiciais requeridas: 12 comércio, 13 indústria, 14 serviços,
+    # 15 agropecuária, 16 total (conferido pelo cabeçalho)
+    cab = {c: str(setor.get((5, c), "")).strip() for c in range(12, 17)}
+    if cab != {12: "Comércio", 13: "Indústria", 14: "Serviços", 15: "Agropecuária", 16: "Total"} or \
+            "Recuperações Judiciais" not in str(setor.get((3, 12), "")):
+        raise RuntimeError("Serasa: cabeçalho da aba por setor mudou: %s" % cab)
+    por_setor = {c: {} for c in range(12, 17)}
+    for r in range(6, 200):
+        if (r, 1) in setor and (r, 16) in setor and str(setor[(r, 1)]).replace(".", "").isdigit():
+            m = mes_excel(setor[(r, 1)])
+            for c in por_setor:
+                por_setor[c][m] = float(setor.get((r, c), 0))
+    for m, tot in por_setor[16].items():
+        soma = sum(por_setor[c][m] for c in range(12, 16))
+        if abs(soma - tot) > 0.5:
+            raise RuntimeError("Serasa: setores não somam o total em %s (%s contra %s)" % (m, soma, tot))
+    ks = sorted(rj)
+    mm3 = {ks[i]: sum(rj[ks[j]] for j in range(i - 2, i + 1)) / 3 for i in range(2, len(ks))}
+    u = ks[-1]
+    ant = "%d-%s" % (int(u[:4]) - 1, u[5:])
+    ano = [m for m in ks if m[:4] == u[:4]]
+    ano_ant = ["%d-%s" % (int(m[:4]) - 1, m[5:]) for m in ano]
+    s_ano, s_ant = sum(rj[m] for m in ano), sum(rj.get(m, 0) for m in ano_ant)
+    print("  recuperações judiciais (Serasa, %s): %s %d pedidos (%s %d); no ano %d contra %d; planilha %s"
+          % (links[-1].rsplit("/", 1)[-1], u, rj[u], ant, rj.get(ant, 0), s_ano, s_ant, url.rsplit("/", 1)[-1]))
+    cores = {12: AZUL, 13: VERMELHO, 14: VERDE, 15: AZUL_CLARO}
+    nomes = {12: "Comércio", 13: "Indústria", 14: "Serviços", 15: "Agropecuária"}
+    return [dict(id="recuperacoes-judiciais", titulo="Recuperações judiciais requeridas",
+                 subtitulo="Pedidos de recuperação judicial por mês; a Serasa abre só os dados desde jan/2024",
+                 unidade="n", fonte="Serasa Experian (Indicador de Falências e Recuperações) e FtM", variantes=[
+                     dict(rot="Pedidos", series=[
+                         cf.serie("Pedidos no mês", AZUL, rj, 0, tipo="barra", rotulo=True),
+                         cf.serie("Média de 3 meses", BRANCO, mm3, 1, largura=4, rotulo=True)]),
+                     dict(rot="Empresas por setor", series=[
+                         cf.serie(nomes[c], cores[c], por_setor[c], 0, tipo="barra") for c in range(12, 16)]
+                         + [cf.serie("Total de empresas (CNPJs)", BRANCO, por_setor[16], 0, largura=4, rotulo=True)]),
+                     dict(rot="Falências requeridas", series=[
+                         cf.serie("Falências requeridas no mês", VERMELHO, fal, 0, tipo="barra", rotulo=True)])])]
 
 
 def trimestres(d):
@@ -472,7 +621,8 @@ CICLO = [("Atividade", "atividade-12m"), ("", "atividade-nivel"), ("", "pms-infl
          ("", "credito-juros-selic"), ("", "credito-direcionado-livre"), ("", "credito-gap-bis"),
          ("Confiança", "confianca"),
          ("Emprego", "atividade-emprego"), ("", "desemprego"), ("", "participacao"), ("", "br-caged-setembro"),
-         ("", "rendimento-produtividade"), ("", "ex3-servicos")]
+         ("", "rendimento-produtividade"), ("", "ex3-servicos"),
+         ("Recuperações judiciais", "recuperacoes-judiciais")]
 
 
 def main():
@@ -517,7 +667,7 @@ def main():
     secoes = [dict(titulo="Selic", texto="", fontes=[], figuras=[], graficos=[g_rec]),
               dict(titulo="", texto="", fontes=[], figuras=[], graficos=[g_ciclos])]
     ciclo = {g["id"]: g for f in (graficos_atividade, graficos_pib_credito, graficos_cartao, graficos_confianca,
-                       graficos_emprego, graficos_trabalho_ponte)
+                       graficos_emprego, graficos_trabalho_ponte, graficos_recuperacoes)
              for g in f()}
     for titulo, gid in CICLO:
         secoes.append(dict(titulo=titulo, texto="", fontes=[], figuras=[], graficos=[ciclo[gid]]))
