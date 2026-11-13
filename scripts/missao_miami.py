@@ -1461,7 +1461,7 @@ def graficos_fiscal_brasil():
 
 
 BRASIL = [("Atividade", "pmc-pms-trimestre"), ("", "pms-volume-inflacao-tri"), ("", "pib-familias-4tri"),
-          ("", "pib-participacao"), ("", "producao-industrial"),
+          ("", "pib-participacao"),
           ("Crédito", "credito-direcionado-livre"),
           ("Confiança", "confianca"),
           ("Emprego", "desemprego"), ("", "participacao"), ("", "br-caged-setembro"),

@@ -9,8 +9,6 @@ parte: Cenário econômico brasileiro
 
 ##
 
-##
-
 ## Crédito
 
 ## Confiança
