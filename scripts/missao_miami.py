@@ -210,12 +210,18 @@ def graficos_atividade():
 
 IDS_PIB = ["pib-familias-4tri", "pib-participacao"]
 IDS_CREDITO = ["credito-concessoes-pf-pj", "credito-inadimplencia", "credito-servico-divida",
-               "credito-endividamento", "credito-juros-selic", "credito-direcionado-livre"]
+               "credito-endividamento", "credito-juros-selic", "credito-direcionado-livre", "credito-gap-bis"]
+# outros cartões do ftm-dados que fecham o roteiro do ciclo: a inflação implícita
+# dos serviços (volume × preço) e os serviços subjacentes, a ponte para a inflação
+IDS_OUTROS = [("dados/pms.json", ["pms-inflacao-implicita"]), ("dados/ipca.json", ["ex3-servicos"])]
 # o ftm-dados não põe fonte em alguns cartões
 FONTES_COPIA = {"credito-inadimplencia": "Banco Central (SGS 21082, 21083 e 21084)",
                 "credito-servico-divida": "Banco Central (SGS 29033, 29034 e 29036)",
                 "credito-endividamento": "Banco Central (SGS 29037 e 29038)",
-                "credito-juros-selic": "Banco Central (SGS 432 e 29033)"}
+                "credito-juros-selic": "Banco Central (SGS 432 e 29033)",
+                "ex3-servicos": "IBGE e Banco Central (SGS 13522, 433 e 29683)"}
+# cores trocadas na cópia (paleta para daltonismo: ciano × verde não)
+CORES_COPIA = {"ex3-servicos": {"IPCA": "#8a8a86", "EX3": AZUL}}
 UNIDADES_COPIA = {"x2": "x"}       # unidades do ftm-dados que o app daqui chama por outro nome
 
 
@@ -276,7 +282,7 @@ def com_focus(g):
 
 def graficos_pib_credito():
     out = []
-    for arq, ids in (("dados/pib.json", IDS_PIB), ("dados/credito.json", IDS_CREDITO)):
+    for arq, ids in [("dados/pib.json", IDS_PIB), ("dados/credito.json", IDS_CREDITO)] + IDS_OUTROS:
         gs = graficos_ftm_dados(arq)
         for i in ids:
             g = direita(sem_trimestral(gs[i]))
@@ -287,6 +293,11 @@ def graficos_pib_credito():
                 g["series"] = [x for x in g["series"] if x["nome"] == "Endividamento das famílias"]
             g["fonte"] = g.get("fonte") or FONTES_COPIA[i]
             g["unidade"] = UNIDADES_COPIA.get(g.get("unidade"), g.get("unidade"))
+            for grupo in [g] + g.get("variantes", []):
+                for x in grupo.get("series", []):
+                    for trecho, cor in CORES_COPIA.get(i, {}).items():
+                        if x["nome"].startswith(trecho) or trecho in x["nome"]:
+                            x["cor"] = cor
             # o número em cima da barra: no ftm-dados é "valores" na série; aqui,
             # no gráfico, e só com "agrupadas" (com uma série de barras, dá no mesmo)
             if any(x.get("valores") for x in g.get("series", [])):
@@ -356,6 +367,72 @@ def graficos_confianca():
                  fonte="CNI, CNC e Fecomercio SP (via Ipeadata)", variantes=variantes)]
 
 
+def trimestres(d):
+    """Série da PNAD por trimestre móvel ("AAAA-MM") → trimestres civis ("AAAA-Qn"):
+    os trimestres móveis que terminam em mar, jun, set e dez."""
+    return {"%s-Q%d" % (m[:4], int(m[5:7]) // 3): v for m, v in d.items() if m[5:7] in ("03", "06", "09", "12")}
+
+
+def acum4(d):
+    """Variação em 4 trimestres sobre os 4 anteriores, em %."""
+    def janela(q):
+        a, n, qs = int(q[:4]), int(q[-1]), []
+        for _ in range(4):
+            qs.append("%d-Q%d" % (a, n))
+            n -= 1
+            if n == 0:
+                a, n = a - 1, 4
+        return qs
+    out = {}
+    for q in d:
+        j, j0 = janela(q), janela("%d-%s" % (int(q[:4]) - 1, q[5:]))
+        if all(x in d for x in j + j0):
+            out[q] = 100 * (sum(d[x] for x in j) / sum(d[x] for x in j0) - 1)
+    return out
+
+
+def graficos_trabalho_ponte():
+    """A ponte entre o ciclo e a inflação: o emprego reage à atividade com
+    atraso (IBC-Br × pessoas ocupadas) e o salário real cresce acima da
+    produtividade (PIB real ÷ ocupados), o que encarece o trabalho por unidade
+    produzida."""
+    ocup = {mes(l["D3C"]): l["v"] for l in sidra("t/6320/n1/all/v/4090/p/all/c11913/96165")}
+    ocup_var = {mes(l["D3C"]): l["v"] for l in sidra("t/6320/n1/all/v/8435/p/all/c11913/96165")}
+    rend = {mes(l["D3C"]): l["v"] for l in sidra("t/6390/n1/all/v/5933/p/all")}
+    pib = {"%s-Q%d" % (l["D3C"][:4], int(l["D3C"][4:])): l["v"]
+           for l in sidra("t/1620/n1/all/v/583/p/all/c11255/90707")}
+    oq, rq = trimestres(ocup), trimestres(rend)
+    prod = {q: pib[q] / oq[q] for q in pib if q in oq}
+    v_prod, v_rend = acum4(prod), acum4(rq)
+    fim_tri = lambda d: {"%s-%02d" % (q[:4], 3 * int(q[-1])): v for q, v in d.items()}   # noqa: E731
+    qp, qr = max(v_prod), max(v_rend)
+    print("  produtividade em 4 tri: %s %.1f%%; rendimento real: %s %.1f%% (%s %.1f%%)"
+          % (qp, v_prod[qp], qr, v_rend[qr], qp, v_rend[qp]))
+    g_prod = dict(id="rendimento-produtividade", titulo="Rendimento médio real e produtividade do trabalho",
+                  subtitulo="Variação acumulada em 4 trimestres sobre os 4 anteriores, em %; produtividade = PIB "
+                            "real ÷ pessoas ocupadas; rendimento = rendimento médio real habitual (PNAD)",
+                  unidade="pct1", buracoMax=3, fonte="IBGE (Contas Nacionais Trimestrais e PNAD Contínua) e FtM",
+                  series=[cf.serie("Rendimento médio real", VERMELHO, fim_tri(v_rend), 1, largura=5, rotulo=True),
+                          cf.serie("Produtividade do trabalho", AZUL, fim_tri(v_prod), 1, largura=5, rotulo=True)])
+    ibc = cn.mensal(cn.sgs(24363, "01/01/2011"))
+    ibc_var = {}
+    for m in sorted(ibc):
+        a = [cf.mes_mais(m, -k) for k in range(3)]
+        b = [cf.mes_mais(x, -12) for x in a]
+        if all(x in ibc for x in a + b):
+            ibc_var[m] = 100 * (sum(ibc[x] for x in a) / sum(ibc[x] for x in b) - 1)
+    ibc_var = {m: v for m, v in ibc_var.items() if m >= min(ocup_var)}
+    um, uo = max(ibc_var), max(ocup_var)
+    print("  IBC-Br trimestre móvel: %s %.1f%%; ocupação: %s %.1f%%" % (um, ibc_var[um], uo, ocup_var[uo]))
+    g_ae = dict(id="atividade-emprego", titulo="Atividade e emprego",
+                subtitulo="Trimestre móvel terminado no mês contra o mesmo trimestre do ano anterior, em %; "
+                          "atividade = IBC-Br, a prévia do PIB do Banco Central; emprego = pessoas ocupadas (PNAD)",
+                unidade="pct1", fonte="Banco Central (SGS 24363), IBGE (PNAD Contínua) e FtM",
+                series=[cf.serie("Atividade (IBC-Br)", BRANCO, ibc_var, 1, largura=5, rotulo=True),
+                        cf.serie("Pessoas ocupadas", VERDE, ocup_var, 1, largura=5, rotulo=True)])
+    return [g_ae, g_prod]
+
+
 def graficos_emprego():
     """Taxa de desemprego e taxa de participação (PNAD, trimestre móvel) e o
     Caged de setembro de cada ano (o do Relatório de Novembro)."""
@@ -388,13 +465,14 @@ def graficos_emprego():
 
 # um gráfico por seção (cada seção anda inteira quando ele muda a ordem); o
 # título só na primeira de cada grupo
-CICLO = [("Atividade", "atividade-12m"), ("", "atividade-nivel"),
+CICLO = [("Atividade", "atividade-12m"), ("", "atividade-nivel"), ("", "pms-inflacao-implicita"),
          ("PIB", "pib-familias-4tri"), ("", "pib-participacao"),
          ("Crédito", "credito-concessoes-pf-pj"), ("", "credito-inadimplencia"), ("", "credito-servico-divida"),
          ("", "credito-endividamento"), ("", "credito-cartao-saldo"), ("", "credito-cartao-inadimplencia"),
-         ("", "credito-juros-selic"), ("", "credito-direcionado-livre"),
+         ("", "credito-juros-selic"), ("", "credito-direcionado-livre"), ("", "credito-gap-bis"),
          ("Confiança", "confianca"),
-         ("Emprego", "desemprego"), ("", "participacao"), ("", "br-caged-setembro")]
+         ("Emprego", "atividade-emprego"), ("", "desemprego"), ("", "participacao"), ("", "br-caged-setembro"),
+         ("", "rendimento-produtividade"), ("", "ex3-servicos")]
 
 
 def main():
@@ -439,7 +517,7 @@ def main():
     secoes = [dict(titulo="Selic", texto="", fontes=[], figuras=[], graficos=[g_rec]),
               dict(titulo="", texto="", fontes=[], figuras=[], graficos=[g_ciclos])]
     ciclo = {g["id"]: g for f in (graficos_atividade, graficos_pib_credito, graficos_cartao, graficos_confianca,
-                       graficos_emprego)
+                       graficos_emprego, graficos_trabalho_ponte)
              for g in f()}
     for titulo, gid in CICLO:
         secoes.append(dict(titulo=titulo, texto="", fontes=[], figuras=[], graficos=[ciclo[gid]]))

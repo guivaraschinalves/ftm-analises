@@ -6,7 +6,10 @@ parte: Cenário econômico brasileiro
 ##
 
 
+
 ## Atividade
+
+##
 
 ##
 
@@ -30,9 +33,17 @@ parte: Cenário econômico brasileiro
 
 ##
 
+##
+
 ## Confiança
 
 ## Emprego
+
+##
+
+##
+
+##
 
 ##
 
