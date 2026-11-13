@@ -143,6 +143,35 @@ parte: Juros no mundo
 
 ##
 
+## Déficit externo dos EUA
+parte: China e desequilíbrios globais
+
+##
+
+##
+
+##
+
+## China: reservas e balanço de pagamentos
+
+##
+
+##
+
+##
+
+## Balanço de pagamentos dos EUA
+
+##
+
+##
+
+##
+
+## Dólar e tarifas
+
+##
+
 ## Bitcoin
 parte: Bitcoin e stablecoins
 

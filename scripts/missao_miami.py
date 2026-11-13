@@ -1670,6 +1670,10 @@ def main():
     juros = {g["id"]: g for g in graficos_juros_mundo()}
     for titulo, gid in JUROS_MUNDO:
         secoes.append(dict(titulo=titulo, texto="", fontes=[], figuras=[], graficos=[juros[gid]]))
+    import missao_china
+    china = {g["id"]: g for g in missao_china.graficos()}
+    for titulo, gid in missao_china.CHINA:
+        secoes.append(dict(titulo=titulo, texto="", fontes=[], figuras=[], graficos=[china[gid]]))
     cripto = {g["id"]: g for g in graficos_cripto()}
     for titulo, gid in CRIPTO:
         secoes.append(dict(titulo=titulo, texto="", fontes=[], figuras=[], graficos=[cripto[gid]]))
@@ -1678,7 +1682,7 @@ def main():
                # a ordem dos gráficos é escolhida na página (botões Subir/Descer e
                # arrastar) e gravada neste arquivo; o app aplica ao abrir
                reordenar="dados/ordens/missao-global-miami.json",
-               fonte="Banco Central, CODACE/FGV, IBGE, FGV IBRE, Serasa, Tesouro Nacional, NOAA e Ministério do Trabalho",
+               fonte="Banco Central, CODACE/FGV, IBGE, FGV IBRE, Serasa, Tesouro Nacional, NOAA, Ministério do Trabalho, FRED, BEA, FMI e SAFE",
                secoes=secoes)
     with open(SAIDA, "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
@@ -1690,7 +1694,7 @@ def main():
     # seção por gráfico, na ordem de CICLO, gráfico some ou sai repetido
     with open(SAIDA, encoding="utf-8") as f:
         ids = [g["id"] for s in json.load(f)["secoes"] for g in s["graficos"]]
-    esperado = [gid for _, gid in BRASIL + EUA + JUROS_MUNDO + CRIPTO]
+    esperado = [gid for _, gid in BRASIL + EUA + JUROS_MUNDO + missao_china.CHINA + CRIPTO]
     if ids != esperado:
         raise RuntimeError("textos/%s.md fora do lugar: o JSON saiu com %s; tinha de ser %s"
                            % (NOME, ids, esperado))

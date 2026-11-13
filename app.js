@@ -334,7 +334,10 @@
                  valor: function (v) { return "US$ " + nf(2).format(v) + "/barril"; } },
     // câmbio: reais por dólar, com centavos ("R$ 5,49")
     brl: { eixo: function (v, passo) { return nf(Math.max(2, casasDoPasso(passo))).format(v); },
-           valor: function (v) { return "R$ " + nf(2).format(v); } }
+           valor: function (v) { return "R$ " + nf(2).format(v); } },
+    // yuans por dólar
+    cny: { eixo: function (v, passo) { return nf(Math.max(1, casasDoPasso(passo))).format(v); },
+           valor: function (v) { return "\u00a5 " + nf(2).format(v); } }
   };
   function unidade(g) { return UNIDADES[g.unidade] || UNIDADES["%"]; }
   // a série pode ter unidade própria (a que vai no eixo da direita, quando o
