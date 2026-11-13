@@ -625,6 +625,375 @@ CICLO = [("Atividade", "atividade-12m"), ("", "atividade-nivel"), ("", "pms-infl
          ("Recuperações judiciais", "recuperacoes-judiciais")]
 
 
+# ================================================================ inflação, fiscal e setor externo
+# O resto da parte Brasil, pelo texto dele de 13/11/2026: inflação (balança de
+# riscos e o impasse do BC), fiscal (resultado, dívida, disputa por crédito,
+# poupança externa) e setor externo e câmbio. A maior parte são cópias do
+# ftm-dados e de outras páginas daqui; o que não existia é feito abaixo.
+
+COPIAS_RESTO = [
+    ("dados/ipca.json", ["ipca-distancia-meta", "ipca-mensal-focus", "contribuicao-12m", "ipca-alimentacao-itens",
+                         "administrados-livres", "ipca-difusao-grupos", "ipca-projecoes-focus"]),
+    ("dados/fiscal.json", ["fiscal-primario-pib", "fiscal-nominal-pib", "fiscal-juros-nominais", "fiscal-divida-bruta",
+                           "fiscal-divida-condicionantes"]),
+    ("dados/divida.json", ["divida-composicao", "divida-detentores"]),
+    ("dados/credito.json", ["credito-ampliado-contribuicoes-total"]),
+    ("dados/juros.json", ["juros-longo"]),
+    ("dados/bp.json", ["bp-cc-12m", "bp-ied-12m", "bp-acoes-fundos"]),
+    ("dados/moedas.json", ["moedas-pp-real", "moedas-cambio-ppc", "moedas-sobrevalorizacao", "moedas-fmi-avaliacao"]),
+]
+COPIAS_LOCAIS = [("defasagem-combustiveis.json", ["ipca-12m"]), ("petroleo.json", ["saldo-comercial-petroleo"])]
+FONTES_RESTO = {
+    "ipca-distancia-meta": "IBGE e Banco Central (SGS 13522 e 13521)",
+    "contribuicao-12m": "IBGE (IPCA, tabela 7060) e FtM",
+    "administrados-livres": "Banco Central (SGS 4449 e 11428) e FtM",
+    "ipca-projecoes-focus": "Banco Central (Focus) e IBGE",
+    "fiscal-primario-pib": "Banco Central (SGS 5793)", "fiscal-nominal-pib": "Banco Central (SGS 5727)",
+    "fiscal-juros-nominais": "Banco Central (SGS 5793 e 5727)", "fiscal-divida-bruta": "Banco Central (SGS 4502 e 13762)",
+    "divida-composicao": "Tesouro Nacional (Relatório Mensal da Dívida)",
+    "divida-detentores": "Tesouro Nacional (Relatório Mensal da Dívida)",
+    "bp-cc-12m": "Banco Central (balanço de pagamentos) e Comex Stat",
+    "bp-ied-12m": "Banco Central (balanço de pagamentos)", "bp-acoes-fundos": "Banco Central (balanço de pagamentos)",
+}
+# ids que já existem na página com outro conteúdo: a cópia ganha um id próprio
+IDS_NOVOS = {"ipca-12m": "ipca-12m-defasagem"}
+UNIDADES_RESTO = {"x2": "x", "brl-usd": "brl", "p.p.": "pp"}
+
+
+def adaptar(g):
+    """Leva um cartão do ftm-dados para o app daqui: trimestre no mês em que
+    termina, eixo da direita, eventos no formato daqui, sem velas (a vela de um
+    ponto só vira linha; a de faixa sai), ranking no lugar do painel de barras."""
+    g = direita(sem_trimestral(g))
+    g.pop("nota", None)
+    g["unidade"] = UNIDADES_RESTO.get(g.get("unidade"), g.get("unidade"))
+    if g.get("painel") == "barras":
+        vs = g.get("variantes") or [dict(rot="", linhas=g.get("linhas", []))]
+        conv = lambda v: [[x["rot"], x["v"], x.get("cor", AZUL)] for x in v.get("linhas", [])]   # noqa: E731
+        out = dict(id=g["id"], tipo="ranking", unidade=g.get("unidade"), titulo=g["titulo"],
+                   subtitulo=g.get("subtitulo"), fonte=g.get("fonte"), itens=conv(vs[0]))
+        if len(vs) > 1:
+            out["variantes"] = [dict(rot=v["rot"], itens=conv(v)) for v in vs]
+        return out
+    if g.get("eventos"):
+        g["eventos"] = [dict(em=e.get("x", e.get("em")), rot=e.get("rot") or "Carta") for e in g["eventos"]]
+    grupos = [g] + g.get("variantes", [])
+    for grupo in grupos:
+        if "series" not in grupo:          # recorte que usa as séries do gráfico
+            continue
+        novas = []
+        for x in grupo.get("series", []):
+            x.pop("hover", None)
+            x.pop("area", None)
+            x.pop("imagem", None)
+            if x.get("tipo") == "vela":
+                o = x.get("ohlc") or []
+                if o and all(len(set(r[1:])) == 1 for r in o):
+                    novas.append(dict(nome=x["nome"], cor=x["cor"], dados=[[r[0], r[1]] for r in o],
+                                      largura=4, rotulo=True))
+                elif grupo is not g:
+                    grupo["_sem_velas"] = True      # recorte de candles: sem eles não faz sentido
+                continue
+            novas.append(x)
+        grupo["series"] = novas
+    if g.get("variantes"):
+        g["variantes"] = [v for v in g["variantes"] if not v.get("_sem_velas") and ("series" not in v or v["series"])]
+        if len(g["variantes"]) == 1:
+            v = g.pop("variantes")[0]
+            if "series" in v:
+                g["series"] = v["series"]
+    if any(x.get("valores") for grupo in [g] + g.get("variantes", []) for x in grupo.get("series", [])):
+        g.update(agrupadas=True, valores=True)
+    return g
+
+
+def graficos_copiados_resto():
+    out = []
+    for arq, ids in COPIAS_RESTO:
+        gs = graficos_ftm_dados(arq)
+        for i in ids:
+            g = adaptar(json.loads(json.dumps(gs[i])))
+            g["fonte"] = g.get("fonte") or FONTES_RESTO.get(i, "FtM")
+            out.append(g)
+    for arq, ids in COPIAS_LOCAIS:
+        for g in cn.copiar(arq, ids):
+            g = json.loads(json.dumps(g))
+            g["id"] = IDS_NOVOS.get(g["id"], g["id"])
+            out.append(adaptar(g))
+    for g in out:
+        print("  %-36s copiado" % g["id"])
+    return out
+
+
+def doze(mensal):
+    """Variação composta em 12 meses (%) de uma série mensal em %."""
+    ks = sorted(mensal)
+    fora = {}
+    for i in range(11, len(ks)):
+        bloco = ks[i - 11:i + 1]
+        if cf.mes_mais(bloco[0], 11) == bloco[-1]:
+            f = 1.0
+            for m in bloco:
+                f *= 1 + mensal[m] / 100
+            fora[bloco[-1]] = 100 * (f - 1)
+    return fora
+
+
+def grafico_atividade_inflacao():
+    """O impasse do BC é a norma: períodos em que a atividade desacelera e a
+    inflação acelera ao mesmo tempo. IBC-Br em 12 meses contra o IPCA em 12 meses."""
+    ibc = cn.mensal(cn.sgs(24363, "01/01/2003"))
+    ks = sorted(ibc)
+    ativ = {}
+    for i in range(23, len(ks)):
+        a, b = ks[i - 11:i + 1], ks[i - 23:i - 11]
+        if cf.mes_mais(b[0], 23) == a[-1]:
+            ativ[a[-1]] = 100 * (sum(ibc[m] for m in a) / sum(ibc[m] for m in b) - 1)
+    ipca = doze(cn.mensal(cn.sgs(433, "01/01/2003")))
+
+    # meses em que a atividade desacelera e a inflação acelera ao mesmo tempo,
+    # contra 6 meses antes (o "impasse": juro não pode cair com a inflação
+    # subindo, mesmo com a economia perdendo fôlego)
+    ms = sorted(m for m in ativ if m in ipca and cf.mes_mais(m, -6) in ativ and cf.mes_mais(m, -6) in ipca
+                and m >= "2005-01")
+    quad = {}
+    for m in ms:
+        da, di = ativ[m] - ativ[cf.mes_mais(m, -6)], ipca[m] - ipca[cf.mes_mais(m, -6)]
+        quad[m] = ("ativ cai" if da < 0 else "ativ sobe") + ", " + ("inflação sobe" if di > 0 else "inflação cai")
+    alvo = "ativ cai, inflação sobe"
+    pct = 100 * sum(1 for m in ms if quad[m] == alvo) / len(ms)
+    for q in sorted(set(quad.values())):
+        print("    %-26s %4.0f%% dos meses" % (q, 100 * sum(1 for m in ms if quad[m] == q) / len(ms)))
+    sombras, ini = [], None
+    for k, m in enumerate(ms + ["fim"]):
+        dentro = m != "fim" and quad[m] == alvo
+        if dentro and ini is None:
+            ini = m
+        if not dentro and ini is not None:
+            fim = ms[k - 1]
+            meses = sum(1 for x in ms if ini <= x <= fim)
+            if meses >= 3:
+                sombras.append(dict(de=ini + "-01", ate=fim_mes(fim), cor=VERMELHO,
+                                    dica="Atividade desacelerando e inflação subindo: %s a %s"
+                                         % (rot_m(ini), rot_m(fim))))
+            ini = None
+    print("  atividade × inflação: atividade desacelerando e inflação subindo em %.0f%% dos meses desde 2005; "
+          "último mês %s: %s" % (pct, ms[-1], quad[ms[-1]]))
+    return dict(id="atividade-inflacao", titulo="Atividade desacelerando e inflação subindo",
+                subtitulo="Variação em 12 meses, em %%; atividade = IBC-Br; faixas = ao menos 3 meses seguidos em que "
+                          "a atividade desacelerava e o IPCA acelerava (contra 6 meses antes): %.0f%% do tempo "
+                          "desde 2005" % pct,
+                unidade="pct1", fonte="Banco Central (SGS 24363), IBGE (SGS 433) e FtM", sombras=sombras,
+                series=[cf.serie("Atividade (IBC-Br)", BRANCO, desde(ativ, "2005-01"), 1, largura=5, rotulo=True),
+                        cf.serie("IPCA", VERMELHO, desde(ipca, "2005-01"), 1, largura=5, rotulo=True)])
+
+
+ONI_URL = "https://www.cpc.ncep.noaa.gov/data/indices/oni.ascii.txt"
+ONI_MES = {"DJF": 1, "JFM": 2, "FMA": 3, "MAM": 4, "AMJ": 5, "MJJ": 6, "JJA": 7, "JAS": 8, "ASO": 9, "SON": 10,
+           "OND": 11, "NDJ": 12}
+
+
+def grafico_el_nino():
+    """El Niño e a comida: o índice ONI da NOAA (anomalia da temperatura do
+    Pacífico, média de 3 meses, no mês do meio) contra a alimentação no
+    domicílio do IPCA em 12 meses (SGS 27864), no eixo da direita."""
+    txt = cf.baixar(ONI_URL, headers=SIDRA_UA).decode("ascii", "replace")
+    oni = {}
+    for l in txt.splitlines()[1:]:
+        p = l.split()
+        if len(p) == 4 and p[0] in ONI_MES:
+            oni["%s-%02d" % (p[1], ONI_MES[p[0]])] = float(p[3])
+    alim = doze(cn.mensal(cn.sgs(27864, "01/01/2000")))
+    u = max(oni)
+    print("  El Niño (ONI): %s %+.2f; alimentação no domicílio em 12 meses: %s %.1f%%"
+          % (u, oni[u], max(alim), alim[max(alim)]))
+    oni = desde(oni, "2001-01")
+    return dict(id="el-nino-alimentos", titulo="El Niño e a inflação de alimentos",
+                subtitulo="Índice ONI da NOAA: anomalia da temperatura do Pacífico equatorial, média de 3 meses, em °C "
+                          "(acima de +0,5 = El Niño; abaixo de −0,5 = La Niña); alimentação no domicílio do IPCA em 12 "
+                          "meses (dir.)",
+                unidade="oc", unidade2="%", fonte="NOAA (Climate Prediction Center) e IBGE (SGS 27864)",
+                series=[cf.serie("El Niño (ONI)", AZUL, oni, 2, largura=5, rotulo=True),
+                        cf.serie("Limiar (+0,5)", CINZA, {m: 0.5 for m in oni}, 1, traco="pontilhado", largura=2,
+                                 legenda=False),
+                        cf.serie("Limiar (−0,5)", CINZA, {m: -0.5 for m in oni}, 1, traco="pontilhado", largura=2,
+                                 legenda=False),
+                        cf.serie("Alimentação no domicílio (dir.)", VERMELHO, desde(alim, "2001-01"), 1, largura=4,
+                                 rotulo=True, dir=True, unidade="%")])
+
+
+def soma12(d):
+    ks = sorted(d)
+    return {ks[i]: sum(d[k] for k in ks[i - 11:i + 1]) for i in range(11, len(ks))
+            if cf.mes_mais(ks[i - 11], 11) == ks[i]}
+
+
+_CC = {}
+
+
+def conta_corrente_pib():
+    """Conta corrente em 12 meses, em % do PIB de 12 meses em dólar (SGS 22701 e 4192)."""
+    if not _CC:
+        cc12 = soma12(cn.mensal(cn.sgs(22701, "01/01/2001")))
+        pib = cn.mensal(cn.sgs(4192, "01/01/2001"))
+        _CC.update({m: 100 * v / pib[m] for m, v in cc12.items() if m in pib})
+    return _CC
+
+
+def grafico_deficits_gemeos():
+    """O déficit do governo e o déficit externo: o resultado nominal do setor
+    público (SGS 5727, sinal invertido) e a conta corrente, os dois em % do PIB
+    em 12 meses. Pela identidade, o que o governo não poupa e o setor privado
+    não cobre vem de fora."""
+    nominal = {m: -v for m, v in cn.mensal(cn.sgs(5727, "01/01/2002")).items()}
+    cc = conta_corrente_pib()
+    un, uc = max(nominal), max(cc)
+    print("  déficits gêmeos: nominal %s %.1f%% do PIB; conta corrente %s %.1f%% do PIB"
+          % (un, nominal[un], uc, cc[uc]))
+    return dict(id="deficits-gemeos", titulo="Resultado nominal do governo e conta corrente",
+                subtitulo="Em % do PIB, acumulado em 12 meses; negativo = déficit; o que o governo não poupa e o "
+                          "setor privado não cobre vem de poupança externa (o déficit em conta corrente)",
+                unidade="%", fonte="Banco Central (SGS 5727, 22701 e 4192) e FtM",
+                series=[cf.serie("Resultado nominal do setor público", VERMELHO, desde(nominal, "2002-12"), 1,
+                                 largura=5, rotulo=True),
+                        cf.serie("Conta corrente", AZUL, desde(cc, "2002-12"), 1, largura=5, rotulo=True)])
+
+
+def graficos_ajuste_fiscal():
+    """Como o Ulrich mostra (aula "O pacote de R$ 300 bilhões do governo e o
+    impacto na dívida pública", 15/10/2026): o custo efetivo da dívida (r, o
+    custo médio da DPMFi em 12 meses, do Relatório Mensal da Dívida via
+    ftm-dados) contra o crescimento do PIB nominal (g, SGS 4382 sobre 12 meses
+    antes). E o primário que estabiliza a dívida/PIB, p* = d × (r − g) ÷ (1 + g),
+    com d = dívida bruta do governo geral (SGS 13762), contra o primário efetivo
+    (SGS 5793, sinal invertido): a distância é o ajuste necessário."""
+    gs = graficos_ftm_dados("dados/divida.json")
+    r = {k: v for x in gs["divida-custo-12m-dpmfi"]["series"] if x["nome"] == "DPMFi" for k, v in x["dados"]}
+    pib12 = cn.mensal(cn.sgs(4382, "01/01/2004"))
+    g = {m: 100 * (v / pib12[cf.mes_mais(m, -12)] - 1) for m, v in pib12.items() if cf.mes_mais(m, -12) in pib12}
+    d = cn.mensal(cn.sgs(13762, "01/01/2008"))
+    prim = {m: -v for m, v in cn.mensal(cn.sgs(5793, "01/01/2008")).items()}
+    est = {m: d[m] * (r[m] - g[m]) / (100 + g[m]) for m in d if m in r and m in g}
+    um = max(m for m in est if m in prim and m in pib12)
+    gap = est[um] - prim[um]
+    gap_bi = gap / 100 * pib12[um] / 1000
+    print("  ajuste fiscal %s: r %.1f%%, g %.1f%%, dívida %.1f%% do PIB; primário que estabiliza %.1f%% contra "
+          "%.1f%% efetivo: faltam %.1f p.p. do PIB (R$ %.0f bi)"
+          % (um, r[um], g[um], d[um], est[um], prim[um], gap, gap_bi))
+    rot = "%s/%s" % (MESES[int(um[5:7]) - 1], um[2:4])
+    g_rg = dict(id="juro-crescimento", titulo="Custo da dívida e crescimento da economia",
+                subtitulo="Em % ao ano, acumulado em 12 meses; custo = custo médio da dívida interna (DPMFi); "
+                          "crescimento = PIB nominal; com o custo acima do crescimento, a dívida/PIB sobe mesmo com "
+                          "o primário zerado",
+                unidade="%", fonte="Tesouro Nacional (Relatório Mensal da Dívida), Banco Central (SGS 4382) e FtM",
+                series=[cf.serie("Custo da dívida (r)", VERMELHO, desde(r, "2008-01"), 1, largura=5, rotulo=True),
+                        cf.serie("Crescimento do PIB nominal (g)", AZUL, desde(g, "2008-01"), 1, largura=5,
+                                 rotulo=True)])
+    g_est = dict(id="primario-estabilizador", titulo="O primário que estabiliza a dívida",
+                 subtitulo="Em %% do PIB, acumulado em 12 meses; primário que estabiliza = dívida bruta × (custo − "
+                           "crescimento) ÷ (1 + crescimento); em %s faltam %s pontos do PIB, cerca de R$ %s bilhões "
+                           "por ano" % (rot, cf.br(gap, 1), cf.br(gap_bi, 0)),
+                 unidade="%", fonte="Banco Central (SGS 13762, 5793 e 4382), Tesouro Nacional e FtM",
+                 series=[cf.serie("Primário que estabiliza a dívida", VERMELHO, est, 1, largura=5, rotulo=True),
+                         cf.serie("Primário efetivo", BRANCO, desde(prim, "2008-01"), 1, largura=5, rotulo=True)])
+    return [g_rg, g_est]
+
+
+def grafico_fluxo_residentes():
+    """Quem traz e quem leva dólar: a conta financeira separa os investimentos de
+    não residentes no país (direto e em carteira) dos de residentes no exterior."""
+    gs = graficos_ftm_dados("dados/bp.json")
+    cf12 = {x["nome"]: dict(map(tuple, x["dados"])) for x in gs["bp-cf-12m"]["series"]}
+    nao_res = {m: cf12["ID no País"][m] + cf12["Carteira no País"][m] for m in cf12["ID no País"]
+               if m in cf12["Carteira no País"]}
+    res = {m: cf12["ID no Exterior"][m] + cf12["Carteira no Exterior"][m] for m in cf12["ID no Exterior"]
+           if m in cf12["Carteira no Exterior"]}
+    u = max(nao_res)
+    print("  fluxo em 12 meses %s: não residentes %+.1f bi, residentes %+.1f bi" % (u, nao_res[u], res[u]))
+    partes = [("Estrangeiros: investimento direto no país", "ID no País", AZUL),
+              ("Estrangeiros: carteira no país", "Carteira no País", AZUL_CLARO),
+              ("Brasileiros: investimento direto no exterior", "ID no Exterior", VERMELHO),
+              ("Brasileiros: carteira no exterior", "Carteira no Exterior", "#632523")]
+    return dict(id="fluxo-residentes", titulo="Quem traz e quem leva dólares",
+                subtitulo="US$ bilhões, acumulado em 12 meses; positivo = entrada; estrangeiros (não residentes) "
+                          "investindo no Brasil e brasileiros (residentes) investindo no exterior, direto e em carteira",
+                unidade="usd-bi", fonte="Banco Central (balanço de pagamentos, conta financeira) e FtM", variantes=[
+                    dict(rot="Estrangeiros × brasileiros", series=[
+                        cf.serie("Estrangeiros (não residentes)", AZUL, nao_res, 1, largura=5, rotulo=True),
+                        cf.serie("Brasileiros (residentes)", VERMELHO, res, 1, largura=5, rotulo=True)]),
+                    dict(rot="Por tipo", barra=1, series=[
+                        cf.serie(n, c, cf12[k], 1, tipo="barra") for n, k, c in partes])])
+
+
+def tabela_2014():
+    """Não é 2014: o setor externo de dezembro de 2014 contra o último dado."""
+    gs = graficos_ftm_dados("dados/bp.json")
+
+    def ser(gid, nome):
+        g = gs[gid]
+        for grupo in [g] + g.get("variantes", []):
+            for x in grupo.get("series", []):
+                if x["nome"] == nome:
+                    return dict(map(tuple, x["dados"]))
+        raise KeyError((gid, nome))
+    cc = ser("bp-cc-12m", "Saldo Conta Corrente")
+    sem = ser("bp-cc-12m", "Saldo sem energia")
+    idp = ser("bp-ied-12m", "ID no País")
+    ccpib = conta_corrente_pib()
+    res = {m: v / 1000 for m, v in cn.mensal(cn.sgs(3546, "01/01/2014")).items()}
+    respib = ser("bp-reservas-pib", "Reservas internacionais")
+    # trimestrais no ftm-dados ("2014-Q4"): passam ao mês em que o trimestre termina
+    tri = lambda d: {("%s-%02d" % (k[:4], 3 * int(k[-1])) if "-Q" in k else k): v for k, v in d.items()}  # noqa: E731
+    dext = tri(ser("bp-divida-externa-liquida", "Dívida externa líquida"))
+    pii = tri(ser("bp-pii-liquida-pib", "PII líquida"))
+    um = max(m for m in cc if m in idp and m in ccpib)
+    uq = max(dext)
+
+    def br(v, casas=1, sinal=True):
+        return cf.br(v, casas, sinal)
+    linhas = [
+        ("Conta corrente em 12 meses", "US$ %s bi" % br(cc["2014-12"]), "US$ %s bi" % br(cc[um])),
+        ("Conta corrente em % do PIB", "%s%%" % br(ccpib["2014-12"]), "%s%%" % br(ccpib[um])),
+        ("Conta corrente sem energia", "US$ %s bi" % br(sem["2014-12"]), "US$ %s bi" % br(sem[um])),
+        ("Investimento direto no país em 12 meses", "US$ %s bi" % br(idp["2014-12"], 1, False),
+         "US$ %s bi" % br(idp[um], 1, False)),
+        ("Conta corrente + investimento direto", "US$ %s bi" % br(cc["2014-12"] + idp["2014-12"]),
+         "US$ %s bi" % br(cc[um] + idp[um])),
+        ("Reservas internacionais", "US$ %s bi" % br(res["2014-12"], 0, False), "US$ %s bi" % br(res[max(res)], 0, False)),
+        ("Reservas em % do PIB", "%s%%" % br(respib["2014-12"], 1, False), "%s%%" % br(respib[max(respib)], 1, False)),
+        ("Dívida externa líquida", "US$ %s bi" % br(dext["2014-12"], 1, False), "US$ %s bi" % br(dext[uq], 1, False)),
+        ("Posição internacional líquida em % do PIB", "%s%%" % br(pii["2014-12"]), "%s%%" % br(pii[uq])),
+    ]
+    rot = lambda m: "%s/%s" % (MESES[int(m[5:7]) - 1], m[2:4])                      # noqa: E731
+    print("  2014 × hoje: CC %s → %s; CC+IDP %s → %s" % (linhas[0][1], linhas[0][2], linhas[4][1], linhas[4][2]))
+    return dict(id="externo-2014-hoje", titulo="O setor externo em 2014 e hoje", tipo="tabela",
+                subtitulo="Dezembro de 2014, às vésperas da crise, contra o último dado (%s; dívida externa e posição "
+                          "internacional: %s)" % (rot(um), rot(uq)),
+                fonte="Banco Central (balanço de pagamentos, SGS 22701, 4192 e 3546) e Comex Stat",
+                colunas=[dict(rot="Indicador"), dict(rot="Dez/2014", num=True), dict(rot="Hoje", num=True)],
+                linhas=[[dict(t=a, forte=True), dict(t=b), dict(t=c)] for a, b, c in linhas])
+
+
+RESTO = [("Inflação", "ipca-distancia-meta"), ("", "ipca-mensal-focus"), ("", "contribuicao-12m"),
+         ("", "ipca-alimentacao-itens"), ("", "administrados-livres"), ("", "ipca-difusao-grupos"),
+         ("", "el-nino-alimentos"), ("", "ipca-12m-defasagem"), ("", "atividade-inflacao"),
+         ("", "ipca-projecoes-focus"),
+         ("Fiscal", "fiscal-primario-pib"), ("", "fiscal-nominal-pib"), ("", "fiscal-juros-nominais"),
+         ("", "juro-crescimento"), ("", "fiscal-divida-bruta"), ("", "fiscal-divida-condicionantes"),
+         ("", "primario-estabilizador"), ("", "divida-composicao"),
+         ("", "divida-detentores"), ("", "credito-ampliado-contribuicoes-total"), ("", "juros-longo"),
+         ("", "deficits-gemeos"),
+         ("Setor externo e câmbio", "bp-cc-12m"), ("", "saldo-comercial-petroleo"), ("", "bp-ied-12m"),
+         ("", "externo-2014-hoje"), ("", "fluxo-residentes"), ("", "bp-acoes-fundos"), ("", "moedas-pp-real"),
+         ("", "moedas-cambio-ppc"), ("", "moedas-sobrevalorizacao"), ("", "moedas-fmi-avaliacao")]
+
+
+def graficos_resto():
+    return (graficos_copiados_resto() + graficos_ajuste_fiscal()
+            + [grafico_atividade_inflacao(), grafico_el_nino(), grafico_deficits_gemeos(),
+               grafico_fluxo_residentes(), tabela_2014()])
+
+
 def main():
     selic = cn.sgs(432, "05/03/1999")
     ult = max(selic)
@@ -667,16 +1036,17 @@ def main():
     secoes = [dict(titulo="Selic", texto="", fontes=[], figuras=[], graficos=[g_rec]),
               dict(titulo="", texto="", fontes=[], figuras=[], graficos=[g_ciclos])]
     ciclo = {g["id"]: g for f in (graficos_atividade, graficos_pib_credito, graficos_cartao, graficos_confianca,
-                       graficos_emprego, graficos_trabalho_ponte, graficos_recuperacoes)
+                       graficos_emprego, graficos_trabalho_ponte, graficos_recuperacoes,
+                       graficos_resto)
              for g in f()}
-    for titulo, gid in CICLO:
+    for titulo, gid in CICLO + RESTO:
         secoes.append(dict(titulo=titulo, texto="", fontes=[], figuras=[], graficos=[ciclo[gid]]))
     hoje = datetime.date.today().isoformat()
     doc = dict(atualizado=hoje, referencia=hoje, formato="artigo", assunto="Missão Global Miami",
                # a ordem dos gráficos é escolhida na página (botões Subir/Descer e
                # arrastar) e gravada neste arquivo; o app aplica ao abrir
                reordenar="dados/ordens/missao-global-miami.json",
-               fonte="Banco Central, CODACE/FGV, IBGE, CNI, CNC, Fecomercio SP e Ministério do Trabalho",
+               fonte="Banco Central, CODACE/FGV, IBGE, FGV IBRE, Serasa, Tesouro Nacional, NOAA e Ministério do Trabalho",
                secoes=secoes)
     with open(SAIDA, "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
@@ -688,7 +1058,7 @@ def main():
     # seção por gráfico, na ordem de CICLO, gráfico some ou sai repetido
     with open(SAIDA, encoding="utf-8") as f:
         ids = [g["id"] for s in json.load(f)["secoes"] for g in s["graficos"]]
-    esperado = ["selic-recessoes", "selic-ciclos"] + [gid for _, gid in CICLO]
+    esperado = ["selic-recessoes", "selic-ciclos"] + [gid for _, gid in CICLO + RESTO]
     if ids != esperado:
         raise RuntimeError("textos/%s.md fora do lugar: o JSON saiu com %s; tinha de ser %s"
                            % (NOME, ids, esperado))

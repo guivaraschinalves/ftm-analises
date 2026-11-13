@@ -50,3 +50,67 @@ parte: Cenário econômico brasileiro
 ##
 
 ## Recuperações judiciais
+
+## Inflação
+
+##
+
+##
+
+##
+
+##
+
+##
+
+##
+
+##
+
+##
+
+##
+
+## Fiscal
+
+##
+
+##
+
+##
+
+##
+
+##
+
+##
+
+##
+
+##
+
+##
+
+##
+
+##
+
+## Setor externo e câmbio
+
+##
+
+##
+
+##
+
+##
+
+##
+
+##
+
+##
+
+##
+
+##
