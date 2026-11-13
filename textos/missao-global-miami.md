@@ -134,6 +134,15 @@ parte: Cenário econômico dos EUA
 
 ##
 
+## Juros longos no G7
+parte: Juros no mundo
+
+##
+
+## A França
+
+##
+
 ## Bitcoin
 parte: Bitcoin e stablecoins
 

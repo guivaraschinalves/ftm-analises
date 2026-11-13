@@ -1269,7 +1269,16 @@ def graficos_bitcoin():
                             "médio do mês",
                   unidade="%", fonte="Coin Metrics, World Bank (preço do ouro), World Gold Council e FtM",
                   series=[cf.serie("Bitcoin ÷ ouro", AMARELO_BTC, razao, 1, largura=5, rotulo=True)])
-    return [g_preco, g_ciclos, g_mvrv, g_mayer, g_ouro]
+    u_ouro = max(ouro_px)
+    print("  ouro %s: US$ %.0f/oz" % (u_ouro, ouro_px[u_ouro]))
+    cinco = "%d%s" % (int(u_ouro[:4]) - 5, u_ouro[4:])
+    g_ouro_px = dict(id="ouro-preco", titulo="Preço do ouro", subtitulo="US$ por onça troy, média do mês",
+                     unidade="usd", fonte="World Bank (Pink Sheet), via datasets/gold-prices", variantes=[
+                         dict(rot="Desde 1971 (fim do padrão-ouro)", series=[
+                             cf.serie("Ouro", "#D9B382", desde(ouro_px, "1971-01"), 0, largura=4, rotulo=True)]),
+                         dict(rot="Últimos 5 anos", series=[
+                             cf.serie("Ouro", "#D9B382", desde(ouro_px, cinco), 0, largura=4, rotulo=True)])])
+    return [g_preco, g_ouro_px, g_mvrv, g_mayer, g_ouro]
 
 
 def graficos_stablecoins():
@@ -1323,7 +1332,7 @@ def graficos_cripto_bp():
 
 
 AMARELO_BTC = "#FFFF00"
-CRIPTO = [("Bitcoin", "btc-preco"), ("", "btc-ciclos"), ("", "btc-mvrv"), ("", "btc-mayer"), ("", "btc-ouro"),
+CRIPTO = [("Bitcoin", "btc-preco"), ("", "ouro-preco"), ("", "btc-mvrv"), ("", "btc-mayer"), ("", "btc-ouro"),
           ("Stablecoins", "stablecoins-total"), ("", "stablecoins-emissores")]
 PARTE_CRIPTO = "Bitcoin e stablecoins"
 
@@ -1469,6 +1478,138 @@ BRASIL = [("Atividade", "pmc-pms-trimestre"), ("", "pms-volume-inflacao-tri"), (
           ("Selic", "selic-recessoes"), ("", "selic-ciclos"), ("", "copom-comunicados")]
 
 
+# ================================================================ juros no mundo
+# Pedido dele em 13/11/2026: os juros longos do G7 no horizonte mais longo
+# possível (o ponto: as taxas de hoje são normais na história; anormal foi o
+# período depois de 2008), a dívida/PIB, e a França (aula do Ulrich "A crise
+# fiscal que vai testar o euro e a União Europeia", 13/10/2026: prêmio de risco
+# francês, dívida e déficits).
+# Fontes: Jordà-Schularick-Taylor Macrohistory Database R6 (anual, 1870-2020;
+# ltrate e debtgdp), OCDE via FRED (IRLTLT01xxM156N, juro de 10 anos do governo,
+# mensal) e FMI WEO DataMapper (dívida bruta e resultado do governo geral).
+
+JST_PAGINA = "https://www.macrohistory.net/database/"
+G7 = [("USA", "US", "EUA", "#4F81BD"), ("GBR", "GB", "Reino Unido", "#C0504D"), ("FRA", "FR", "França", "#9BBB59"),
+      ("DEU", "DE", "Alemanha", "#1F497D"), ("ITA", "IT", "Itália", "#8EB4E3"), ("JPN", "JP", "Japão", "#632523"),
+      ("CAN", "CA", "Canadá", "#FFFF00")]
+IMF_MAPPER = "https://www.imf.org/external/datamapper/api/v1/"
+
+
+def jst():
+    """{iso: {"ltrate": {ano: %}, "debtgdp": {ano: % do PIB}}} da base JST."""
+    import re
+    pagina = cf.baixar(JST_PAGINA, headers=SIDRA_UA).decode("utf-8", "replace")
+    link = re.findall(r'href="(/app/download/[^"]+\.xlsx[^"]*)"', pagina)
+    if not link:
+        raise RuntimeError("JST: link do .xlsx não encontrado")
+    corpo = cf.baixar("https://www.macrohistory.net" + link[0], headers=SIDRA_UA)
+    cel = xlsx_celulas(corpo, "Sheet1")
+    cab = {v: k for (r, k), v in cel.items() if r == 1}
+    fora = {}
+    for r in sorted({r for r, _ in cel if r > 1}):
+        iso, ano = cel.get((r, cab["iso"])), cel.get((r, cab["year"]))
+        if iso not in [x[0] for x in G7] or not ano:
+            continue
+        d = fora.setdefault(iso, {"ltrate": {}, "debtgdp": {}})
+        for c, f in (("ltrate", 1), ("debtgdp", 100)):
+            v = cel.get((r, cab[c]))
+            if v not in (None, ""):
+                d[c][int(float(ano))] = float(v) * f
+    return fora
+
+
+def imf_mapper(indicador):
+    """{iso: {ano: valor}} do FMI WEO (DataMapper, sem chave)."""
+    # sem User-Agent: com um de navegador o FMI responde 403
+    j = json.loads(cf.baixar(IMF_MAPPER + indicador))
+    return {iso: {int(a): v for a, v in d.items() if v is not None} for iso, d in j["values"][indicador].items()}
+
+
+def graficos_juros_mundo():
+    base = jst()
+    ano_atual = datetime.date.today().year
+    oecd = {iso: cf.fred("IRLTLT01%sM156N" % c2) for iso, c2, _, _ in G7}
+    longo, mensal = {}, {}
+    for iso, c2, nome, cor in G7:
+        anual = dict(base[iso]["ltrate"])
+        por_ano = {}
+        for m, v in oecd[iso].items():
+            por_ano.setdefault(int(m[:4]), []).append(v)
+        for a, vs in por_ano.items():
+            if a > max(anual):
+                anual[a] = sum(vs) / len(vs)
+        longo[iso] = {"%d-12" % a: v for a, v in anual.items()}
+        mensal[iso] = {m: v for m, v in oecd[iso].items() if m >= "2000-01"}
+    anos = sorted({k for d in longo.values() for k in d})
+    media = {k: sum(longo[i][k] for i in longo if k in longo[i]) / sum(1 for i in longo if k in longo[i])
+             for k in anos if sum(1 for i in longo if k in longo[i]) >= 4}
+    def med(a0, a1):
+        vs = [v for k, v in media.items() if a0 <= int(k[:4]) <= a1]
+        return sum(vs) / len(vs)
+    m_hist, m_baixo, hoje = med(1870, 2008), med(2009, 2021), media[max(media)]
+    print("  juros longos do G7 (média): 1870-2008 %.1f%%; 2009-2021 %.1f%%; %s %.1f%%"
+          % (m_hist, m_baixo, max(media)[:4], hoje))
+    sombra = [dict(de="2009-01-01", ate="2021-12-31", dica="2009 a 2021: juro excepcionalmente baixo")]
+    g_juros = dict(id="juros-longos-g7", titulo="Juros longos dos países do G7 desde 1870",
+                   subtitulo="Juro do título de longo prazo do governo, em %% ao ano; média anual; média do G7: %s%% "
+                             "de 1870 a 2008, %s%% de 2009 a 2021 (faixa cinza) e %s%% em %s"
+                             % (cf.br(m_hist, 1), cf.br(m_baixo, 1), cf.br(hoje, 1), max(media)[:4]),
+                   unidade="%", fonte="Jordà-Schularick-Taylor Macrohistory Database (até 2020) e OCDE via FRED",
+                   variantes=[
+                       dict(rot="Desde 1870 (anual)", buracoMax=12, sombras=sombra, series=[
+                           cf.serie(nome, cor, longo[iso], 1, largura=2, rotulo=False) for iso, _, nome, cor in G7]
+                           + [cf.serie("Média do G7", BRANCO, media, 1, largura=5, rotulo=True)]),
+                       dict(rot="Desde 2000 (mensal)", series=[
+                           cf.serie(nome, cor, mensal[iso], 2, largura=3, rotulo=True) for iso, _, nome, cor in G7])])
+    # dívida/PIB: JST até 2020 (o conceito varia por país) e FMI, governo geral, 1980 até o ano corrente
+    weo = imf_mapper("GGXWDG_NGDP")
+    divida_longa = {iso: {"%d-12" % a: v for a, v in base[iso]["debtgdp"].items()} for iso, _, _, _ in G7}
+    divida_fmi = {iso: {"%d-12" % a: v for a, v in weo.get(iso, {}).items() if a <= ano_atual}
+                  for iso, _, _, _ in G7}
+    print("  dívida/PIB (FMI, %d): %s" % (ano_atual, ", ".join("%s %.0f%%" % (n, divida_fmi[i].get("%d-12" % ano_atual,
+                                                                                            float("nan")))
+                                                         for i, _, n, _ in G7)))
+    g_div = dict(id="divida-g7", titulo="Dívida pública dos países do G7",
+                 subtitulo="Dívida bruta do governo em % do PIB", unidade="%",
+                 fonte="Jordà-Schularick-Taylor Macrohistory Database e FMI (World Economic Outlook)", variantes=[
+                     dict(rot="Desde 1870 (até 2020)", buracoMax=12, series=[
+                         cf.serie(nome, cor, divida_longa[iso], 1, largura=3, rotulo=True) for iso, _, nome, cor in G7]),
+                     dict(rot="Desde 1980 (FMI, governo geral; %d = estimativa)" % ano_atual, buracoMax=12, series=[
+                         cf.serie(nome, cor, divida_fmi[iso], 1, largura=3, rotulo=True) for iso, _, nome, cor in G7])])
+    # França: prêmio de risco contra a Alemanha (e a Itália para comparar); dívida e déficit
+    de = oecd["DEU"]
+    sp_fr = {m: 100 * (v - de[m]) for m, v in oecd["FRA"].items() if m in de and m >= "1991-01"}
+    sp_it = {m: 100 * (v - de[m]) for m, v in oecd["ITA"].items() if m in de}
+    u = max(sp_fr)
+    print("  spread contra a Alemanha %s: França %.0f pb, Itália %.0f pb" % (u, sp_fr[u], sp_it.get(u, float("nan"))))
+    g_sp = dict(id="spread-franca-italia", titulo="Prêmio de risco: França e Itália contra a Alemanha",
+                subtitulo="Juro de 10 anos do governo menos o da Alemanha, em pontos-base; média do mês",
+                unidade="n", fonte="OCDE via FRED (IRLTLT01) e FtM",
+                series=[cf.serie("França", "#9BBB59", sp_fr, 0, largura=5, rotulo=True),
+                        cf.serie("Itália", "#8EB4E3", sp_it, 0, largura=3, rotulo=True)])
+    res = imf_mapper("GGXCNL_NGDP")
+    paises = [("FRA", "França", "#9BBB59"), ("DEU", "Alemanha", "#1F497D"), ("ITA", "Itália", "#8EB4E3")]
+    def anos_fmi(d):
+        return {"%d-12" % a: v for a, v in d.items() if 1995 <= a <= ano_atual}
+    print("  França (FMI, %d): dívida %.0f%% do PIB, resultado %.1f%%"
+          % (ano_atual, weo["FRA"].get(ano_atual, float("nan")), res["FRA"].get(ano_atual, float("nan"))))
+    g_fr = dict(id="franca-divida-deficit", titulo="França: dívida e déficit do governo",
+                subtitulo="Governo geral, em %% do PIB; %d = estimativa do FMI; Alemanha e Itália para comparar"
+                          % ano_atual, unidade="%", fonte="FMI (World Economic Outlook)", variantes=[
+                    dict(rot="Dívida bruta", buracoMax=12, series=[
+                        cf.serie(n, c, anos_fmi(weo[i]), 1, largura=5 if i == "FRA" else 3, rotulo=True)
+                        for i, n, c in paises]),
+                    dict(rot="Resultado (negativo = déficit)", buracoMax=12, series=[
+                        cf.serie(n, c, anos_fmi(res[i]), 1, largura=5 if i == "FRA" else 3, rotulo=True)
+                        for i, n, c in paises])])
+    return [g_juros, g_div, g_sp, g_fr]
+
+
+JUROS_MUNDO = [("Juros longos no G7", "juros-longos-g7"), ("", "divida-g7"),
+               ("A França", "spread-franca-italia"), ("", "franca-divida-deficit")]
+PARTE_JUROS = "Juros no mundo"
+
+
 def main():
     selic = cn.sgs(432, "05/03/1999")
     ult = max(selic)
@@ -1526,6 +1667,9 @@ def main():
         if k == 0:
             sec["parte"] = PARTE_EUA
         secoes.append(sec)
+    juros = {g["id"]: g for g in graficos_juros_mundo()}
+    for titulo, gid in JUROS_MUNDO:
+        secoes.append(dict(titulo=titulo, texto="", fontes=[], figuras=[], graficos=[juros[gid]]))
     cripto = {g["id"]: g for g in graficos_cripto()}
     for titulo, gid in CRIPTO:
         secoes.append(dict(titulo=titulo, texto="", fontes=[], figuras=[], graficos=[cripto[gid]]))
@@ -1546,7 +1690,7 @@ def main():
     # seção por gráfico, na ordem de CICLO, gráfico some ou sai repetido
     with open(SAIDA, encoding="utf-8") as f:
         ids = [g["id"] for s in json.load(f)["secoes"] for g in s["graficos"]]
-    esperado = [gid for _, gid in BRASIL + EUA + CRIPTO]
+    esperado = [gid for _, gid in BRASIL + EUA + JUROS_MUNDO + CRIPTO]
     if ids != esperado:
         raise RuntimeError("textos/%s.md fora do lugar: o JSON saiu com %s; tinha de ser %s"
                            % (NOME, ids, esperado))
