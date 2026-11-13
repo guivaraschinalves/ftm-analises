@@ -210,7 +210,8 @@ def graficos_atividade():
 
 
 IDS_PIB = ["pib-familias-4tri", "pib-participacao"]
-IDS_CREDITO = ["credito-direcionado-livre", "credito-ampliado-contribuicoes-empresas", "credito-juros-selic", "credito-controle-razao", "credito-poupanca-moeda"]
+IDS_CREDITO = ["credito-direcionado-livre", "credito-ampliado-contribuicoes-empresas", "credito-juros-selic", "credito-controle-razao", "credito-poupanca-moeda", "credito-concessoes-pf-pj",
+               "credito-inadimplencia"]
 # outros cartões do ftm-dados que fecham o roteiro do ciclo: a inflação implícita
 # dos serviços (volume × preço) e os serviços subjacentes, a ponte para a inflação
 IDS_OUTROS = [("dados/ipca.json", ["servicos"])]
@@ -1134,7 +1135,7 @@ MIDTERMS_IDS = ["midterms-historia-aprovacao", "midterms-resultado-camara", "mid
                 "midterms-resultado-mapa-senado"]
 
 EUA = [("Atividade e emprego", "pib-eua-contribuicoes"), ("", "ism-pmi"), ("", "payroll-setores"),
-       ("", "eua-u3-u6"), ("", "jolts"),
+       ("", "eua-u3-u6"), ("", "eua-participacao"),
        ("Inteligência artificial", "pib-eua-investimento-ti"), ("", "construcao-datacenters-fabricas"),
        ("", "datacenters-participacao"), ("", "ia-indices"), ("", "ia-vix"),
        ("Bolsa", "sp500-pl"),
@@ -1482,7 +1483,7 @@ def graficos_fiscal_brasil():
 
 BRASIL = [("Atividade", "pmc-pms-trimestre"), ("", "pms-volume-inflacao-tri"), ("", "pib-familias-4tri"),
           ("", "pib-participacao"),
-          ("Crédito", "credito-direcionado-livre"), ("", "credito-ampliado-contribuicoes-empresas"), ("", "credito-juros-selic"), ("", "credito-controle-razao"), ("", "credito-poupanca-moeda"),
+          ("Crédito", "credito-direcionado-livre"), ("", "credito-ampliado-contribuicoes-empresas"), ("", "credito-juros-selic"), ("", "credito-controle-razao"), ("", "credito-poupanca-moeda"), ("", "credito-concessoes-pf-pj"), ("", "credito-inadimplencia"),
           ("Confiança", "confianca"),
           ("Emprego", "desemprego"), ("", "participacao"), ("", "br-caged-setembro"),
           ("Inflação", "ipca-mensal-focus"), ("", "ipca-distancia-meta"), ("", "ipca-alimentacao-contribuicao"),
@@ -1680,6 +1681,15 @@ def main():
         raise RuntimeError("gráficos do Brasil que ninguém gerou: %s" % faltam)
     secoes = [dict(titulo=titulo, texto="", fontes=[], figuras=[], graficos=[brasil[gid]]) for titulo, gid in BRASIL]
     eua = {g["id"]: g for g in graficos_eua()}
+    # desemprego só com o U-3 (sem os recortes do U-6); a participação é a da Wealth (cenário de novembro)
+    u = eua["eua-u3-u6"]
+    u3 = [x for x in u["variantes"][0]["series"] if "U-3" in x["nome"]]
+    if len(u3) != 1:
+        raise RuntimeError("desemprego dos EUA: série do U-3 não encontrada")
+    eua["eua-u3-u6"] = dict({k: v for k, v in u.items() if k != "variantes"}, titulo="Taxa de desemprego (U-3)",
+                            subtitulo="% da força de trabalho, com ajuste sazonal", series=u3)
+    if "eua-participacao" not in eua:
+        eua["eua-participacao"] = cn.graficos_ftm_dados_eua()["participacao"]
     faltam = [gid for _, gid in EUA if gid not in eua]
     if faltam:
         raise RuntimeError("gráficos dos EUA que ninguém gerou: %s" % faltam)
