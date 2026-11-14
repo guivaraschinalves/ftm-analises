@@ -299,6 +299,8 @@
     dp: { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
           valor: function (v) { return nf(2).format(v) + " dp"; } },
     // razão entre duas medidas (volatilidade depois ÷ antes)
+    // número com duas casas (escala de −2 a 2 da Pesquisa Trimestral de Condições de Crédito)
+    n2: { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); }, valor: function (v) { return nf(2).format(v); } },
     x: { eixo: function (v, passo) { return nf(Math.max(1, casasDoPasso(passo))).format(v); },
          valor: function (v) { return nf(2).format(v) + "\u00d7"; } },
     // reais por litro: preço de combustível, onde o centavo é a unidade que

@@ -127,15 +127,26 @@ def desde(d, ini):
 
 
 def graficos_ftm_dados(arq):
-    """{id: cartão} de um JSON do ftm-dados."""
+    """{id: cartão} de um JSON do ftm-dados, como está no GitHub; o que ainda
+    não subiu vem do arquivo local (só lido, nunca gravado), com aviso."""
     gs = {}
 
-    def anda(secs):
+    def anda(secs, destino):
         for s in secs:
             for g in s.get("graficos", []):
-                gs[g["id"]] = g
-            anda(s.get("subsecoes", []))
-    anda(cn.json_ftm_dados(arq)["secoes"])
+                destino.setdefault(g["id"], g)
+            anda(s.get("subsecoes", []), destino)
+    anda(cn.json_ftm_dados(arq)["secoes"], gs)
+    local = {}
+    try:
+        with open(os.path.join(cn.FTM_DADOS, arq), encoding="utf-8") as f:
+            anda(json.load(f)["secoes"], local)
+    except (OSError, ValueError):
+        pass
+    for i, g in local.items():
+        if i not in gs:
+            gs[i] = g
+            print("  %-36s do ftm-dados local (ainda não está no GitHub)" % i)
     return gs
 
 
@@ -211,7 +222,12 @@ def graficos_atividade():
 
 IDS_PIB = ["pib-familias-4tri", "pib-participacao"]
 IDS_CREDITO = ["credito-direcionado-livre", "credito-ampliado-contribuicoes-empresas", "credito-juros-selic", "credito-controle-razao", "credito-poupanca-moeda", "credito-concessoes-pf-pj",
-               "credito-inadimplencia"]
+               "credito-inadimplencia", "credito-capital-giro-prazo", "credito-ptc-motivos-empresas"]
+# cartões do ftm-dados com vários recortes de que a Missão usa um só: (recorte, título)
+SO_RECORTE = {"credito-capital-giro-prazo": ("Concessões ÷ saldo", "Capital de giro a empresas por prazo: "
+                                                                   "concessões ÷ saldo"),
+              "credito-ptc-motivos-empresas": ("Grandes empresas", "Motivos da demanda de crédito das grandes "
+                                                                   "empresas na visão dos bancos")}
 # outros cartões do ftm-dados que fecham o roteiro do ciclo: a inflação implícita
 # dos serviços (volume × preço) e os serviços subjacentes, a ponte para a inflação
 IDS_OUTROS = [("dados/ipca.json", ["servicos"])]
@@ -289,6 +305,11 @@ def graficos_pib_credito():
         for i in ids:
             g = direita(sem_trimestral(gs[i]))
             g.pop("nota", None)
+            if i in SO_RECORTE:
+                rot, titulo = SO_RECORTE[i]
+                v = next(v for v in g.pop("variantes") if v["rot"] == rot)
+                g.update(titulo=titulo, series=v["series"], unidade=v.get("unidade", g.get("unidade")),
+                         subtitulo=v.get("subtitulo", g.get("subtitulo")))
             if i == "pib-familias-4tri":
                 g = com_focus(g)
             if i == "credito-endividamento":       # só o total, sem a linha "exceto habitacional"
@@ -1483,7 +1504,7 @@ def graficos_fiscal_brasil():
 
 BRASIL = [("Atividade", "pmc-pms-trimestre"), ("", "pms-volume-inflacao-tri"), ("", "pib-familias-4tri"),
           ("", "pib-participacao"),
-          ("Crédito", "credito-direcionado-livre"), ("", "credito-ampliado-contribuicoes-empresas"), ("", "credito-juros-selic"), ("", "credito-controle-razao"), ("", "credito-poupanca-moeda"), ("", "credito-concessoes-pf-pj"), ("", "credito-inadimplencia"),
+          ("Crédito", "credito-direcionado-livre"), ("", "credito-ampliado-contribuicoes-empresas"), ("", "credito-juros-selic"), ("", "credito-controle-razao"), ("", "credito-poupanca-moeda"), ("", "credito-concessoes-pf-pj"), ("", "credito-inadimplencia"), ("", "credito-capital-giro-prazo"), ("", "credito-ptc-motivos-empresas"),
           ("Confiança", "confianca"),
           ("Emprego", "desemprego"), ("", "participacao"), ("", "br-caged-setembro"),
           ("Inflação", "ipca-mensal-focus"), ("", "ipca-distancia-meta"), ("", "ipca-alimentacao-contribuicao"),
