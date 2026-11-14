@@ -652,7 +652,7 @@ def ajustes_brasil(brasil):
     inv = next(v for v in pp["variantes"] if v["rot"] != "Componentes")
     fbcf = next(x for x in inv["series"] if "FBCF)" in x["nome"])
     gov = next(x for x in comp["series"] if "governo" in x["nome"])
-    inv.update(rot="FBCF e governo", series=[dict(fbcf, cor=VERMELHO), dict(gov, cor=AZUL)])
+    inv.update(rot="FBCF e governo", series=[dict(fbcf, cor=AZUL), dict(gov, cor=VERMELHO)])
     inv.pop("unidade2", None)
     # contribuição por grupo, em 12 e em 3 meses, num gráfico só (no lugar do IPCA × Focus)
     ipca = graficos_ftm_dados("dados/ipca.json")
