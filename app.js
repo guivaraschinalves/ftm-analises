@@ -312,6 +312,9 @@
     "mil m³": { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
                     valor: function (v) { return nf(0).format(v) + " mil m³"; } },
     // comércio exterior em bilhões de dólares, e índice (IC-Br, dez/2005 = 100)
+    // bilhões de dólares sem casa decimal, para o número em cima de cada coluna caber
+    "usd-bi0": { eixo: function (v, passo) { return "US$ " + nf(casasDoPasso(passo)).format(v); },
+                 valor: function (v) { return "US$ " + nf(0).format(v); } },
     "usd-bi": { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
                 valor: function (v) { return "US$ " + nf(1).format(v) + " bi"; } },
     pts: { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
@@ -1296,6 +1299,12 @@
     if (g.tipo === "dispersao") return construirDispersao(cartao, L0, nomeTema);
     if (g.tipo === "simulador") return construirSimulador(cartao, L0, nomeTema);
     var L = Object.assign({}, L0);
+    // "categoriasInclinadas": nomes compridos (países) inclinados, como no
+    // slide; o gráfico sobe para dar lugar a eles
+    if (g.categoriasInclinadas && g.categorias) {
+      var maiorCat = Math.max.apply(null, g.categorias.map(function (c) { return largura(c, L.xlab * 1.1); }));
+      L.y1 = Math.min(L.y1, L.H - 44 - maiorCat * 0.72);
+    }
 
     // subtítulo que não cabe numa linha quebra em duas (versão estreita)
     var subLinhas = [g.subtitulo || ""];
@@ -1544,6 +1553,13 @@
         if (!rotuloX(g, ci)) continue;
         var cxc = X(ci + 0.5);
         svg.appendChild(el("line", { x1: cxc, x2: cxc, y1: L.y1, y2: L.y1 + 7, stroke: pal.zero, "stroke-width": 1.5 }));
+        if (g.categoriasInclinadas) {
+          svg.appendChild(texto(rotuloX(g, ci), {
+            x: cxc + 6, y: L.y1 + 14, "font-size": L.xlab * 1.1, fill: pal.eixo, "text-anchor": "end",
+            "dominant-baseline": "hanging", transform: "rotate(-45 " + (cxc + 6) + " " + (L.y1 + 14) + ")"
+          }));
+          continue;
+        }
         svg.appendChild(texto(rotuloX(g, ci), {
           x: cxc, y: L.y1 + 14, "font-size": fsCat, fill: pal.eixo,
           "text-anchor": "middle", "dominant-baseline": "hanging"
@@ -1645,15 +1661,17 @@
     var baseP = {}, baseN = {}, bw = Math.max(2, pxMes * fBarra + (fBarra >= 1 ? 1 : 0));
     // "agrupadas": as séries de barra ficam lado a lado dentro da categoria,
     // em vez de empilhadas; "valores" escreve o número na ponta de cada uma
-    var barrasAg = g.agrupadas ? g.series.filter(function (s) { return s.tipo === "barra"; }) : [];
+    var barrasAg = g.agrupadas ? g.series.filter(function (s) { return s.tipo === "barra" && !s.dentro; }) : [];
     if (barrasAg.length) {
       var wb = bw / barrasAg.length, fsV = Math.round(L.xlab * 0.85);
       barrasAg.forEach(function (s, kb) {
         var cor = corNoTema(s.cor, pal), k = g.series.indexOf(s);
         vis[k].forEach(function (p) {
           var y0b = Y(0), y1b = Y(p.v), xb0 = X(p.i + 0.5) - bw / 2 + kb * wb;
+          // "cores": {categoria: cor} pinta uma barra de outra cor (as stablecoins entre os países)
+          var corB = s.cores && s.cores[p.i] ? corNoTema(s.cores[p.i], pal) : cor;
           area.appendChild(el("rect", { x: xb0 + 1, y: Math.min(y0b, y1b), width: Math.max(1, wb - 2),
-                                        height: Math.max(0.6, Math.abs(y1b - y0b)), fill: cor, rx: 3 }));
+                                        height: Math.max(0.6, Math.abs(y1b - y0b)), fill: corB, rx: 3 }));
           if (g.valores) {
             svg.appendChild(texto((p.v > 0 && g.sinal ? "+" : "") + F.valor(p.v), {
               x: xb0 + wb / 2, y: p.v >= 0 ? y1b - fsV * 0.45 : y1b + fsV * 1.05, "font-size": fsV,
@@ -1662,8 +1680,25 @@
         });
       });
     }
+    // "dentro": barra fina por cima da coluna, a partir do zero (a variação em
+    // 12 meses dentro do estoque de cada país); com o valor escrito ao lado
     g.series.forEach(function (s, k) {
-      if (s.tipo !== "barra" || g.agrupadas) return;
+      if (s.tipo !== "barra" || !s.dentro) return;
+      var cor = corNoTema(s.cor, pal), wd = bw * (s.dentro === true ? 0.32 : s.dentro), fsD = Math.round(L.xlab * 0.8);
+      vis[k].forEach(function (p) {
+        var y0d = Y(0), y1d = Y(p.v), xc = X(p.i + 0.5);
+        area.appendChild(el("rect", { x: xc - wd / 2, y: Math.min(y0d, y1d), width: wd,
+                                      height: Math.max(0.6, Math.abs(y1d - y0d)), fill: cor, rx: 2 }));
+        if (s.valores) {
+          var tx = (p.v > 0 ? "+" : p.v < 0 ? "\u2212" : "") + nf(0).format(Math.abs(p.v));
+          svg.appendChild(texto(tx, { x: xc, y: p.v >= 0 ? Math.min(y0d, y1d) - fsD * 0.4 : y1d + fsD * 1.05,
+                                      "font-size": fsD, "font-weight": "bold", fill: cor, "text-anchor": "middle",
+                                      stroke: pal.bg, "stroke-width": 3, "paint-order": "stroke" }));
+        }
+      });
+    });
+    g.series.forEach(function (s, k) {
+      if (s.tipo !== "barra" || g.agrupadas || s.dentro) return;
       var cor = corNoTema(s.cor, pal);
       vis[k].forEach(function (p) {
         if (!p.v) return;
@@ -3585,7 +3620,14 @@
 
     function completar(lista) {
       var fora = (lista || []).filter(function (id, i, l) { return porId[id] && l.indexOf(id) === i; });
-      original.forEach(function (id) { if (fora.indexOf(id) < 0) fora.push(id); });
+      // gráfico que a ordem gravada não conhece (entrou depois) fica logo
+      // depois do vizinho que o precede na ordem do arquivo, e não no fim
+      original.forEach(function (id, k) {
+        if (fora.indexOf(id) >= 0) return;
+        var j = k - 1;
+        while (j >= 0 && fora.indexOf(original[j]) < 0) j--;
+        fora.splice(j < 0 ? 0 : fora.indexOf(original[j]) + 1, 0, id);
+      });
       return fora;
     }
     function igual(a, b) { return a.join("|") === b.join("|"); }

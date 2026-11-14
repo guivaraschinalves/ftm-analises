@@ -1477,6 +1477,8 @@ def grafico_treasuries_stablecoins(n=20):
     datas = sorted({r[2] for r in linhas if re.match(r"\d{4}-\d{2}$", r[2])})
     ult = datas[-1]
     fora = ("Total", "Memo", "Of Which", "All Countries", "Grand Total", "International", "Country")
+    ano_antes = "%d-%s" % (int(ult[:4]) - 1, ult[5:])
+    antes = {r[0]: float(r[3]) / 1000 for r in linhas if r[2] == ano_antes and r[3].lstrip("-").isdigit()}
     paises = [(r[0], float(r[3]) / 1000) for r in linhas
               if r[2] == ult and r[3].lstrip("-").isdigit() and not r[0].startswith(fora)]
     paises = sorted(paises, key=lambda x: -x[1])[:n]
@@ -1490,11 +1492,25 @@ def grafico_treasuries_stablecoins(n=20):
     pos = next(k for k, it in enumerate(itens) if it[0] == "USDT + USDC") + 1
     print("  Treasuries: TIC %s (%s US$ %.0f bi); USDT+USDC %s US$ %.1f bi (USDT %.1f, USDC %.1f), %dº lugar"
           % (ult, paises[0][0], paises[0][1], sc["data"], v_sc, sc["usdt"], sc["usdc"], pos))
-    return dict(id="treasuries-paises-stablecoins", tipo="ranking", unidade="usd-bi",
+    # colunas em pé, como no slide dele, com o valor em cima e as stablecoins em verde
+    # barrinha dentro de cada país: a variação em 12 meses (mesmo mês do ano anterior, TIC)
+    nome_en = {PAISES_PT.get(p, p): p for p, _ in paises}
+    var12 = [[str(k), round(it[1] - antes[nome_en[it[0]]], 1)] for k, it in enumerate(itens)
+             if it[0] in nome_en and nome_en[it[0]] in antes]
+    maior = max(var12, key=lambda x: abs(x[1]))
+    print("  maior variação em 12 meses: %s %+.0f bi" % (itens[int(maior[0])][0], maior[1]))
+    return dict(id="treasuries-paises-stablecoins", unidade="usd-bi0", agrupadas=True, valores=True, barra=0.7,
+                categorias=[it[0] for it in itens], categoriasInclinadas=True,
+                series=[dict(nome="Estoque", cor=AZUL, tipo="barra",
+                             dados=[[str(k), it[1]] for k, it in enumerate(itens)],
+                             cores={str(pos - 1): VERDE}),
+                        dict(nome="Variação em 12 meses (países)", cor=BRANCO, tipo="barra", dentro=True,
+                             valores=True, dados=var12)],
                 titulo="Maiores detentores de títulos do Tesouro dos EUA e as stablecoins",
-                subtitulo="US$ bilhões em bills, notes e bonds; países: %s (TIC); USDT e USDC: %s, títulos detidos "
-                          "diretamente, sem compromissadas" % (cf.rot_mes(ult), cf.rot_mes(sc["data"])),
-                fonte="Tesouro dos EUA (TIC, tabela 3), Tether (BDO), Circle (Deloitte) e FtM", itens=itens)
+                subtitulo="US$ bilhões em bills, notes e bonds; países: %s (TIC), barra branca = variação desde %s; "
+                          "USDT e USDC: %s, títulos detidos diretamente, sem compromissadas"
+                          % (cf.rot_mes(ult), cf.rot_mes(ano_antes), cf.rot_mes(sc["data"])),
+                fonte="Tesouro dos EUA (TIC, tabela 3), Tether (BDO), Circle (Deloitte) e FtM")
 
 
 def graficos_cripto():
