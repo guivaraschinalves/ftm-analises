@@ -222,7 +222,9 @@ def graficos_atividade():
 
 IDS_PIB = ["pib-familias-4tri", "pib-participacao"]
 IDS_CREDITO = ["credito-direcionado-livre", "credito-ampliado-contribuicoes-total", "credito-juros-selic", "credito-poupanca-moeda", "credito-concessoes-pf-pj",
-               "credito-inadimplencia", "credito-capital-giro-prazo", "credito-ptc-motivos-empresas"]
+               "credito-inadimplencia", "credito-capital-giro-prazo", "credito-ptc-motivos-empresas",
+               "credito-concessoes-tab11", "credito-concessoes-tab13", "credito-concessoes-tab10",
+               "credito-concessoes-tab12"]
 # cartões do ftm-dados com vários recortes de que a Missão usa um só: (recorte, título)
 SO_RECORTE = {"credito-capital-giro-prazo": ("Concessões ÷ saldo", "Capital de giro a empresas por prazo: "
                                                                    "concessões ÷ saldo"),
@@ -639,6 +641,16 @@ DESDE_2023 = ["pmc-pms-trimestre", "pms-volume-inflacao-tri", "credito-direciona
 
 def ajustes_brasil(brasil):
     """Pedidos dele de 14/11/2026 para a parte Brasil."""
+    # concessões: contribuições em 12 meses, livre e direcionado num cartão só, PF e PJ
+    for novo, quem, livre, direc in (("credito-concessoes-pf-contribuicoes", "pessoas físicas",
+                                      "credito-concessoes-tab11", "credito-concessoes-tab13"),
+                                     ("credito-concessoes-pj-contribuicoes", "pessoas jurídicas",
+                                      "credito-concessoes-tab10", "credito-concessoes-tab12")):
+        gl, gd = brasil.pop(livre), brasil.pop(direc)
+        brasil[novo] = dict({k: v for k, v in gl.items() if k != "series"}, id=novo,
+                            titulo="Concessões de crédito a %s: contribuições em 12 meses" % quem,
+                            variantes=[dict(rot="Livre", series=gl["series"]),
+                                       dict(rot="Direcionado", series=gd["series"])])
     # recorte desde jan/2023, ao lado da série inteira
     for gid in DESDE_2023:
         g = brasil[gid]
@@ -1701,7 +1713,7 @@ def graficos_fiscal_brasil():
 
 BRASIL = [("Atividade", "pmc-pms-trimestre"), ("", "pms-volume-inflacao-tri"), ("", "pib-familias-4tri"),
           ("", "pib-participacao"),
-          ("Crédito", "credito-direcionado-livre"), ("", "credito-juros-selic"), ("", "credito-poupanca-moeda"), ("", "credito-concessoes-pf-pj"), ("", "credito-inadimplencia"), ("", "credito-capital-giro-prazo"), ("", "credito-ptc-motivos-empresas"),
+          ("Crédito", "credito-direcionado-livre"), ("", "credito-juros-selic"), ("", "credito-poupanca-moeda"), ("", "credito-concessoes-pf-pj"), ("", "credito-concessoes-pf-contribuicoes"), ("", "credito-concessoes-pj-contribuicoes"), ("", "credito-inadimplencia"), ("", "credito-capital-giro-prazo"), ("", "credito-ptc-motivos-empresas"),
           ("Confiança", "confianca"),
           ("Emprego", "desemprego"), ("", "participacao"), ("", "rendimento-produtividade"), ("", "br-caged-setembro"),
           ("Inflação", "contribuicao-ipca-grupos"), ("", "ipca-distancia-meta"), ("", "ipca-alimentacao-contribuicao"),
