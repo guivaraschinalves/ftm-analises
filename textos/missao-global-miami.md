@@ -23,10 +23,6 @@ parte: Cenário econômico brasileiro
 
 ##
 
-##
-
-##
-
 ## Confiança
 
 ## Emprego
