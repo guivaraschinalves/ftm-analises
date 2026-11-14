@@ -658,6 +658,8 @@ def ajustes_brasil(brasil):
             raise RuntimeError("%s já tem recortes; o desde jan/2023 precisa de outro jeito" % gid)
         recente = [dict(x, dados=[p for p in x["dados"] if p[0] >= "2023-01"]) for x in g["series"]]
         g["variantes"] = [dict(rot="Série inteira", series=g.pop("series")), dict(rot="Desde jan/2023", series=recente)]
+    # serviços desde jan/2023: o eixo começa em 4% (pedido dele)
+    brasil["servicos"]["variantes"][1]["eixo"] = {"min": 4}
     # PIB: componentes como está; o segundo recorte vira FBCF e governo
     pp = brasil["pib-participacao"]
     comp = next(v for v in pp["variantes"] if v["rot"] == "Componentes")
