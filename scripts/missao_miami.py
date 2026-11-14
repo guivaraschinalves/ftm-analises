@@ -1454,7 +1454,10 @@ TIC_TABELA3 = "https://ticdata.treasury.gov/resource-center/data-chart-center/ti
 #   Tether: Financial Figures and Reserves Report (BDO), 30/09/2026, "U.S. Treasury Bills" = 122.839.738.995
 #   Circle: USDC Reserve Report (Deloitte), 30/09/2026, Treasuries do Circle Reserve Fund (25.361.578.416)
 #           + os fora do fundo (1.757.678.272); todos bills
-STABLECOINS_TESOURO = dict(data="2026-09", usdt=122.839738995, usdc=25.361578416 + 1.757678272)
+#   um ano antes (variação em 12 meses): Tether 30/09/2025, "U.S. Treasury Bills" = 112.417.034.272;
+#   Circle 30/09/2025, só no Circle Reserve Fund (nada fora dele) = 21.761.417.417
+STABLECOINS_TESOURO = dict(data="2026-09", usdt=122.839738995, usdc=25.361578416 + 1.757678272,
+                           usdt_antes=112.417034272, usdc_antes=21.761417417)
 PAISES_PT = {"Japan": "Japão", "United Kingdom": "Reino Unido", "China, Mainland": "China", "Belgium": "Bélgica",
              "Canada": "Canadá", "Cayman Islands": "Ilhas Cayman", "Luxembourg": "Luxemburgo", "France": "França",
              "Ireland": "Irlanda", "Taiwan": "Taiwan", "Switzerland": "Suíça", "Singapore": "Singapura",
@@ -1497,6 +1500,8 @@ def grafico_treasuries_stablecoins(n=20):
     nome_en = {PAISES_PT.get(p, p): p for p, _ in paises}
     var12 = [[str(k), round(it[1] - antes[nome_en[it[0]]], 1)] for k, it in enumerate(itens)
              if it[0] in nome_en and nome_en[it[0]] in antes]
+    var12.append([str(pos - 1), round(v_sc - sc["usdt_antes"] - sc["usdc_antes"], 1)])
+    var12.sort(key=lambda x: int(x[0]))
     maior = max(var12, key=lambda x: abs(x[1]))
     print("  maior variação em 12 meses: %s %+.0f bi" % (itens[int(maior[0])][0], maior[1]))
     return dict(id="treasuries-paises-stablecoins", unidade="usd-bi0", agrupadas=True, valores=True, barra=0.7,
@@ -1504,12 +1509,12 @@ def grafico_treasuries_stablecoins(n=20):
                 series=[dict(nome="Estoque", cor=AZUL, tipo="barra",
                              dados=[[str(k), it[1]] for k, it in enumerate(itens)],
                              cores={str(pos - 1): VERDE}),
-                        dict(nome="Variação em 12 meses (países)", cor=BRANCO, tipo="barra", dentro=True,
+                        dict(nome="Variação em 12 meses", cor=BRANCO, tipo="barra", dentro=True,
                              valores=True, dados=var12)],
                 titulo="Maiores detentores de títulos do Tesouro dos EUA e as stablecoins",
-                subtitulo="US$ bilhões em bills, notes e bonds; países: %s (TIC), barra branca = variação desde %s; "
-                          "USDT e USDC: %s, títulos detidos diretamente, sem compromissadas"
-                          % (cf.rot_mes(ult), cf.rot_mes(ano_antes), cf.rot_mes(sc["data"])),
+                subtitulo="US$ bilhões em bills, notes e bonds; barra branca = variação em 12 meses; países: %s "
+                          "(TIC); USDT e USDC: %s, títulos detidos diretamente, sem compromissadas"
+                          % (cf.rot_mes(ult), cf.rot_mes(sc["data"])),
                 fonte="Tesouro dos EUA (TIC, tabela 3), Tether (BDO), Circle (Deloitte) e FtM")
 
 
