@@ -1291,17 +1291,17 @@ def graficos_eua():
 MIDTERMS_IDS = ["midterms-historia-aprovacao", "midterms-resultado-camara", "midterms-resultado-senado",
                 "midterms-resultado-mapa-senado"]
 
-EUA = [("Atividade e emprego", "pib-eua-contribuicoes"), ("", "ism-pmi"), ("", "payroll-setores"), ("", "eua-payroll-breakeven"),
-       ("", "eua-u3-u6"), ("", "eua-participacao"),
-       ("Inteligência artificial", "pib-eua-investimento-ti"), ("", "construcao-datacenters-fabricas"),
-       ("", "datacenters-participacao"), ("", "ia-indices"), ("", "ia-vix"),
-       ("Bolsa", "sp500-pl"),
-       ("Crédito corporativo", "spreads-credito"), ("", "ia-divida"), ("", "ia-cds-bloomberg"), ("", "ia-cds-reuters"),
-       ("Inflação nos EUA", "cpi-cheio-nucleo"), ("", "cpi-componentes"), ("", "pce-nucleos"), ("", "pce-componentes"),
-       ("Fed", "fomc-comunicados"), ("", "treasuries-5-10-30"),
-       ("Déficit fiscal", "eua-deficit"), ("", "governo-receita-despesa"), ("", "despesa-contribuicao"), ("", "eua-divida-pib"), ("", "eua-divida-detentores"),
-       ("Midterms", "midterms-historia-aprovacao"), ("", "midterms-resultado-camara"),
-       ("", "midterms-resultado-senado"), ("", "midterms-resultado-mapa-senado")]
+EUA = [("Atividade nos EUA", "ism-pmi"), ("", "pib-eua-contribuicoes"), ("Inteligência artificial", "pib-eua-investimento-ti"),
+       ("", "construcao-datacenters-fabricas"), ("", "datacenters-participacao"), ("Crédito corporativo", "spreads-credito"),
+       ("", "treasuries-5-10-30"), ("", "ia-divida"), ("", "ia-cds-bloomberg"),
+       ("", "ia-cds-reuters"), ("Déficit fiscal", "eua-deficit"), ("", "governo-receita-despesa"),
+       ("", "despesa-contribuicao"), ("", "eua-divida-pib"), ("", "eua-divida-detentores"),
+       ("Midterms", "midterms-historia-aprovacao"), ("", "midterms-resultado-camara"), ("", "midterms-resultado-senado"),
+       ("", "midterms-resultado-mapa-senado"), ("", "ia-indices"), ("", "ia-vix"),
+       ("Mercado de trabalho", "payroll-setores"), ("", "eua-payroll-breakeven"), ("", "eua-u3-u6"),
+       ("", "eua-participacao"), ("Inflação nos EUA", "cpi-cheio-nucleo"), ("", "cpi-componentes"),
+       ("", "pce-nucleos"), ("", "pce-componentes"), ("Fed", "fomc-comunicados"),
+       ("Bolsa", "sp500-pl")]
 PARTE_EUA = "Cenário econômico dos EUA"
 
 

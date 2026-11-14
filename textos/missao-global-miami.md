@@ -189,16 +189,8 @@ Desde 1999 foram 8 ciclos de alta e 10 de corte, contando o atual. Os de corte j
 
 O comunicado de novembro muda o tom. Ele diz que a atividade mostra "uma moderação mais acentuada", contra "moderação gradual" em setembro, e que o mercado de trabalho tem "sinais de desaquecimento na margem". Incorpora também os "choques de oferta materializados" (gasolina subiu um pouco; o diesel segue defasado). E entra um parágrafo novo: Selic "substancialmente contracionista", incertezas maiores, expectativas mais altas e desaceleração mais forte formam "um cenário desafiador", que exige "serenidade e cautela".
 
-## Atividade e emprego
+## Atividade nos EUA
 parte: Cenário econômico dos EUA
-
-##
-
-##
-
-##
-
-##
 
 ##
 
@@ -208,12 +200,6 @@ parte: Cenário econômico dos EUA
 
 ##
 
-##
-
-##
-
-## Bolsa
-
 ## Crédito corporativo
 
 ##
@@ -221,16 +207,6 @@ parte: Cenário econômico dos EUA
 ##
 
 ##
-
-## Inflação nos EUA
-
-##
-
-##
-
-##
-
-## Fed
 
 ##
 
@@ -251,6 +227,30 @@ parte: Cenário econômico dos EUA
 ##
 
 ##
+
+##
+
+##
+
+## Mercado de trabalho
+
+##
+
+##
+
+##
+
+## Inflação nos EUA
+
+##
+
+##
+
+##
+
+## Fed
+
+## Bolsa
 
 ## Juros longos no G7
 parte: Juros no mundo
