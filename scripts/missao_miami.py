@@ -747,7 +747,8 @@ CICLO = [("Atividade", "atividade-12m"), ("", "atividade-nivel"), ("", "pms-infl
 
 COPIAS_RESTO = [
     ("dados/ipca.json", ["ipca-distancia-meta", "ipca-mensal-focus", "ipca-alimentacao-contribuicao",
-                         "ipca-alimentacao-itens", "administrados-livres", "ipca-difusao-grupos"]),
+                         "ipca-alimentacao-itens", "administrados-livres", "ipca-difusao-grupos",
+                         "ipca-projecoes-focus"]),
     ("dados/divida.json", ["divida-composicao", "divida-detentores"]),
     ("dados/bp.json", ["bp-12m", "bp-cc-12m", "bp-reservas-composicao", "bp-reservas-divida", "bp-reservas-moeda",
                        "bp-necessidade-curto-prazo", "bp-carteira-dom-3m", "bp-criptos-12m"]),
@@ -846,6 +847,8 @@ def graficos_copiados_resto():
             g["fonte"] = g.get("fonte") or FONTES_RESTO.get(i, "FtM")
             if i == "ipca-difusao-grupos":
                 g = so_difusao(g)
+            if i == "ipca-projecoes-focus":     # só as linhas: o app daqui não desenha velas
+                g.pop("variantes", None)
             out.append(g)
     for arq, ids in COPIAS_LOCAIS:
         for g in cn.copiar(arq, ids):
@@ -1718,7 +1721,7 @@ BRASIL = [("Atividade", "pmc-pms-trimestre"), ("", "pms-volume-inflacao-tri"), (
           ("Crédito", "credito-direcionado-livre"), ("", "credito-juros-selic"), ("", "credito-poupanca-moeda"), ("", "credito-concessoes-pf-pj"), ("", "credito-concessoes-pf-contribuicoes"), ("", "credito-concessoes-pj-contribuicoes"), ("", "credito-inadimplencia"), ("", "credito-capital-giro-prazo"), ("", "credito-ptc-motivos-empresas"),
           ("Confiança", "confianca"),
           ("Emprego", "desemprego"), ("", "participacao"), ("", "br-caged-setembro"),
-          ("Inflação", "contribuicao-ipca-grupos"), ("", "ipca-distancia-meta"), ("", "ipca-alimentacao-contribuicao"),
+          ("Inflação", "contribuicao-ipca-grupos"), ("", "ipca-projecoes-focus"), ("", "ipca-distancia-meta"), ("", "ipca-alimentacao-contribuicao"),
           ("", "ipca-alimentacao-itens"), ("", "ipca-difusao-grupos"), ("", "servicos"),
           ("", "administrados-livres"),
           ("Fiscal", "resultado-primario"), ("", "receita-rfb-pib"), ("", "despesa-juros-pib"), ("", "divida-duas-metodologias"),
