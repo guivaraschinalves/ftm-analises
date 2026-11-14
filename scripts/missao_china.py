@@ -393,7 +393,7 @@ CHINA = [("Déficit externo dos EUA", "eua-cc-pib"), ("", "eua-bp-pib"), ("", "e
          ("", "china-cc"),
          ("Balanço de pagamentos dos EUA", "eua-cc-componentes"), ("", "eua-bp"), ("", "eua-conta-financeira"),
          ("", "eua-comercio-paises"),
-         ("Dólar e tarifas", "dxy"), ("", "eua-tarifa-efetiva"),
+         ("Dólar e tarifas", "miran-conclusao"), ("", "dxy"), ("", "eua-tarifa-efetiva"),
          ("Ouro nas reservas", "reservas-ouro-tesouros")]      # copiado do ftm-dados (reservas.json)
 PARTE_CHINA = "China e desequilíbrios globais"
 
@@ -401,5 +401,14 @@ PARTE_CHINA = "China e desequilíbrios globais"
 def graficos():
     pib = bea("GDP")
     out = list(graficos_eua_externo(pib)) + list(graficos_bp_eua(pib)) + list(graficos_china())
-    out += [grafico_comercio_paises(), grafico_dxy(), grafico_tarifa()]
+    out += [grafico_comercio_paises(), FIGURA_MIRAN, grafico_dxy(), grafico_tarifa()]
     return out
+
+
+# trecho da conclusão do ensaio de Stephen Miran (nov/2024), como imagem
+FIGURA_MIRAN = dict(id="miran-conclusao", tipo="figura", imagem="assets/missao/miran-conclusao.jpg",
+                    titulo="A User's Guide to Restructuring the Global Trading System: conclusão",
+                    subtitulo="Stephen Miran, Hudson Bay Capital, novembro de 2024",
+                    fonte="Hudson Bay Capital",
+                    link="https://www.hudsonbaycapital.com/documents/a-users-guide-to-restructuring-the-global-trading-system",
+                    rotuloLink="Ver o ensaio")

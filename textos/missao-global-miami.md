@@ -192,6 +192,8 @@ parte: China e desequilíbrios globais
 
 ##
 
+##
+
 ## Ouro nas reservas
 
 ## Bitcoin
