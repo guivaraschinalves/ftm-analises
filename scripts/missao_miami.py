@@ -1715,7 +1715,7 @@ BRASIL = [("Atividade", "pmc-pms-trimestre"), ("", "pms-volume-inflacao-tri"), (
           ("", "pib-participacao"),
           ("Crédito", "credito-direcionado-livre"), ("", "credito-juros-selic"), ("", "credito-poupanca-moeda"), ("", "credito-concessoes-pf-pj"), ("", "credito-concessoes-pf-contribuicoes"), ("", "credito-concessoes-pj-contribuicoes"), ("", "credito-inadimplencia"), ("", "credito-capital-giro-prazo"), ("", "credito-ptc-motivos-empresas"),
           ("Confiança", "confianca"),
-          ("Emprego", "desemprego"), ("", "participacao"), ("", "rendimento-produtividade"), ("", "br-caged-setembro"),
+          ("Emprego", "desemprego"), ("", "participacao"), ("", "br-caged-setembro"),
           ("Inflação", "contribuicao-ipca-grupos"), ("", "ipca-distancia-meta"), ("", "ipca-alimentacao-contribuicao"),
           ("", "ipca-alimentacao-itens"), ("", "ipca-difusao-grupos"), ("", "servicos"),
           ("", "administrados-livres"),
@@ -1904,7 +1904,6 @@ def main():
                                    cn.graficos_copom)
               for g in f()}
     brasil.update({g_rec["id"]: g_rec, g_ciclos["id"]: g_ciclos})
-    brasil["rendimento-produtividade"] = grafico_rendimento()
     ajustes_brasil(brasil)
     import missao_fiscal
     brasil.update({g["id"]: g for g in missao_fiscal.graficos()})
