@@ -39,7 +39,7 @@ Para os bancos, a demanda das grandes empresas vem do capital de giro (+0,62 num
 
 ##
 
-Nas famílias, o crédito livre cresce 10% em 12 meses, e quase 7 pontos disso vêm do cartão à vista. No direcionado, o imobiliário acelera e contribui com 9,7 pontos, talvez pela queda recente dos juros. O rural recua e tira 6 pontos.
+Nas famílias, o crédito livre cresce 10% em 12 meses, e quase 7 pontos disso vêm do cartão à vista. O consignado também volta a puxar: contribui com 1,2 ponto, contra −0,4 em agosto de 2025, com o empurrão do governo ao consignado para trabalhadores do setor privado (Crédito do Trabalhador, lançado em março de 2025). No direcionado, o imobiliário acelera e contribui com 9,7 pontos, talvez pela queda recente dos juros. O rural recua e tira 6 pontos.
 
 ##
 
