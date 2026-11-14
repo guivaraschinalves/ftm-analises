@@ -1718,7 +1718,7 @@ def graficos_fiscal_brasil():
 
 BRASIL = [("Atividade", "pmc-pms-trimestre"), ("", "pms-volume-inflacao-tri"), ("", "pib-familias-4tri"),
           ("", "pib-participacao"),
-          ("Crédito", "credito-direcionado-livre"), ("", "credito-juros-selic"), ("", "credito-poupanca-moeda"), ("", "credito-concessoes-pf-pj"), ("", "credito-concessoes-pf-contribuicoes"), ("", "credito-concessoes-pj-contribuicoes"), ("", "credito-inadimplencia"), ("", "credito-capital-giro-prazo"), ("", "credito-ptc-motivos-empresas"),
+          ("Crédito", "credito-poupanca-moeda"), ("", "credito-concessoes-pf-pj"), ("", "credito-concessoes-pj-contribuicoes"), ("", "credito-capital-giro-prazo"), ("", "credito-ptc-motivos-empresas"), ("", "credito-concessoes-pf-contribuicoes"), ("", "credito-inadimplencia"), ("", "credito-juros-selic"), ("", "credito-direcionado-livre"),
           ("Confiança", "confianca"),
           ("Emprego", "desemprego"), ("", "participacao"), ("", "br-caged-setembro"),
           ("Inflação", "contribuicao-ipca-grupos"), ("", "ipca-projecoes-focus"), ("", "ipca-distancia-meta"), ("", "ipca-alimentacao-contribuicao"),

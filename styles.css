@@ -257,6 +257,8 @@ ul.artigo-texto ul li { margin: 0 0 4px; }
 /* ---------- mudar os gráficos de lugar (assuntos com "reordenar") ---------- */
 .ordem-controles { display: flex; gap: 8px; align-items: center; justify-content: flex-end; margin: 0 0 -18px; }
 .ordem-controles .btn { padding: 4px 10px; font-size: 13px; }
+/* seção sem título: o texto começa logo abaixo, então os botões não sobem sobre ele */
+.ordem-controles + .artigo-texto { margin-top: 30px; }
 .ordem-alca {
   cursor: grab; user-select: none; padding: 4px 10px; font-size: 13px; color: var(--ink-2);
   border: 1px dashed var(--border); border-radius: 8px; touch-action: none;
