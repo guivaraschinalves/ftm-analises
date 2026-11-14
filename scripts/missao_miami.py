@@ -1444,12 +1444,61 @@ def graficos_cripto_bp():
 
 AMARELO_BTC = "#FFFF00"
 CRIPTO = [("Bitcoin", "btc-preco"), ("", "ouro-preco"), ("", "btc-mvrv"), ("", "btc-mayer"), ("", "btc-ouro"),
-          ("Stablecoins", "stablecoins-total"), ("", "stablecoins-emissores")]
+          ("Stablecoins", "stablecoins-total"), ("", "stablecoins-emissores"), ("", "treasuries-paises-stablecoins")]
 PARTE_CRIPTO = "Bitcoin e stablecoins"
 
 
+TIC_TABELA3 = "https://ticdata.treasury.gov/resource-center/data-chart-center/tic/Documents/slt_table3.txt"
+# Títulos do Tesouro dos EUA (bills, notes e bonds) que as emissoras detêm diretamente, na última divulgação
+# de cada uma. Fora: compromissadas (o Treasury é só a garantia) e caixa. Atualizar à mão quando sair a nova.
+#   Tether: Financial Figures and Reserves Report (BDO), 30/09/2026, "U.S. Treasury Bills" = 122.839.738.995
+#   Circle: USDC Reserve Report (Deloitte), 30/09/2026, Treasuries do Circle Reserve Fund (25.361.578.416)
+#           + os fora do fundo (1.757.678.272); todos bills
+STABLECOINS_TESOURO = dict(data="2026-09", usdt=122.839738995, usdc=25.361578416 + 1.757678272)
+PAISES_PT = {"Japan": "Japão", "United Kingdom": "Reino Unido", "China, Mainland": "China", "Belgium": "Bélgica",
+             "Canada": "Canadá", "Cayman Islands": "Ilhas Cayman", "Luxembourg": "Luxemburgo", "France": "França",
+             "Ireland": "Irlanda", "Taiwan": "Taiwan", "Switzerland": "Suíça", "Singapore": "Singapura",
+             "Hong Kong": "Hong Kong", "India": "Índia", "Norway": "Noruega", "Brazil": "Brasil",
+             "Saudi Arabia": "Arábia Saudita", "Korea, South": "Coreia do Sul",
+             "United Arab Emirates": "Emirados Árabes", "Bermuda": "Bermudas", "Israel": "Israel",
+             "Mexico": "México", "Germany": "Alemanha", "British Virgin Islands": "Ilhas Virgens Britânicas",
+             "Spain": "Espanha", "Thailand": "Tailândia", "Australia": "Austrália", "Kuwait": "Kuwait"}
+
+
+def grafico_treasuries_stablecoins(n=20):
+    """Os maiores detentores estrangeiros de títulos do Tesouro dos EUA (TIC,
+    tabela 3 do SLT, todos os países) e, no meio deles, o que a Tether e a
+    Circle têm em Treasuries."""
+    import csv
+    import io
+    import re
+    txt = cf.baixar(TIC_TABELA3, headers=SIDRA_UA).decode("latin-1")
+    linhas = [r for r in csv.reader(io.StringIO(txt), delimiter="\t") if len(r) > 3]
+    datas = sorted({r[2] for r in linhas if re.match(r"\d{4}-\d{2}$", r[2])})
+    ult = datas[-1]
+    fora = ("Total", "Memo", "Of Which", "All Countries", "Grand Total", "International", "Country")
+    paises = [(r[0], float(r[3]) / 1000) for r in linhas
+              if r[2] == ult and r[3].lstrip("-").isdigit() and not r[0].startswith(fora)]
+    paises = sorted(paises, key=lambda x: -x[1])[:n]
+    if not paises or paises[0][0] != "Japan" and paises[0][1] < 500:
+        raise RuntimeError("TIC: lista de países estranha (%s)" % paises[:3])
+    sc = STABLECOINS_TESOURO
+    v_sc = sc["usdt"] + sc["usdc"]
+    itens = [[PAISES_PT.get(p, p), round(v, 1), AZUL] for p, v in paises]
+    itens.append(["USDT + USDC", round(v_sc, 1), VERDE, True])
+    itens.sort(key=lambda it: -it[1])
+    pos = next(k for k, it in enumerate(itens) if it[0] == "USDT + USDC") + 1
+    print("  Treasuries: TIC %s (%s US$ %.0f bi); USDT+USDC %s US$ %.1f bi (USDT %.1f, USDC %.1f), %dº lugar"
+          % (ult, paises[0][0], paises[0][1], sc["data"], v_sc, sc["usdt"], sc["usdc"], pos))
+    return dict(id="treasuries-paises-stablecoins", tipo="ranking", unidade="usd-bi",
+                titulo="Maiores detentores de títulos do Tesouro dos EUA e as stablecoins",
+                subtitulo="US$ bilhões em bills, notes e bonds; países: %s (TIC); USDT e USDC: %s, títulos detidos "
+                          "diretamente, sem compromissadas" % (cf.rot_mes(ult), cf.rot_mes(sc["data"])),
+                fonte="Tesouro dos EUA (TIC, tabela 3), Tether (BDO), Circle (Deloitte) e FtM", itens=itens)
+
+
 def graficos_cripto():
-    return graficos_bitcoin() + graficos_stablecoins()
+    return graficos_bitcoin() + graficos_stablecoins() + [grafico_treasuries_stablecoins()]
 
 
 # ================================================================ parte Brasil enxuta
