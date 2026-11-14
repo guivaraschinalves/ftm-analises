@@ -605,6 +605,34 @@ def graficos_trabalho_ponte():
     return [g_ae, g_prod]
 
 
+def grafico_rendimento():
+    """A frase da ata do Copom: o rendimento médio desacelerou na margem, mesmo
+    nominal, mas o real ainda cresce acima da produtividade. Os dois primeiros
+    recortes são variações que o IBGE publica na tabela 6390 (trimestre móvel
+    contra o trimestre móvel imediatamente anterior, sem sobreposição, e contra
+    o mesmo do ano anterior); o terceiro é o rendimento real contra a
+    produtividade (PIB real ÷ ocupados) em 4 trimestres."""
+    var = {}
+    for l in sidra("t/6390/n1/all/v/8821,8832,8826,8837/p/all"):
+        var.setdefault(l["D2C"], {})[mes(l["D3C"])] = l["v"]
+    prod = next(g for g in graficos_trabalho_ponte() if g["id"] == "rendimento-produtividade")
+    u = max(var["8821"])
+    print("  rendimento %s: na margem nominal %.1f%%, real %.1f%%; em 12 meses nominal %.1f%%, real %.1f%%"
+          % (u, var["8821"][u], var["8832"][u], var["8826"][u], var["8837"][u]))
+    def par(cn_, cr):
+        return [cf.serie("Nominal", AZUL, var[cn_], 1, largura=4, rotulo=True),
+                cf.serie("Real", VERMELHO, var[cr], 1, largura=5, rotulo=True)]
+    return dict(id="rendimento-produtividade", titulo="Rendimento médio do trabalho e produtividade",
+                subtitulo="Rendimento médio habitual das pessoas ocupadas (PNAD), em %; produtividade = PIB real "
+                          "÷ pessoas ocupadas", unidade="pct1",
+                fonte="IBGE (PNAD Contínua, tabela 6390, e Contas Nacionais Trimestrais) e FtM", variantes=[
+                    dict(rot="Na margem: contra o trimestre móvel anterior", series=par("8821", "8832")),
+                    dict(rot="Contra o mesmo trimestre do ano anterior", series=par("8826", "8837")),
+                    dict(rot="Real contra a produtividade, em 4 trimestres", buracoMax=3,
+                         series=[dict(x, nome="Rendimento médio real" if "endimento" in x["nome"] else x["nome"])
+                                 for x in prod["series"]])])
+
+
 def graficos_emprego():
     """Taxa de desemprego e taxa de participação (PNAD, trimestre móvel) e o
     Caged de setembro de cada ano (o do Relatório de Novembro)."""
@@ -1506,7 +1534,7 @@ BRASIL = [("Atividade", "pmc-pms-trimestre"), ("", "pms-volume-inflacao-tri"), (
           ("", "pib-participacao"),
           ("Crédito", "credito-direcionado-livre"), ("", "credito-ampliado-contribuicoes-empresas"), ("", "credito-juros-selic"), ("", "credito-controle-razao"), ("", "credito-poupanca-moeda"), ("", "credito-concessoes-pf-pj"), ("", "credito-inadimplencia"), ("", "credito-capital-giro-prazo"), ("", "credito-ptc-motivos-empresas"),
           ("Confiança", "confianca"),
-          ("Emprego", "desemprego"), ("", "participacao"), ("", "br-caged-setembro"),
+          ("Emprego", "desemprego"), ("", "participacao"), ("", "rendimento-produtividade"), ("", "br-caged-setembro"),
           ("Inflação", "ipca-mensal-focus"), ("", "ipca-distancia-meta"), ("", "ipca-alimentacao-contribuicao"),
           ("", "ipca-alimentacao-itens"), ("", "ipca-difusao-grupos"), ("", "servicos"),
           ("", "administrados-livres"),
@@ -1695,6 +1723,7 @@ def main():
                                    cn.graficos_copom)
               for g in f()}
     brasil.update({g_rec["id"]: g_rec, g_ciclos["id"]: g_ciclos})
+    brasil["rendimento-produtividade"] = grafico_rendimento()
     import missao_fiscal
     brasil.update({g["id"]: g for g in missao_fiscal.graficos()})
     faltam = [gid for _, gid in BRASIL if gid not in brasil]
