@@ -209,7 +209,8 @@ SUB_RECESSAO = "faixas cinza = recessões (NBER)"
 
 # ================================================================ inflação
 
-def graficos_inflacao():
+def graficos_inflacao(com_ppi=True):
+    """com_ppi=False: sem a tabela do PPI (a única coisa que usa a API do BLS, que tem cota diária)."""
     rec = recessoes()
     cheio, nucleo = var(fred("CPIAUCNS")), var(fred("CPILFENS"))
     g1 = dict(id="cpi-cheio-nucleo", titulo="Inflação ao consumidor (CPI): cheio e núcleo",
@@ -229,7 +230,7 @@ def graficos_inflacao():
                   dict(rot="Diferença, CPI menos PCE, p.p.", unidade="pp", series=[
                       serie("CPI menos PCE", AZUL, desde(comum, "1960-01"), tipo="barra", legenda=False)]),
               ])
-    return [g1] + graficos_frbsf() + [graficos_frbsf_pce(), g4, tabela_ppi()]
+    return [g1] + graficos_frbsf() + [graficos_frbsf_pce(), g4] + ([tabela_ppi()] if com_ppi else [])
 
 
 # ---- contribuições por componente: Fed de San Francisco

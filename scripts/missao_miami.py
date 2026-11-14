@@ -1104,6 +1104,48 @@ def grafico_pl_sp500():
                         cf.serie("Projetado (FactSet)", AZUL, proj, 1, largura=4, rotulo=True)])])
 
 
+def graficos_divida_eua():
+    """Dívida federal dos EUA em % do PIB e quem a detém (FRED: Tesouro, Fed e
+    BEA). Detentores: Fed (FDHBFRBN), estrangeiros (FDHBFIN), governo =
+    dívida total menos a em poder do público (fundos e agências federais), e
+    o resto do público (bancos, fundos, famílias, estados) por diferença."""
+    bruta, publico = cf.fred("GFDEGDQ188S"), cf.fred("FYGFGDQ188S")
+    q = lambda d: {"%s-%02d" % (k[:4], int(k[5:7]) + 2): v for k, v in d.items()}   # noqa: E731
+    bruta, publico = q(bruta), q(publico)
+    u = max(bruta)
+    print("  dívida dos EUA %s: bruta %.0f%% do PIB, em poder do público %.0f%%" % (u, bruta[u], publico[u]))
+    g_pib = dict(id="eua-divida-pib", titulo="Dívida federal dos EUA em % do PIB",
+                 subtitulo="Fim de trimestre, em %% do PIB; %s: dívida bruta %s%%, em poder do público %s%%"
+                           % (cf.rot_mes(u), cf.br(bruta[u], 0), cf.br(publico[u], 0)),
+                 unidade="%", buracoMax=3, fonte="Tesouro dos EUA e BEA via FRED (GFDEGDQ188S e FYGFGDQ188S) e FtM",
+                 series=[cf.serie("Dívida bruta (inclui a dos fundos do governo)", BRANCO, bruta, 1, largura=5,
+                                  rotulo=True),
+                         cf.serie("Em poder do público", AZUL, publico, 1, largura=5, rotulo=True)])
+    tot, pub = q(cf.fred("GFDEBTN")), q(cf.fred("FYGFDPUN"))
+    fed, ext = q(cf.fred("FDHBFRBN")), q(cf.fred("FDHBFIN"))
+    ks = sorted(k for k in tot if k in pub and k in fed and k in ext)
+    partes = {"Fed": {k: fed[k] / 1000 for k in ks}, "Estrangeiros": {k: ext[k] / 1000 for k in ks},
+              "Governo (fundos e agências federais)": {k: (tot[k] - pub[k]) / 1e6 for k in ks}}
+    partes["Demais investidores nos EUA"] = {k: tot[k] / 1e6 - sum(p[k] for p in partes.values()) for k in ks}
+    cores = {"Demais investidores nos EUA": AZUL, "Estrangeiros": VERMELHO, "Fed": VERDE,
+             "Governo (fundos e agências federais)": CINZA}   # azul-escuro some no fundo da Missão
+    ordem = ["Demais investidores nos EUA", "Estrangeiros", "Fed", "Governo (fundos e agências federais)"]
+    u = ks[-1]
+    pct = {n: {k: 100 * v / (tot[k] / 1e6) for k, v in d.items()} for n, d in partes.items()}
+    print("  detentores %s: %s" % (u, ", ".join("%s %.0f%%" % (n, pct[n][u]) for n in ordem)))
+    g_det = dict(id="eua-divida-detentores", titulo="Detentores da dívida federal dos EUA",
+                 subtitulo="Fim de trimestre; demais investidores nos EUA por diferença (bancos, fundos, famílias, "
+                           "estados); %s: estrangeiros %s%%, Fed %s%%"
+                           % (cf.rot_mes(u), cf.br(pct["Estrangeiros"][u], 0), cf.br(pct["Fed"][u], 0)),
+                 unidade="%", barra=3, buracoMax=3,
+                 fonte="Tesouro dos EUA e Federal Reserve via FRED (GFDEBTN, FYGFDPUN, FDHBFRBN e FDHBFIN) e FtM",
+                 variantes=[
+                     dict(rot="% do total", series=[cf.serie(n, cores[n], pct[n], 1, tipo="barra") for n in ordem]),
+                     dict(rot="US$ trilhões", unidade="usd-tri",
+                          series=[cf.serie(n, cores[n], partes[n], 2, tipo="barra") for n in ordem])])
+    return [g_pib, g_det]
+
+
 def grafico_deficit_eua():
     """Resultado do governo federal americano: Monthly Treasury Statement
     (FRED MTSDS133FMS, US$ milhões no mês) somado em 12 meses, em % do PIB
@@ -1144,7 +1186,7 @@ def graficos_eua():
     out += cn.graficos_ftm_dados_eua().get("pib") and [cn.graficos_ftm_dados_eua()["pib"]] or []
     out += cn.graficos_ia()
     out.append(cf.dissidentes_fomc())
-    out += cf.graficos_inflacao()
+    out += cf.graficos_inflacao(com_ppi=False)
     out += cf.graficos_trabalho()
     out += cf.graficos_governo()
     out += cf.graficos_credito()
@@ -1183,15 +1225,15 @@ def graficos_eua():
 MIDTERMS_IDS = ["midterms-historia-aprovacao", "midterms-resultado-camara", "midterms-resultado-senado",
                 "midterms-resultado-mapa-senado"]
 
-EUA = [("Atividade e emprego", "pib-eua-contribuicoes"), ("", "ism-pmi"), ("", "payroll-setores"),
+EUA = [("Atividade e emprego", "pib-eua-contribuicoes"), ("", "ism-pmi"), ("", "payroll-setores"), ("", "eua-payroll-breakeven"),
        ("", "eua-u3-u6"), ("", "eua-participacao"),
        ("Inteligência artificial", "pib-eua-investimento-ti"), ("", "construcao-datacenters-fabricas"),
        ("", "datacenters-participacao"), ("", "ia-indices"), ("", "ia-vix"),
        ("Bolsa", "sp500-pl"),
        ("Crédito corporativo", "spreads-credito"), ("", "ia-divida"), ("", "ia-cds-bloomberg"), ("", "ia-cds-reuters"),
        ("Inflação nos EUA", "cpi-cheio-nucleo"), ("", "cpi-componentes"), ("", "pce-nucleos"), ("", "pce-componentes"),
-       ("Fed", "fomc-comunicados"), ("", "fomc-dissidentes"), ("", "treasuries-5-10-30"),
-       ("Déficit fiscal", "eua-deficit"), ("", "governo-receita-despesa"), ("", "despesa-contribuicao"),
+       ("Fed", "fomc-comunicados"), ("", "treasuries-5-10-30"),
+       ("Déficit fiscal", "eua-deficit"), ("", "governo-receita-despesa"), ("", "despesa-contribuicao"), ("", "eua-divida-pib"), ("", "eua-divida-detentores"),
        ("Midterms", "midterms-historia-aprovacao"), ("", "midterms-resultado-camara"),
        ("", "midterms-resultado-senado"), ("", "midterms-resultado-mapa-senado")]
 PARTE_EUA = "Cenário econômico dos EUA"
@@ -1731,6 +1773,22 @@ def main():
         raise RuntimeError("gráficos do Brasil que ninguém gerou: %s" % faltam)
     secoes = [dict(titulo=titulo, texto="", fontes=[], figuras=[], graficos=[brasil[gid]]) for titulo, gid in BRASIL]
     eua = {g["id"]: g for g in graficos_eua()}
+    for g in graficos_divida_eua():
+        eua[g["id"]] = g
+    pb = graficos_ftm_dados("dados/trabalho-eua.json")["eua-payroll-breakeven"]
+    eua["eua-payroll-breakeven"] = adaptar(json.loads(json.dumps(pb)))
+    # PCE: sem a mediana do CPI de Cleveland (pedido dele)
+    pce = eua["pce-nucleos"]
+    for grupo in [pce] + pce.get("variantes", []):
+        if "series" in grupo:
+            grupo["series"] = [x for x in grupo["series"] if "Cleveland" not in x["nome"]]
+    # PIB: a série inteira do ftm-dados (desde 1947), no eixo de tempo, e não as categorias desde 2021
+    pe = adaptar(json.loads(json.dumps(graficos_ftm_dados("dados/pib-eua.json")["pib-eua-contribuicoes"])))
+    for k in ("periodoPadrao", "selecao"):
+        pe.pop(k, None)
+    pe.update(barra=3, fonte=pe.get("fonte") or eua["pib-eua-contribuicoes"]["fonte"],
+              subtitulo=pe["subtitulo"] + "; desde 1947; arraste no gráfico para escolher o período")
+    eua["pib-eua-contribuicoes"] = pe
     # desemprego só com o U-3 (sem os recortes do U-6); a participação é a da Wealth (cenário de novembro)
     u = eua["eua-u3-u6"]
     u3 = [x for x in u["variantes"][0]["series"] if "U-3" in x["nome"]]

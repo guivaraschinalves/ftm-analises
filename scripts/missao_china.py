@@ -31,6 +31,8 @@ import cenario_fomc as cf
 AZUL, VERMELHO, VERDE = "#4F81BD", "#C0504D", "#9BBB59"
 AZUL_ESCURO, AZUL_CLARO, VINHO, AMARELO = "#1F497D", "#8EB4E3", "#632523", "#FFFF00"
 CINZA, CINZA_ESCURO = "#8a8a86", "#5c5c59"
+# reservas: só a borda laranja, sem preenchimento, como no BP do Brasil no ftm-dados (pedido dele)
+LARANJA = "#F79646"
 BRANCO = cf.BRANCO
 UA = {"User-Agent": "Mozilla/5.0 (ftm-analises)"}
 
@@ -195,7 +197,7 @@ def graficos_bp_eua(pib):
     print("  BP dos EUA em 4 tri %s: CC %.1f%%, financeira %.1f%%, erros %.1f%% do PIB"
           % (u, pct["cc"][u], pct["financeira"][u], pct["erros"][u]))
     nomes = [("cc", "Conta corrente", AZUL), ("capital", "Conta capital", AMARELO),
-             ("financeira", "Conta financeira", VERDE), ("reservas", "Reservas internacionais", CINZA),
+             ("financeira", "Conta financeira", VERDE), ("reservas", "Reservas internacionais", LARANJA),
              ("erros", "Erros e omissões", VERMELHO)]
     g_pct = dict(id="eua-bp-pib", titulo="Balanço de pagamentos dos EUA em % do PIB",
                  subtitulo="Acumulado em 4 trimestres, em %% do PIB, desde 1973; conta financeira sem as "
@@ -203,13 +205,13 @@ def graficos_bp_eua(pib):
                            % (rot_tri(u), cf.br(pct["cc"][u], 1), cf.br(pct["financeira"][u], 1)),
                  unidade="%", barra=3, buracoMax=3,
                  fonte="BEA (desde 1999) e FMI (Balance of Payments, antes) via FRED e DBnomics; FtM",
-                 series=[barras(n, c, pct[k], 2, rotulo=k in ("cc", "financeira", "erros")) for k, n, c in nomes])
+                 series=[barras(n, c, pct[k], 2, rotulo=k in ("cc", "financeira", "erros"), contorno=k == "reservas") for k, n, c in nomes])
     bi = {c: {k: v / 1000 for k, v in d.items() if k >= "1999-12"} for c, d in q.items()}
     g_bi = dict(id="eua-bp", titulo="Balanço de pagamentos dos EUA",
                 subtitulo="US$ bilhões, acumulado em 4 trimestres, desde 1999; %s: conta corrente US$ %s bi, "
                           "financeira US$ %s bi" % (rot_tri(u), cf.br(bi["cc"][u], 0), cf.br(bi["financeira"][u], 0)),
                 unidade="usd-bi", barra=3, buracoMax=3, fonte=FONTE_BEA,
-                series=[barras(n, c, bi[k], 1, rotulo=k in ("cc", "financeira", "erros")) for k, n, c in nomes])
+                series=[barras(n, c, bi[k], 1, rotulo=k in ("cc", "financeira", "erros"), contorno=k == "reservas") for k, n, c in nomes])
     # conta corrente por componente
     comp = [("Balança comercial (bens)", AZUL, "IEABCG"), ("Serviços", VERMELHO, "IEABCS"),
             ("Renda primária", VERDE, "IEABCPI"), ("Renda secundária", AZUL_ESCURO, "IEABCSI")]
@@ -294,7 +296,7 @@ def graficos_china():
     print("  BP da China em 4 tri %s: CC US$ %.0f bi, financeira US$ %.0f bi, reservas US$ %.0f bi"
           % (u, q["cc"][u], q["financeira"][u], q["reservas"][u]))
     nomes = [("cc", "Conta corrente", AZUL), ("capital", "Conta capital", AMARELO),
-             ("financeira", "Conta financeira", VERDE), ("reservas", "Reservas internacionais", CINZA),
+             ("financeira", "Conta financeira", VERDE), ("reservas", "Reservas internacionais", LARANJA),
              ("erros", "Erros e omissões", VERMELHO)]
     g_bp = dict(id="china-bp", titulo="Balanço de pagamentos da China",
                 subtitulo="US$ bilhões, acumulado em 4 trimestres (esq.), desde 1998; conta financeira sem as "
@@ -302,7 +304,7 @@ def graficos_china():
                           "yuans por dólar (dir.); %s: conta corrente US$ %s bi" % (rot_tri(u), cf.br(q["cc"][u], 0)),
                 unidade="usd-bi", unidade2="cny", barra=3, buracoMax=3,
                 fonte="SAFE (China), Federal Reserve via FRED (DEXCHUS) e FtM",
-                series=[barras(n, c, q[k], 1, rotulo=k in ("cc", "financeira", "reservas"))
+                series=[barras(n, c, q[k], 1, rotulo=k in ("cc", "financeira", "reservas"), contorno=k == "reservas")
                         for k, n, c in nomes]
                 + [linha("Yuans por dólar (dir.)", BRANCO, {k: v for k, v in cny.items() if k >= "1998-12"}, 2,
                          dir=True, unidade="cny")])

@@ -106,6 +106,8 @@ parte: Cenário econômico dos EUA
 
 ##
 
+##
+
 ## Inteligência artificial
 
 ##
@@ -138,9 +140,11 @@ parte: Cenário econômico dos EUA
 
 ##
 
+## Déficit fiscal
+
 ##
 
-## Déficit fiscal
+##
 
 ##
 
