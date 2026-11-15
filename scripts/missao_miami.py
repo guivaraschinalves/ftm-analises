@@ -2074,7 +2074,120 @@ def graficos_juros_mundo():
 
 
 JUROS_MUNDO = [("Juros longos no G7", "juros-longos-g7"), ("", "divida-g7"),
-               ("A França", "spread-franca-italia"), ("", "franca-divida-deficit")]
+               ("A França", "spread-franca-italia"), ("", "spread-zona-euro"), ("", "franca-divida-deficit"),
+               ("", "franca-detentores"), ("", "franca-r-g")]
+
+
+# ---------- zona do euro e França pelo BCE (pedido dele em 15/11/2026) ----------
+# Juros de 10 anos do BCE (IRS, critério de convergência, média do mês): chega
+# um mês antes que a OCDE no FRED. Detentores da dívida e as contas que
+# decompõem a variação da dívida: estatísticas fiscais anuais do BCE (GFS).
+BCE = "https://data-api.ecb.europa.eu/service/data/"
+ZONA_EURO = [("AT", "Áustria"), ("BE", "Bélgica"), ("BG", "Bulgária"), ("CY", "Chipre"), ("EE", "Estônia"),
+             ("ES", "Espanha"), ("FI", "Finlândia"), ("FR", "França"), ("GR", "Grécia"), ("HR", "Croácia"),
+             ("IE", "Irlanda"), ("IT", "Itália"), ("LU", "Luxemburgo"), ("LV", "Letônia"), ("MT", "Malta"),
+             ("NL", "Holanda"), ("PT", "Portugal"), ("SI", "Eslovênia"), ("SK", "Eslováquia")]
+
+
+def bce(chave, inicio="1990"):
+    """{(chave da série): {período: valor}} de uma consulta à API do BCE."""
+    import csv as _csv
+    import io as _io
+    import urllib.request
+    req = urllib.request.Request(BCE + chave + "?startPeriod=%s&format=csvdata" % inicio,
+                                 headers={"Accept": "text/csv", "User-Agent": "ftm-analises"})
+    texto = urllib.request.urlopen(req, timeout=180).read().decode("utf-8")
+    out = {}
+    for r in _csv.DictReader(_io.StringIO(texto)):
+        if r["OBS_VALUE"]:
+            out.setdefault(r["KEY"], {})[r["TIME_PERIOD"]] = float(r["OBS_VALUE"])
+    return out
+
+
+def juros_bce():
+    """{país: {mês: juro de 10 anos}} da base IRS do BCE."""
+    return {k.split(".")[2]: v for k, v in bce("IRS/M..L.L40.CI.0000.EUR.N.Z", "1993-01").items()}
+
+
+def graficos_zona_euro():
+    j = juros_bce()
+    de = j["DE"]
+    def spread(c):
+        return {m: 100 * (v - de[m]) for m, v in j[c].items() if m in de}
+    sp_fr, sp_it = spread("FR"), spread("IT")
+    u = max(sp_fr)
+    print("  spread contra a Alemanha (BCE) %s: França %.0f pb, Itália %.0f pb" % (u, sp_fr[u], sp_it[u]))
+    g_sp = dict(id="spread-franca-italia", titulo="Prêmio de risco: França e Itália contra a Alemanha",
+                subtitulo="Juro de 10 anos do governo menos o da Alemanha, em pontos-base; média do mês; %s: França %s, "
+                          "Itália %s" % (cf.rot_mes(u), cf.br(sp_fr[u], 0), cf.br(sp_it[u], 0)),
+                unidade="n", fonte="BCE (juros de longo prazo do critério de convergência) e FtM",
+                series=[cf.serie("França", "#9BBB59", sp_fr, 0, largura=5, rotulo=True),
+                        cf.serie("Itália", "#8EB4E3", sp_it, 0, largura=3, rotulo=True)])
+    base = "2024-05"
+    itens = []
+    for c, nome in ZONA_EURO:
+        if c == "DE" or c not in j or base not in j[c] or u not in j[c]:
+            continue
+        sp = spread(c)
+        if base in sp and u in sp:
+            itens.append([nome, round(sp[u] - sp[base]), VERMELHO if c == "FR" else CINZA])
+    itens.sort(key=lambda it: -it[1])
+    print("  spread desde mai/24: %s" % ", ".join("%s %+d" % (n, v) for n, v, _ in itens[:4]))
+    g_rank = dict(id="spread-zona-euro", tipo="ranking", sinal=True, unidade="n",
+                  titulo="Variação do prêmio de risco contra a Alemanha desde maio de 2024",
+                  subtitulo="Juro de 10 anos menos o da Alemanha, de mai/24 a %s, em pontos-base; média do mês; "
+                            "países da zona do euro" % cf.rot_mes(u),
+                  fonte="BCE (juros de longo prazo do critério de convergência) e FtM", itens=itens)
+    # quem detém a dívida
+    det = bce("GFS/A.N.FR+IT+DE.W1+W2.S13.S1+S121.C.L.LE.GD.T._Z.XDC_R_GD._T.F.V.N._T", "1995")
+    def ser(pais, area, setor):
+        return {"%s-12" % a: v for a, v in det.get("GFS.A.N.%s.%s.S13.%s.C.L.LE.GD.T._Z.XDC_R_GD._T.F.V.N._T"
+                                                     % (pais, area, setor), {}).items()}
+    nr = {c: ser(c, "W1", "S1") for c in ("FR", "IT", "DE")}
+    bc = {c: ser(c, "W2", "S121") for c in ("FR", "IT", "DE")}
+    ua = max(nr["FR"])
+    print("  França %s: não residentes %.0f%%, banco central %.0f%%" % (ua[:4], nr["FR"][ua], bc["FR"].get(ua, 0)))
+    cores = {"FR": "#9BBB59", "IT": "#8EB4E3", "DE": CINZA}
+    nomes = {"FR": "França", "IT": "Itália", "DE": "Alemanha"}
+    g_det = dict(id="franca-detentores", titulo="Quem detém a dívida da França, da Itália e da Alemanha",
+                 subtitulo="Em % da dívida bruta do governo geral, fim de ano", unidade="pct1", buracoMax=12,
+                 fonte="BCE (estatísticas de finanças públicas) e FtM", variantes=[
+                     dict(rot="Não residentes", series=[cf.serie(nomes[c], cores[c], nr[c], 1, largura=5 if c == "FR" else 3,
+                                                                  rotulo=True) for c in ("FR", "IT", "DE")]),
+                     dict(rot="Banco central do país", series=[cf.serie(nomes[c], cores[c], bc[c], 1,
+                                                                         largura=5 if c == "FR" else 3, rotulo=True)
+                                                               for c in ("FR", "IT", "DE")])])
+    # o que mexe na dívida da França a cada ano
+    pref = "GFS/A.N.FR.W0.S13.S1."
+    divida = next(iter(bce(pref + "C.L.LE.GD.T._Z.XDC._T.F.V.N._T", "1995").values()))
+    pib = next(iter(bce("GFS/A.N.FR.W0.S1.S1._Z.B.B1GQ._Z._Z._Z.XDC._Z.S.V.N._T", "1995").values()))
+    prim = next(iter(bce(pref + "_Z.B.B9P._Z._Z._Z.XDC_R_B1GQ._Z.S.V.N._T", "1995").values()))
+    juros = next(iter(bce(pref + "C.D.D41._Z._Z._T.XDC_R_B1GQ._Z.S.V.N._T", "1995").values()))
+    anos = sorted(a for a in divida if a in pib and a in prim and a in juros and str(int(a) - 1) in divida
+                  and str(int(a) - 1) in pib and int(a) >= 2000)
+    d = {a: 100 * divida[a] / pib[a] for a in divida if a in pib}
+    var, cprim, crg, cout = {}, {}, {}, {}
+    for a in anos:
+        a0 = str(int(a) - 1)
+        g = pib[a] / pib[a0] - 1
+        var[a] = d[a] - d[a0]
+        cprim[a] = -prim[a]
+        crg[a] = juros[a] - d[a0] * g / (1 + g)
+        cout[a] = var[a] - cprim[a] - crg[a]
+    for a in anos[-3:]:
+        print("  França %s: dívida %+.1f p.p. = primário %+.1f, r - g %+.1f, outros %+.1f" % (a, var[a], cprim[a], crg[a], cout[a]))
+    idx = {a: str(k) for k, a in enumerate(anos)}
+    def cat(dd):
+        return [[idx[a], round(dd[a], 2)] for a in anos]
+    g_rg = dict(id="franca-r-g", titulo="França: o que mexe na dívida a cada ano",
+                subtitulo="Variação da dívida bruta do governo geral, em pontos do PIB; barras = contribuição do déficit "
+                          "primário, dos juros menos o crescimento nominal (r − g) e dos ajustes estoque-fluxo",
+                unidade="pp", categorias=anos, fonte="BCE (estatísticas de finanças públicas) e FtM",
+                series=[dict(nome="Déficit primário", cor=VERMELHO, tipo="barra", dados=cat(cprim)),
+                        dict(nome="Juros menos crescimento (r − g)", cor=AZUL, tipo="barra", dados=cat(crg)),
+                        dict(nome="Ajustes estoque-fluxo", cor=CINZA, tipo="barra", dados=cat(cout)),
+                        dict(nome="Variação da dívida", cor=BRANCO, dados=cat(var), largura=4, rotulo=True)])
+    return [g_sp, g_rank, g_det, g_rg]
 PARTE_JUROS = "Juros no mundo"
 
 
@@ -2171,6 +2284,7 @@ def main():
             sec["parte"] = PARTE_EUA
         secoes.append(sec)
     juros = {g["id"]: g for g in graficos_juros_mundo()}
+    juros.update({g["id"]: g for g in graficos_zona_euro()})      # spread pelo BCE (chega a outubro)
     for titulo, gid in JUROS_MUNDO:
         secoes.append(dict(titulo=titulo, texto="", fontes=[], figuras=[], graficos=[juros[gid]]))
     import missao_china

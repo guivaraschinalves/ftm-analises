@@ -375,11 +375,31 @@ O diretor Christopher Waller defende subir pelo menos 0,25 ponto em dezembro e d
 ## Juros longos no G7
 parte: Juros no mundo
 
+Os juros longos do G7 voltaram a 3,7% em média em 2026, o dobro dos 1,9% de 2009 a 2021, mas ainda abaixo da média histórica de 5,5%.
+
 ##
+
+Com a dívida perto ou acima de 100% do PIB em quase todo o G7, como os 127% dos EUA, os 118% da França e os 199% do Japão, juro mais alto pesa muito mais no orçamento.
 
 ## A França
 
+Desde dezembro de 2025, a França paga em alguns meses um prêmio maior que o da Itália, algo inédito na série do BCE, que começa em 1993, e em outubro foram 147 pontos-base contra 126.
+
 ##
+
+Desde maio de 2024, um mês antes da dissolução da Assembleia Nacional, o prêmio da França subiu 96 pontos-base, enquanto o dos outros países da zona do euro caiu ou ficou parado, com exceção da Bélgica: não foi a zona do euro, foi a França.
+
+##
+
+O FMI estima que a dívida francesa chegue a 118% do PIB em 2026, com déficit de 5,4%, contra 98% e 2,4% em 2019.
+
+##
+
+Os não residentes detêm 54% da dívida francesa, contra 34% da italiana, e a fatia do Banque de France caiu de 23% em 2022 para 17% em 2025, com o fim das compras do BCE.
+
+##
+
+Em 2023, a inflação fez o r − g derrubar a dívida em 5,2 pontos do PIB mesmo com déficit primário de 3,5%, mas em 2025 o r − g zerou e o déficit primário de 2,9% passou a subir a dívida quase ponto por ponto.
 
 ## Déficit externo dos EUA
 parte: China e desequilíbrios globais
