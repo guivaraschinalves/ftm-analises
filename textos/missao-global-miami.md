@@ -268,6 +268,8 @@ parte: Cenário econômico dos EUA
 
 ##
 
+O PCE, a medida de inflação que o Fed persegue, está acima da meta de 2% em todos os meses desde março de 2021: são 5 anos e 7 meses seguidos, até os 3,65% em 12 meses de setembro. O núcleo também está acima de 2% desde março de 2021 e chegou a 3,12%, e o supercore, a 3,60%. A média aparada do Fed de Dallas, que tira os itens de variação mais extrema, dá uma leitura bem mais baixa: 2,26%. É uma medida de que Kevin Warsh já disse gostar, mas da qual não fala há um tempo.
+
 ##
 
 ## Fed
