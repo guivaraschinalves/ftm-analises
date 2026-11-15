@@ -38,3 +38,6 @@ dados/.cache-midterms/
 
 # DI1 da B3 (scripts/missao_di.py): duas taxas por pregão, refeitas da B3 se faltar
 dados/.cache-b3/
+
+# HTML avulso de uma análise (scripts/html_avulso.py): gerado, com tudo embutido
+avulso/
