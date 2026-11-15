@@ -119,7 +119,7 @@ A dívida bruta sobe nas duas metodologias. Pela oficial, está em 82,9% do PIB.
 
 ##
 
-Para estabilizar a dívida, precisamos do tal do "ajuste fiscal", o resultado primário necessário para que a dívida apenas pare de crescer. Isso depende de mais dois fatores: o juro real, que faz a dívida crescer e o crescimento da economia, que a dilui.
+Para estabilizar a dívida, precisamos do tal do "ajuste fiscal": elevar o resultado primário até o nível necessário para que a dívida apenas pare de crescer. Esse nível depende do tamanho da dívida e de mais dois fatores: o juro real, que faz a dívida crescer, e o crescimento da economia, que a dilui.
 
 Com juro real de 7% e crescimento entre 1,5% e 2,0% ao ano, o primário que estabiliza a dívida fica entre 4,1% e 4,5% do PIB, contra um déficit de 0,5% hoje. O ajuste seria de 4,6 a 5,0 pontos do PIB, entre R$ 620 bilhões e R$ 670 bilhões por ano.
 
