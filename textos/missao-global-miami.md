@@ -119,9 +119,9 @@ A dívida bruta sobe nas duas metodologias. Pela oficial, está em 82,9% do PIB.
 
 ##
 
-O tão falado ajuste fiscal é fazer o governo voltar a poupar o suficiente para a dívida parar de subir em relação ao PIB. A conta tem três peças. O juro real faz a dívida crescer. O crescimento da economia a dilui, porque aumenta o PIB que fica no denominador. E o resultado primário, receitas menos despesas sem contar os juros, é a parte que o governo controla. Quanto maior o juro real e menor o crescimento, maior o primário necessário.
+O tão falado ajuste fiscal é o esforço para o governo economizar o suficiente para que a dívida pare de crescer em relação ao PIB. Isso depende de três coisas: o juro real, que faz a dívida crescer, o crescimento da economia, que a dilui, e o resultado primário (receitas menos despesas, sem os juros), a única que o governo controla diretamente.
 
-Num cenário de juro real de 7% e crescimento entre 1,5% e 2,0% ao ano, o primário que estabiliza a dívida bruta fica entre 4,1% e 4,5% do PIB. Hoje o governo tem déficit primário de 0,5% do PIB. O ajuste, portanto, seria de 4,6 a 5,0 pontos do PIB, algo entre R$ 620 bilhões e R$ 670 bilhões por ano.
+Com juro real de 7% e crescimento entre 1,5% e 2,0% ao ano, o primário que estabiliza a dívida fica entre 4,1% e 4,5% do PIB, contra um déficit de 0,5% hoje. O ajuste seria de 4,6 a 5,0 pontos do PIB, entre R$ 620 bilhões e R$ 670 bilhões por ano.
 
 ##
 
