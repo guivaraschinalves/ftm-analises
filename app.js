@@ -2265,6 +2265,7 @@
     if (cartao.atualizarPeriodos) cartao.atualizarPeriodos();
     desenhar(cartao, true);
     if (visor && visor.cartao === cartao && !visor.box.hidden) pintarVisor();
+    repintarApresentacao(cartao, false);
   }
 
   function ligarHover(cartao, desenho) {
@@ -2857,6 +2858,355 @@
     } else if (volta && volta.botaoTelaCheia) volta.botaoTelaCheia.focus({ preventScroll: true });
   }
 
+  // ---------- apresentação ----------
+  // A análise inteira em slides, na ordem da página (a gravada): a capa, a
+  // divisória de cada parte e um gráfico por slide. O gráfico entra se
+  // desenhando: título, eixos e legenda aparecem, a área dos dados abre da
+  // esquerda para a direita (é o próprio recorte do gráfico que cresce, então
+  // vale para linha, barra, área e faixa) e os rótulos do último ponto chegam
+  // por último. → espaço e PageDown passam; ← e PageUp voltam; ↑ e ↓ trocam o
+  // recorte; T abre o texto da seção; F, tela cheia; Esc sai.
+  var apres = null;
+  var SEM_MOVIMENTO = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  var AP_ABRE = 1500, AP_ESPERA = 350;     // a área dos dados: quanto leva para abrir e quando começa
+
+  function slidesDaPagina() {
+    var art = document.querySelector("#graficos .artigo");
+    if (!art) return [];
+    var dados = docs[atual] || {}, porRaiz = [], lista = [], secao = "", parte = "";
+    cartoes.forEach(function (c) { porRaiz.push([c.raiz, c]); });
+    function cartaoDe(raiz) {
+      for (var k = 0; k < porRaiz.length; k++) if (porRaiz[k][0] === raiz) return porRaiz[k][1];
+      return null;
+    }
+    lista.push({ tipo: "capa", img: dados.capa || null, titulo: dados.assunto || "", assinatura: dados.assinatura || "" });
+    [].forEach.call(art.children, function (no) {
+      if (no.classList.contains("artigo-parte")) {
+        parte = no.textContent.trim();
+        secao = "";
+        lista.push({ tipo: "parte", titulo: parte });
+        return;
+      }
+      if (!no.classList.contains("artigo-secao")) return;
+      var h = no.querySelector(".artigo-secao-titulo");
+      if (h) secao = h.textContent.trim();
+      var textos = [].filter.call(no.children, function (x) { return x.classList.contains("artigo-texto"); });
+      [].forEach.call(no.querySelectorAll(".card"), function (raiz) {
+        var c = cartaoDe(raiz);
+        if (c) lista.push({ tipo: "grafico", cartao: c, onde: [parte, secao].filter(Boolean).join(" · "), textos: textos });
+      });
+    });
+    return lista;
+  }
+
+  // O SVG do slide é um segundo desenho do mesmo gráfico que já está na
+  // página, com os mesmos ids; o url(#…) acharia o recorte do cartão, e a
+  // animação mexeria num recorte que ninguém está vendo.
+  function idsProprios(svg) {
+    var mapa = {};
+    [].forEach.call(svg.querySelectorAll("[id]"), function (n) { mapa[n.id] = n.id + "-ap"; n.id += "-ap"; });
+    [].forEach.call(svg.querySelectorAll("*"), function (n) {
+      ["clip-path", "mask", "fill", "stroke", "filter"].forEach(function (a) {
+        var v = n.getAttribute(a), m = v && v.match(/^url\(#([^)]+)\)$/);
+        if (m && mapa[m[1]]) n.setAttribute(a, "url(#" + mapa[m[1]] + ")");
+      });
+    });
+  }
+
+  function animarGrafico(svg, tipo) {
+    if (SEM_MOVIMENTO) return;
+    if (tipo === "ranking") return animarRanking(svg);
+    if (tipo === "hemiciclo") return animarHemiciclo(svg);
+    var area = null;
+    [].some.call(svg.children, function (x) {
+      if (x.tagName === "g" && x.getAttribute("clip-path")) { area = x; return true; }
+      return false;
+    });
+    var id = area && (area.getAttribute("clip-path").match(/#([^)]+)/) || [])[1];
+    var rect = id && svg.querySelector('[id="' + id + '"] rect');
+    if (!rect) { svg.classList.add("ap-tudo"); return; }
+    var rx = +rect.getAttribute("x"), ry = +rect.getAttribute("y"), rh = +rect.getAttribute("height");
+    var largura = +rect.getAttribute("width"), depois = false;
+    // o que vem depois da área e cai dentro da faixa do gráfico (os rótulos
+    // do último ponto, os valores em cima das barras) espera a área abrir; o
+    // resto (título, eixos, legenda, fonte) entra logo
+    [].forEach.call(svg.children, function (x) {
+      if (x === area) { depois = true; return; }
+      if (x.tagName === "defs") return;
+      var noMeio = false;
+      if (depois) {
+        try {
+          var b = x.getBBox(), cy = b.y + b.height / 2;
+          noMeio = b.width > 0 && cy >= ry && cy <= ry + rh && b.x + b.width > rx;
+        } catch (e) {}
+      }
+      x.classList.add(noMeio ? "ap-depois" : "ap-antes");
+    });
+    rect.setAttribute("width", "0");
+    var t0 = null;
+    function passo(t) {
+      if (!rect.isConnected) return;
+      if (t0 === null) t0 = t;
+      var k = Math.min(1, Math.max(0, (t - t0 - AP_ESPERA) / AP_ABRE));
+      var e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      rect.setAttribute("width", (largura * e).toFixed(1));
+      if (k < 1) requestAnimationFrame(passo);
+    }
+    requestAnimationFrame(passo);
+  }
+
+  // ranking: as barras crescem a partir do zero, uma depois da outra, e o
+  // valor de cada uma chega no fim; nomes e eixo entram logo
+  function animarRanking(svg) {
+    var zero = null;
+    [].some.call(svg.querySelectorAll("line"), function (l) {
+      if (l.getAttribute("x1") === l.getAttribute("x2")) { zero = +l.getAttribute("x1"); return true; }
+      return false;
+    });
+    if (zero === null) { svg.classList.add("ap-tudo"); return; }
+    var n = 0;
+    [].forEach.call(svg.children, function (x) {
+      if (x.tagName === "defs") return;
+      var bx = +x.getAttribute("x"), bw = +x.getAttribute("width");
+      if (x.tagName === "rect" && bw && (Math.abs(bx - zero) < 1 || Math.abs(bx + bw - zero) < 1)) {
+        x.style.transformOrigin = zero + "px 0";
+        x.style.animationDelay = (250 + n++ * 45) + "ms";
+        x.classList.add("ap-cresce");
+      } else if (x.tagName === "text" && bx >= zero - 2) {
+        x.classList.add("ap-depois");
+      } else x.classList.add("ap-antes");
+    });
+  }
+  // hemiciclo: as cadeiras pingam da esquerda para a direita
+  function animarHemiciclo(svg) {
+    var cad = svg.querySelectorAll("circle");
+    if (!cad.length) { svg.classList.add("ap-tudo"); return; }
+    var lista = [].slice.call(cad).sort(function (a, b) { return a.getAttribute("cx") - b.getAttribute("cx"); });
+    lista.forEach(function (c, k) {
+      c.style.animationDelay = (200 + k * 1100 / lista.length).toFixed(0) + "ms";
+      c.classList.add("ap-pinga");
+    });
+  }
+
+  // Figura, tabela e comparador não são desenho: vão numa lâmina de 1920×1080
+  // (a mesma medida do gráfico), escalada para o palco
+  function lamina(classe) {
+    var l = html("div", { "class": "apres-lamina" + (classe ? " " + classe : "") });
+    apres.palco.appendChild(l);
+    escalarLamina();
+    return l;
+  }
+  function escalarLamina() {
+    if (!apres) return;
+    var l = apres.palco.querySelector(".apres-lamina");
+    if (l) l.style.transform = "scale(" + (apres.palco.clientWidth / 1920) + ")";
+  }
+  function cabecalhoLamina(l, g) {
+    l.appendChild(html("h2", { "class": "apres-l-titulo", texto: g.titulo }));
+    if (g.subtitulo) l.appendChild(html("p", { "class": "apres-l-sub", texto: g.subtitulo }));
+  }
+
+  function pintarSlide(animar) {
+    var s = apres.slides[apres.i], palco = apres.palco;
+    palco.innerHTML = "";
+    palco.className = "apres-palco" + (animar && !SEM_MOVIMENTO ? " ap-entra" : "");
+    apres.cartao = s.tipo === "grafico" ? s.cartao : null;
+    if (s.tipo === "capa") {
+      var l = lamina("apres-capa");
+      if (s.img) l.appendChild(html("img", { src: s.img, alt: s.titulo }));
+      else l.appendChild(html("h1", { texto: s.titulo }));
+      if (s.assinatura) l.appendChild(html("p", { "class": "apres-capa-assinatura", texto: s.assinatura }));
+      return;
+    }
+    if (s.tipo === "parte") {
+      lamina("apres-parte").appendChild(html("span", { texto: s.titulo }));
+      return;
+    }
+    var c = s.cartao, g = graficoDe(c);
+    if (g.tipo === "figura") {
+      var lf = lamina("apres-figura");
+      cabecalhoLamina(lf, g);
+      lf.appendChild(html("img", { src: g.imagem, alt: g.titulo }));
+      if (g.fonte) lf.appendChild(html("p", { "class": "apres-l-fonte", texto: "Fonte: " + g.fonte }));
+      return;
+    }
+    if (g.tipo === "tabela" || g.tipo === "comunicados") {
+      var lt = lamina("apres-quadro");
+      cabecalhoLamina(lt, g);
+      var corpo = html("div", { "class": "apres-quadro-corpo" + (g.tipo === "comunicados" ? " apres-comunicados" : "") });
+      corpo.appendChild(g.tipo === "tabela" ? montarTabela(g) : montarComparador(g));
+      lt.appendChild(corpo);
+      if (g.fonte && g.tipo === "tabela") lt.appendChild(html("p", { "class": "apres-l-fonte", texto: "Fonte: " + g.fonte }));
+      return;
+    }
+    var d = construir(c, LAYOUTS.wide, tema());
+    ligarHover(c, d);
+    idsProprios(d.svg);
+    palco.appendChild(d.svg);
+    if (animar) animarGrafico(d.svg, g.tipo);
+  }
+
+  function irNaApresentacao(i, animar) {
+    var n = apres.slides.length;
+    i = Math.max(0, Math.min(n - 1, i));
+    if (i === apres.i && animar !== "forcar") return;
+    apres.i = i;
+    var s = apres.slides[i];
+    pintarSlide(animar !== false);
+    apres.contador.textContent = (i + 1) + " / " + n;
+    apres.onde.textContent = s.tipo === "grafico" ? s.onde : s.tipo === "parte" ? s.titulo : "";
+    apres.progresso.style.width = (n > 1 ? i / (n - 1) * 100 : 100) + "%";
+    apres.setaAnt.disabled = i === 0;
+    apres.setaProx.disabled = i === n - 1;
+    recortesDaApresentacao();
+    // o texto da seção, embaixo, quando pedido
+    apres.texto.innerHTML = "";
+    (s.textos || []).forEach(function (p) { apres.texto.appendChild(p.cloneNode(true)); });
+    apres.btnTexto.disabled = !(s.textos && s.textos.length);
+    apres.texto.hidden = !apres.comTexto || apres.btnTexto.disabled;
+  }
+
+  function recortesDaApresentacao() {
+    var box = apres.recortes, c = apres.cartao, vs = c && graficoDe(c) && c.grafico.variantes;
+    box.innerHTML = "";
+    box.hidden = !vs;
+    if (!vs) return;
+    var sel = html("select", { "class": "visor-btn visor-select", "aria-label": "Recorte do gráfico" });
+    vs.forEach(function (v, k) {
+      var o = html("option", { value: String(k), texto: v.rot });
+      if (k === (c.variante || 0)) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.addEventListener("change", function () { c.trocarVariante(+sel.value); sel.blur(); });
+    box.appendChild(sel);
+  }
+
+  // chamado pelo cartão quando troca de recorte, de janela ou de tema
+  function repintarApresentacao(cartao, animar) {
+    if (!apres || apres.box.hidden || (cartao && apres.cartao !== cartao)) return;
+    pintarSlide(animar);
+    recortesDaApresentacao();
+  }
+
+  function montarApresentacao() {
+    var box = html("div", { "class": "apres", role: "dialog", "aria-modal": "true", "aria-label": "Apresentação", hidden: "" });
+    var palco = html("div", { "class": "apres-palco" });
+    var barra = html("div", { "class": "apres-barra" });
+    var contador = html("span", { "class": "apres-contador" });
+    var onde = html("span", { "class": "apres-onde" });
+    var recortes = html("div", { "class": "apres-recortes" });
+    var btnTexto = html("button", { type: "button", "class": "visor-btn", texto: "Texto", "aria-pressed": "false",
+                                    title: "Mostrar o texto desta seção (T)" });
+    var btnFs = html("button", { type: "button", "class": "visor-btn", texto: "Tela cheia", title: "Tela cheia (F)" });
+    btnFs.hidden = !fullscreenSuportado(box);
+    var btnSair = html("button", { type: "button", "class": "visor-btn", texto: "Sair", title: "Sair da apresentação (Esc)" });
+    var texto = html("div", { "class": "apres-texto", hidden: "" });
+    var trilho = html("div", { "class": "apres-trilho" });
+    var progresso = html("span");
+    trilho.appendChild(progresso);
+    [contador, onde, recortes].forEach(function (x) { barra.appendChild(x); });
+    var direita = html("div", { "class": "apres-barra-dir" });
+    [btnTexto, btnFs, btnSair].forEach(function (x) { direita.appendChild(x); });
+    barra.appendChild(direita);
+
+    function seta(dir) {
+      var b = html("button", { type: "button", "class": "visor-btn apres-seta",
+        "aria-label": dir < 0 ? "Slide anterior" : "Próximo slide", title: dir < 0 ? "Anterior (←)" : "Próximo (→)" });
+      b.appendChild(el("svg", { viewBox: "0 0 24 24", width: "16", height: "16", "aria-hidden": "true" }, [
+        el("path", { d: dir < 0 ? "M15 5l-7 7 7 7" : "M9 5l7 7-7 7", fill: "none", stroke: "currentColor",
+          "stroke-width": "2.4", "stroke-linecap": "round", "stroke-linejoin": "round" })
+      ]));
+      b.addEventListener("click", function (ev) { ev.stopPropagation(); irNaApresentacao(apres.i + dir); });
+      return b;
+    }
+    var setaAnt = seta(-1), setaProx = seta(1);
+    barra.insertBefore(setaProx, barra.firstChild);
+    barra.insertBefore(setaAnt, setaProx);
+    [palco, texto, barra, trilho].forEach(function (x) { box.appendChild(x); });
+    document.body.appendChild(box);
+
+    function alternarTexto() {
+      if (btnTexto.disabled) return;
+      apres.comTexto = !apres.comTexto;
+      btnTexto.setAttribute("aria-pressed", String(apres.comTexto));
+      texto.hidden = !apres.comTexto;
+    }
+    btnTexto.addEventListener("click", alternarTexto);
+    btnFs.addEventListener("click", function () { if (elFullscreen() === box) sairFullscreen(); else entrarFullscreen(box); });
+    btnSair.addEventListener("click", fecharApresentacao);
+    ["fullscreenchange", "webkitfullscreenchange"].forEach(function (t) {
+      document.addEventListener(t, function () {
+        btnFs.textContent = elFullscreen() === box ? "Sair da tela cheia" : "Tela cheia";
+        requestAnimationFrame(escalarLamina);
+      });
+    });
+    window.addEventListener("resize", escalarLamina);
+
+    // os controles somem com o mouse parado, como num player
+    var timer = null;
+    function mostrarControles() {
+      box.classList.remove("chrome-oculto");
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        if (box.contains(document.activeElement) && document.activeElement.tagName === "SELECT") return;
+        box.classList.add("chrome-oculto");
+      }, 2200);
+    }
+    box.addEventListener("pointermove", mostrarControles);
+    box.addEventListener("pointerdown", mostrarControles);
+
+    document.addEventListener("keydown", function (ev) {
+      if (box.hidden || ev.altKey || ev.ctrlKey || ev.metaKey) return;
+      if (ev.target && ev.target.tagName === "SELECT") return;
+      var k = ev.key, acao = null;
+      if (k === "ArrowRight" || k === "PageDown" || k === " " || k === "Enter") acao = function () { irNaApresentacao(apres.i + 1); };
+      else if (k === "ArrowLeft" || k === "PageUp" || k === "Backspace") acao = function () { irNaApresentacao(apres.i - 1); };
+      else if (k === "Home") acao = function () { irNaApresentacao(0); };
+      else if (k === "End") acao = function () { irNaApresentacao(apres.slides.length - 1); };
+      else if (k === "ArrowUp" || k === "ArrowDown") acao = function () {
+        var c = apres.cartao, vs = c && c.grafico.variantes;
+        if (!vs) return;
+        var j = ((c.variante || 0) + (k === "ArrowDown" ? 1 : -1) + vs.length) % vs.length;
+        c.trocarVariante(j);
+      };
+      else if (k === "t" || k === "T") acao = alternarTexto;
+      else if ((k === "f" || k === "F") && !btnFs.hidden) acao = function () { btnFs.click(); };
+      else if (k === "Escape") acao = fecharApresentacao;
+      if (!acao) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      acao();
+    }, true);
+
+    apres = { box: box, palco: palco, barra: barra, contador: contador, onde: onde, recortes: recortes,
+              texto: texto, btnTexto: btnTexto, progresso: progresso, setaAnt: setaAnt, setaProx: setaProx,
+              mostrarControles: mostrarControles, slides: [], i: -1, cartao: null, comTexto: false };
+  }
+
+  function abrirApresentacao(inicio) {
+    if (!apres) montarApresentacao();
+    apres.slides = slidesDaPagina();
+    if (!apres.slides.length) return;
+    apres.box.hidden = false;
+    document.body.classList.add("apres-aberta");
+    if (fullscreenSuportado(apres.box)) entrarFullscreen(apres.box);
+    apres.i = -1;
+    // depois do layout: a lâmina se escala pela largura do palco
+    requestAnimationFrame(function () { irNaApresentacao(inicio || 0, "forcar"); apres.mostrarControles(); });
+  }
+
+  function fecharApresentacao() {
+    if (!apres || apres.box.hidden) return;
+    if (elFullscreen() === apres.box) sairFullscreen();
+    apres.box.hidden = true;
+    apres.palco.innerHTML = "";
+    document.body.classList.remove("apres-aberta");
+    var s = apres.slides[apres.i];
+    apres.cartao = null;
+    // volta à página no gráfico em que parou
+    if (s && s.tipo === "grafico") setTimeout(function () { irPara(s.cartao.grafico.id); }, 150);
+  }
+
   // ---------- cartão ----------
   function extensao(g) {
     var ini = Infinity, fim = -Infinity;
@@ -2918,6 +3268,7 @@
         montarPeriodos();
         desenhar(cartao, true);
         if (visor && visor.cartao === cartao && !visor.box.hidden) pintarVisor();
+        repintarApresentacao(cartao, true);
       };
       g.variantes.forEach(function (v, k) {
         var b = html("button", { type: "button", texto: v.rot, "aria-pressed": String(k === 0) });
@@ -3770,6 +4121,7 @@
     try { localStorage.setItem("ftm_analises_tema", novo); } catch (e) {}
     cartoes.forEach(function (c) { desenhar(c, true); });
     if (visor && !visor.box.hidden) pintarVisor();
+    repintarApresentacao(null, false);
   }
 
   // ---------- carga ----------
@@ -4400,6 +4752,8 @@
     else document.documentElement.removeAttribute("data-marca");
     marcaNosGraficos(docs[i].marca);
     montarAssunto(docs[i], host);
+    var btnAp = document.getElementById("apresentar");
+    if (btnAp) btnAp.hidden = docs[i].formato !== "artigo";
     montarIndiceLateral(docs[i]);
     montarNav(docs, document.getElementById("nav"), i);
     montarRodape([docs[i]]);
@@ -4546,6 +4900,14 @@
     // libera o acesso (ligar duas vezes faria o tema piscar)
     document.getElementById("tema").addEventListener("click", alternarTema);
     telaCheiaDaPagina();
+    // "Apresentar": a análise em slides (só nas de formato artigo, ver mostrar)
+    var btnAp = html("button", { type: "button", "class": "icon-btn apres-botao", id: "apresentar", hidden: "",
+                                 title: "Apresentar esta análise em slides", "aria-label": "Apresentar em slides" });
+    btnAp.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">' +
+      '<path d="M7 4.5v15l12-7.5z"/></svg><span>Apresentar</span>';
+    btnAp.addEventListener("click", function () { abrirApresentacao(0); });
+    var tema0 = document.getElementById("tema");
+    tema0.parentNode.insertBefore(btnAp, tema0);
     var espera;
     window.addEventListener("resize", function () {
       clearTimeout(espera);

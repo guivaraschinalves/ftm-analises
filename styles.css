@@ -874,3 +874,124 @@ body.visor-aberto { overflow: hidden; }
   border-top: 3px solid transparent; border-image: var(--missao-filete) 1; border-image-slice: 1 0 0 0;
 }
 .missao-rodape img { height: 34px; width: auto; display: block; }
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Apresentação: a análise em slides (app.js, "apresentação"). O palco é 16:9
+   e ocupa a tela; o gráfico é o SVG de sempre, e o que não é desenho (capa,
+   parte, figura, tabela) vai numa lâmina de 1920×1080 escalada pelo JS. */
+.apres-botao { width: auto; display: inline-flex; gap: 6px; padding: 0 12px; font: inherit; font-size: 14px; }
+.apres-botao[hidden] { display: none; }
+@media (max-width: 600px) { .apres-botao span { display: none; } .apres-botao { padding: 0; width: 34px; justify-content: center; } }
+body.apres-aberta { overflow: hidden; }
+.apres {
+  position: fixed; inset: 0; z-index: 80; background: #05070b;
+  display: flex; align-items: center; justify-content: center;
+}
+:root[data-marca="missao"] .apres { background: #020a18; }
+:root[data-theme="light"] .apres { background: #d9dee5; }
+.apres[hidden] { display: none; }
+.apres.chrome-oculto { cursor: none; }
+.apres-palco {
+  position: relative; overflow: hidden; line-height: 0; aspect-ratio: 16 / 9;
+  width: min(100vw, calc(100vh * 16 / 9)); background: var(--chart-bg);
+}
+.apres-palco > svg { display: block; width: 100%; height: 100%; }
+.apres-lamina {
+  position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0;
+  line-height: 1.3; color: var(--ink); font-family: Calibri, Carlito, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+
+/* a entrada: o gráfico tem a sua (abaixo); a lâmina sobe de leve */
+.apres-palco.ap-entra .apres-lamina > * { animation: apSobe .7s cubic-bezier(.2, .7, .2, 1) both; }
+.apres-palco.ap-entra .apres-lamina > *:nth-child(2) { animation-delay: .12s; }
+.apres-palco.ap-entra .apres-lamina > *:nth-child(3) { animation-delay: .24s; }
+.apres-palco.ap-entra .apres-lamina > *:nth-child(4) { animation-delay: .36s; }
+.apres .ap-antes { animation: apAparece .55s ease-out both; }
+.apres .ap-depois { animation: apAparece .5s ease-out 1.8s both; }
+.apres .ap-tudo { animation: apSobe .8s cubic-bezier(.2, .7, .2, 1) both; }
+.apres .ap-cresce { animation: apCresce .6s cubic-bezier(.2, .7, .2, 1) both; transform-box: view-box; }
+.apres .ap-pinga { animation: apPinga .35s ease-out both; transform-box: fill-box; transform-origin: center; }
+@keyframes apCresce { from { transform: scaleX(0); } }
+@keyframes apPinga { from { opacity: 0; transform: scale(.3); } }
+@keyframes apAparece { from { opacity: 0; } }
+@keyframes apSobe { from { opacity: 0; transform: translateY(26px); } }
+@keyframes apFilete { from { transform: scaleX(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .apres-palco.ap-entra .apres-lamina > *, .apres .ap-antes, .apres .ap-depois, .apres .ap-tudo,
+  .apres .ap-cresce, .apres .ap-pinga { animation: none; }
+}
+
+/* capa e parte */
+.apres-capa { background: #061630; }
+.apres-capa img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.apres-capa h1 {
+  position: absolute; left: 120px; right: 120px; top: 420px; margin: 0; text-align: center;
+  font-size: 120px; line-height: 1; color: var(--ink);
+}
+.apres-capa .apres-capa-assinatura {
+  position: absolute; left: 0; right: 0; bottom: 0; margin: 0; padding: 26px 60px 32px;
+  font-size: 34px; letter-spacing: .04em; color: #fff;
+  background: linear-gradient(180deg, transparent, rgba(2, 10, 24, .75));
+}
+:root[data-marca="missao"] .apres-capa-assinatura { font-family: var(--titulo-missao); font-size: 44px; }
+.apres-parte {
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  background: var(--bg);
+}
+.apres-parte span { font-size: 130px; line-height: 1; font-weight: 700; padding: 0 120px; }
+:root[data-marca="missao"] .apres-parte { background: #061630 url("assets/missao/parte.jpg") center / cover no-repeat; }
+:root[data-marca="missao"] .apres-parte span {
+  font-family: var(--titulo-missao); font-weight: 400; font-size: 170px; letter-spacing: .02em;
+  color: #fff; text-shadow: 0 4px 40px rgba(0, 0, 0, .55);
+}
+:root[data-marca="missao"] .apres-capa::after,
+:root[data-marca="missao"] .apres-parte::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 10px;
+  background: var(--missao-filete); transform-origin: 0 50%;
+}
+.apres-palco.ap-entra .apres-parte::after { animation: apFilete 1.1s cubic-bezier(.6, 0, .2, 1) .2s both; }
+
+/* figura, tabela e comparador: o cabeçalho na medida do gráfico */
+.apres-l-titulo { position: absolute; left: 35px; top: 30px; margin: 0; font-size: 40px; font-weight: 700; }
+.apres-l-sub { position: absolute; left: 36px; top: 84px; margin: 0; font-size: 24px; font-style: italic; color: var(--ink-2); }
+.apres-l-fonte { position: absolute; right: 15px; bottom: 8px; margin: 0; font-size: 16px; color: var(--ink-2); }
+.apres-figura img { position: absolute; left: 60px; right: 60px; top: 140px; width: 1800px; height: 890px; object-fit: contain; }
+.apres-quadro-corpo { position: absolute; left: 35px; right: 35px; top: 150px; bottom: 50px; overflow: auto; }
+.apres-quadro-corpo .tabela { zoom: 2.1; width: 100%; border-collapse: collapse; line-height: 1.45; color: var(--ink); font-size: 14px; }
+.apres-quadro-corpo .tabela th, .apres-quadro-corpo .tabela td { padding: 7px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+.apres-quadro-corpo .tabela thead th { font-weight: 600; color: var(--ink-2); white-space: nowrap; border-bottom-width: 2px; }
+.apres-quadro-corpo .tabela th.num, .apres-quadro-corpo .tabela td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.apres-quadro-corpo .tabela td.forte { font-weight: 700; }
+.apres-quadro-corpo .tabela tbody tr:last-child td { border-bottom: 0; }
+.apres-comunicados .comparador { zoom: 1.7; }
+
+/* os controles: embaixo (em cima cobririam o título), e somem com o mouse parado */
+.apres-barra {
+  position: absolute; bottom: 14px; left: 18px; right: 18px; z-index: 2;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; transition: opacity .3s ease;
+}
+.apres-contador, .apres-onde {
+  font-size: 14px; color: #fff; background: rgba(6, 10, 18, .66); border-radius: 7px; padding: 6px 10px;
+  font-variant-numeric: tabular-nums;
+}
+.apres-onde:empty { display: none; }
+.apres-recortes[hidden] { display: none; }
+.apres-barra-dir { margin-left: auto; display: flex; gap: 8px; }
+.apres .visor-btn { background: rgba(6, 10, 18, .66); }
+.apres .visor-btn:disabled { opacity: .4; cursor: default; }
+.apres .visor-btn[aria-pressed="true"] { background: rgba(255, 255, 255, .28); border-color: #fff; }
+.apres.chrome-oculto .apres-barra { opacity: 0; pointer-events: none; }
+.apres-seta { display: inline-grid; place-items: center; padding: 6px 9px; }
+.apres-trilho { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: rgba(255, 255, 255, .08); z-index: 2; }
+.apres-trilho span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .4s ease; }
+:root[data-marca="missao"] .apres-trilho span { background: var(--missao-filete); }
+
+/* o texto da seção, quando pedido: uma faixa embaixo do palco */
+.apres-texto {
+  position: absolute; left: 50%; bottom: 64px; transform: translateX(-50%); z-index: 2;
+  width: min(1100px, calc(100vw - 140px)); max-height: 42vh; overflow: auto;
+  padding: 18px 24px 4px; border-radius: 12px; background: rgba(4, 12, 26, .93);
+  border: 1px solid rgba(255, 255, 255, .16); box-shadow: 0 18px 50px rgba(0, 0, 0, .5);
+}
+.apres-texto[hidden] { display: none; }
+.apres-texto .artigo-texto { color: #e8edf3; font-size: 19px; line-height: 1.6; margin: 0 0 14px; }
