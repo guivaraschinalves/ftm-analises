@@ -200,6 +200,8 @@ parte: Cenário econômico dos EUA
 
 ##
 
+##
+
 ## Crédito corporativo
 
 ##
@@ -232,6 +234,26 @@ parte: Cenário econômico dos EUA
 
 ##
 
+## SpaceX
+
+##
+
+##
+
+##
+
+## Anthropic
+
+##
+
+##
+
+##
+
+##
+
+##
+
 ## Mercado de trabalho
 
 ##
@@ -249,6 +271,10 @@ parte: Cenário econômico dos EUA
 ##
 
 ## Fed
+
+##
+
+##
 
 ## Bolsa
 

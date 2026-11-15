@@ -1291,18 +1291,120 @@ def graficos_eua():
 MIDTERMS_IDS = ["midterms-historia-aprovacao", "midterms-resultado-camara", "midterms-resultado-senado",
                 "midterms-resultado-mapa-senado"]
 
-EUA = [("Atividade nos EUA", "ism-pmi"), ("", "pib-eua-contribuicoes"), ("Inteligência artificial", "pib-eua-investimento-ti"),
+EUA = [("Atividade nos EUA", "ism-pmi"), ("", "pib-eua-contribuicoes"), ("Inteligência artificial", "pib-eua-investimento-ti"), ("", "pib-eua-investimento-importacoes"),
        ("", "construcao-datacenters-fabricas"), ("", "datacenters-participacao"), ("Crédito corporativo", "spreads-credito"),
        ("", "treasuries-5-10-30"), ("", "ia-divida"), ("", "ia-cds-bloomberg"),
        ("", "ia-cds-reuters"), ("Déficit fiscal", "eua-deficit"), ("", "governo-receita-despesa"),
        ("", "despesa-contribuicao"), ("", "eua-divida-pib"), ("", "eua-divida-detentores"),
        ("Midterms", "midterms-historia-aprovacao"), ("", "midterms-resultado-camara"), ("", "midterms-resultado-senado"),
        ("", "midterms-resultado-mapa-senado"), ("", "ia-indices"), ("", "ia-vix"),
+       ("SpaceX", "spacex-receita-trimestral"), ("", "spacex-caixa-9m"), ("", "spacex-capex-trimestral"),
+       ("", "spacex-3t-comparacao"), ("Anthropic", "anthropic-receita-trimestral"), ("", "anthropic-dre-acumulado"),
+       ("", "anthropic-despesas-receita"), ("", "anthropic-valor-mercado"), ("", "anthropic-preco-vendas"),
+       ("", "anthropic-moat"),
        ("Mercado de trabalho", "payroll-setores"), ("", "eua-payroll-breakeven"), ("", "eua-u3-u6"),
        ("", "eua-participacao"), ("Inflação nos EUA", "cpi-cheio-nucleo"), ("", "cpi-componentes"),
-       ("", "pce-nucleos"), ("", "pce-componentes"), ("Fed", "fomc-comunicados"),
+       ("", "pce-nucleos"), ("", "pce-componentes"), ("Fed", "fomc-comunicados"), ("", "fed-ativos-juros-cpi"), ("", "fed-fedwatch"),
        ("Bolsa", "sp500-pl")]
 PARTE_EUA = "Cenário econômico dos EUA"
+
+
+# SpaceX e Anthropic, depois das midterms (pedido dele em 15/11/2026): cópias
+# do ftm-dados (dados/acoes-eua.json). Os painéis (colunas com guidance,
+# cascata, pares, lista) foram portados para o app daqui; as colunas por
+# trimestre viram eixo de categorias ("1T25", "2T25"...).
+EMPRESAS = [("SpaceX", "spacex-receita-trimestral"), ("", "spacex-caixa-9m"), ("", "spacex-capex-trimestral"),
+            ("", "spacex-3t-comparacao"),
+            ("Anthropic", "anthropic-receita-trimestral"), ("", "anthropic-dre-acumulado"),
+            ("", "anthropic-despesas-receita"), ("", "anthropic-valor-mercado"), ("", "anthropic-preco-vendas"),
+            ("", "anthropic-moat")]
+# CME FedWatch (probabilidades condicionais por reunião), copiado à mão do
+# print que ele mandou em 15/11/2026: o CME bloqueia acesso automático.
+# Intervalos em pontos-base; None = o CME não mostra o intervalo naquela reunião.
+FEDWATCH_INTERVALOS = [375, 400, 425, 450, 475, 500, 525, 550]
+FEDWATCH = [("09/12/2026", [0.0, 88.5, 11.5, 0.0, 0.0, 0.0, None, None]),
+            ("27/01/2027", [0.0, 23.5, 68.1, 8.5, 0.0, 0.0, 0.0, 0.0]),
+            ("17/03/2027", [0.0, 7.1, 37.0, 49.9, 5.9, 0.0, 0.0, 0.0]),
+            ("28/04/2027", [0.0, 4.5, 26.1, 45.2, 21.9, 2.1, 0.0, 0.0]),
+            ("09/06/2027", [0.0, 2.7, 17.4, 37.5, 31.4, 10.2, 0.9, 0.0]),
+            ("28/07/2027", [0.0, 2.3, 15.1, 34.4, 32.3, 13.4, 2.3, 0.1]),
+            ("15/09/2027", [0.0, 2.0, 13.3, 31.7, 32.6, 16.1, 3.9, 0.4]),
+            ("17/11/2027", [0.3, 3.5, 15.9, 31.8, 30.3, 14.4, 3.4, 0.4])]
+
+
+def tabela_fedwatch():
+    def faixa(b):
+        return "%s–%s" % (cf.br(b / 100, 2), cf.br((b + 25) / 100, 2))
+    for data, ps in FEDWATCH:
+        soma = sum(p for p in ps if p is not None)
+        if abs(soma - 100) > 0.3:
+            raise RuntimeError("FedWatch %s soma %.1f%%" % (data, soma))
+    linhas = []
+    for data, ps in FEDWATCH:
+        mx = max(p for p in ps if p is not None)
+        linhas.append([dict(t=data[:6] + data[8:], forte=True)] + [
+            None if p is None else dict(t=cf.br(p, 1), **(dict(forte=True, cor="#8EB4E3") if p == mx else {}))
+            for p in ps])
+    return dict(id="fed-fedwatch", tipo="tabela", titulo="Probabilidades para os juros nas próximas reuniões do Fed",
+                subtitulo="Probabilidade, em %, de cada intervalo da meta dos fed funds (em % ao ano) depois de cada "
+                          "reunião, implícita nos futuros; em destaque, o intervalo mais provável; hoje a meta é de "
+                          "3,75% a 4,00%",
+                fonte="CME FedWatch, consulta de novembro de 2026",
+                colunas=[dict(rot="Reunião")] + [dict(rot=faixa(b), num=True) for b in FEDWATCH_INTERVALOS],
+                linhas=linhas)
+
+
+UNIDADES_EMPRESAS = {"x": "x1"}      # o "x" do ftm-dados tem uma casa; o daqui, duas
+
+
+def trimestre_em_categoria(g):
+    """"2026-Q3" vira a categoria "3T26" (o app daqui não tem eixo trimestral
+    de barras com rótulo por trimestre)."""
+    grupos = [g] + g.get("variantes", [])
+    chaves = sorted({p[0] for gr in grupos for x in gr.get("series") or [] for p in x["dados"]})
+    idx = {c: str(k) for k, c in enumerate(chaves)}
+    g["categorias"] = ["%sT%s" % (c[-1], c[2:4]) for c in chaves]
+    for gr in grupos:
+        for x in gr.get("series") or []:
+            x["dados"] = [[idx[p[0]], p[1]] for p in x["dados"]]
+    g.pop("trimestral", None)
+    g.pop("selecao", None)
+    return g
+
+
+def grafico_pib_investimento_importacoes():
+    """PIB, investimento fixo privado (a FBCF privada, sem estoques) e
+    importações, variação real em 4 trimestres (pedido dele em 15/11/2026):
+    o boom da IA entra no PIB pelo investimento e sai pelas importações."""
+    import missao_china as mc
+    def a4(d):
+        return {k: 100 * (v / d[k2] - 1) for k, v in d.items()
+                for k2 in ["%d-%s" % (int(k[:4]) - 1, k[5:])] if k2 in d}
+    pib, inv, imp = (a4(mc.bea(sid)) for sid in ("GDPC1", "FPIC1", "IMPGSC1"))
+    ini = min(inv)                      # o investimento fixo real do FRED (FPIC1) só começa em 2007
+    pib, imp = ({k: v for k, v in d.items() if k >= ini} for d in (pib, imp))
+    u = max(pib)
+    print("  PIB/investimento/importações dos EUA %s: %.1f / %.1f / %.1f" % (u, pib[u], inv[u], imp[u]))
+    return dict(id="pib-eua-investimento-importacoes",
+                titulo="Crescimento do PIB, do investimento fixo e das importações dos EUA",
+                subtitulo="Variação real sobre o mesmo trimestre do ano anterior, em %; investimento fixo privado "
+                          "(máquinas, equipamentos, software e construção, sem estoques)",
+                unidade="pct1", buracoMax=3, fonte="BEA (contas nacionais) via FRED e FtM",
+                series=[mc.linha("Importações", VERMELHO, imp, 1, largura=3),
+                        mc.linha("Investimento fixo privado", AZUL, inv, 1, largura=3),
+                        mc.linha("PIB", BRANCO, pib, 1, largura=4)])
+
+
+def graficos_empresas():
+    gs = graficos_ftm_dados("dados/acoes-eua.json")
+    out = []
+    for _, gid in EMPRESAS:
+        g = json.loads(json.dumps(gs[gid]))
+        if g.get("trimestral"):
+            g = trimestre_em_categoria(g)
+        g["unidade"] = UNIDADES_EMPRESAS.get(g.get("unidade"), g.get("unidade"))
+        out.append(g)
+    return out
 
 
 # ================================================================ bitcoin e stablecoins
@@ -1940,6 +2042,10 @@ def main():
         raise RuntimeError("desemprego dos EUA: série do U-3 não encontrada")
     eua["eua-u3-u6"] = dict({k: v for k, v in u.items() if k != "variantes"}, titulo="Taxa de desemprego (U-3)",
                             subtitulo="% da força de trabalho, com ajuste sazonal", series=u3)
+    eua.update({g["id"]: g for g in graficos_empresas()})
+    eua["pib-eua-investimento-importacoes"] = grafico_pib_investimento_importacoes()
+    eua["fed-ativos-juros-cpi"] = cf.balanco_fed()
+    eua["fed-fedwatch"] = tabela_fedwatch()
     if "eua-participacao" not in eua:
         eua["eua-participacao"] = cn.graficos_ftm_dados_eua()["participacao"]
     faltam = [gid for _, gid in EUA if gid not in eua]
