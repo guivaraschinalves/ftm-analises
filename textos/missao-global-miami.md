@@ -204,13 +204,13 @@ Parte da alta do índice vem de gargalo: a produção chegou a 59,0, a maior des
 
 No 3º trimestre, o PIB cresceu 3,4% em ritmo anualizado. O investimento privado respondeu por 3,3 pontos: metade veio dos estoques (1,6 ponto), e os equipamentos deram 1,2. O consumo das famílias somou 2,5 pontos e segue de pé. É a economia em K: quem tem ações, que subiram com a IA, se sente mais rico e consome mais, e quem não tem consome menos. As exportações líquidas tiraram 3,3 pontos, porque boa parte do equipamento é importada.
 
+##
+
+Em 12 meses, o investimento fixo privado cresceu 6,1%, e as importações, 10,3%, contra 2,1% do PIB. Muito do equipamento é importado, como as memórias da Coreia do Sul: entra no PIB pelo investimento e sai pelas importações.
+
 ## Inteligência artificial
 
 Os equipamentos de processamento de informação, onde entram computadores e servidores, chegaram a 15,3% do investimento fixo privado no 3º trimestre, acima do pico da bolha da internet (15,1% no fim de 2000).
-
-##
-
-O boom da IA sustenta a atividade, mas uma parte vaza para fora. Em 12 meses, o investimento fixo privado cresceu 6,1%, e as importações, 10,3%, contra 2,1% do PIB. Muito do equipamento é importado, como as memórias da Coreia do Sul: entra no PIB pelo investimento e sai pelas importações.
 
 ##
 
@@ -234,15 +234,15 @@ As empresas de IA passaram a financiar o capex com dívida. Meta, Amazon, Oracle
 
 ##
 
-Os credores já cobram mais para se proteger contra um calote. O CDS de 5 anos da Oracle passou de 300 pontos-base em outubro, e o da SpaceX, de 250. Os das hyperscalers também subiram, mas seguem bem mais baixos, e o da Microsoft quase não se mexeu.
+Os credores já cobram mais para se proteger contra um calote. O CDS de 5 anos da Oracle passou de 300 pontos-base em outubro, o que embute uma probabilidade de calote de cerca de 22% em cinco anos, e o da SpaceX passou de 250, cerca de 19%. Os das hyperscalers também subiram, mas seguem bem mais baixos, e o da Microsoft quase não se mexeu. A probabilidade sai do próprio CDS, supondo que o credor recupere 40% da dívida, a convenção do mercado.
 
 ##
 
-O caso extremo é a CoreWeave: o CDS dela subiu mais de 500 pontos-base desde novembro de 2025, quase tudo desde junho.
+O caso extremo é a CoreWeave. O CDS dela subiu mais de 500 pontos-base desde novembro de 2025, quase tudo desde junho, e bateu o recorde de cerca de 1.195 pontos-base em 15 de outubro. Isso embute uma probabilidade de calote de cerca de 63% em cinco anos.
 
 ## Déficit fiscal
 
-Muitos fatores mexem nas taxas dos Treasuries, mas o que eleva o patamar é o fiscal. O déficit do governo federal chegou a 6,4% do PIB em 12 meses até outubro, contra 5,1% em março.
+Muitos fatores mexem nas taxas dos Treasuries, mas o fiscal é certamente um dos principais. O déficit do governo federal chegou a 6,4% do PIB em 12 meses até outubro, contra 5,1% em março.
 
 ##
 
@@ -254,7 +254,7 @@ Em outubro, primeiro mês do ano fiscal de 2027, a despesa cresceu 12,2% sobre o
 
 ##
 
-A dívida federal bruta está em 121% do PIB, e a que está em poder do público, em 97% (junho de 2026).
+A dívida federal chegou a 125% do PIB no ano fiscal de 2026: US$ 40,2 trilhões, contra um PIB médio de US$ 32,2 trilhões no ano. Está acima do pico da 2ª Guerra (118% em 1946) e perto do recorde de 2020 (126%).
 
 ##
 
@@ -273,6 +273,7 @@ Os democratas já elegeram 252 deputados, bem acima dos 218 da maioria, e os rep
 No Senado, os democratas, com os dois independentes que votam com eles, terão pelo menos 54 cadeiras a partir de 2027, contra 44 dos republicanos. Duas ainda estão sem resultado.
 
 ##
+
 
 
 ##
@@ -313,11 +314,11 @@ A manchete de prejuízo engana. Nos 9 meses de 2026, o prejuízo líquido foi de
 
 ##
 
-A US$ 74 por ação, o meio da faixa do IPO, a Anthropic valeria US$ 1,25 trilhão, pouco abaixo da Meta (US$ 1,61 trilhão) e da SpaceX (US$ 1,99 trilhão).
+A US$ 74 por ação, o meio da faixa do IPO, a Anthropic valeria US$ 968 bilhões, com as 13,09 bilhões de ações em circulação depois da oferta. Ficaria abaixo da Meta (US$ 1,61 trilhão) e da SpaceX (US$ 1,99 trilhão). Contando também as ações que ainda podem ser emitidas (base totalmente diluída), a Reuters calcula cerca de US$ 1,4 trilhão no topo da faixa.
 
 ##
 
-Contra a receita do último trimestre anualizada, ela vale 18,5 vezes as vendas. É mais que as big techs e a Nvidia (13,6 vezes), mas pouco mais da metade da SpaceX (34,2 vezes). Com a receita de 12 meses, o múltiplo sobe para 35,5 vezes.
+Contra a receita do último trimestre anualizada, ela vale 14,3 vezes as vendas, pouco acima da Nvidia (13,6 vezes) e bem abaixo da SpaceX (34,2 vezes). Com a receita de 12 meses, o múltiplo sobe para 27,4 vezes.
 
 ##
 
@@ -337,7 +338,7 @@ O desemprego caiu de 4,5% em novembro de 2025 para 4,1% em outubro. O ponto ruim
 
 ##
 
-A participação na força de trabalho subiu para 61,9% em outubro.
+Como vimos no breakeven, a mudança demográfica pode distorcer o sinal desses indicadores. A taxa de participação observada, de 61,9% em outubro, está bem abaixo do pico de 67,3% de 2000, mas boa parte da queda é o envelhecimento da população. Ajustada pela composição por idade e sexo de hoje, a participação está a 0,1 ponto da máxima da série, que começa em 1977 (62,0%, em abril de 2000).
 
 ## Inflação nos EUA
 
@@ -351,25 +352,19 @@ Quem puxa é a energia, com 1,31 ponto dos 3,74%. Lá o governo não segura o pr
 
 O PCE, a medida de inflação que o Fed persegue, está acima da meta de 2% em todos os meses desde março de 2021: são 5 anos e 7 meses seguidos, até os 3,65% em 12 meses de setembro. O núcleo também está acima de 2% desde março de 2021 e chegou a 3,12%, e o supercore, a 3,60%. A média aparada do Fed de Dallas, que tira os itens de variação mais extrema, dá uma leitura bem mais baixa: 2,26%. É uma medida de que Kevin Warsh já disse gostar, mas da qual não fala há um tempo.
 
-##
-
-No PCE, o peso maior está nos serviços sem moradia: 1,85 ponto dos 3,65%. A energia contribui com 0,79 ponto.
-
 ## Fed
 
-Em 28 de outubro, o Fed manteve os juros entre 3,75% e 4,00%, numa votação de 10 a 2: Lisa Cook e Beth Hammack queriam subir 0,25 ponto. Na segunda reunião de Kevin Warsh como presidente, o comunicado ficou mais enxuto: nas palavras dele, "um pouco mais curto e mais simples". A atividade deixou de crescer em "solid pace" e passou a "strong pace". E saiu a frase de que a decisão anterior apressaria a volta da inflação à meta: agora o Fed diz que vai esperar mais dados para definir os juros. Warsh também anunciou que, em 2027, uma das oito reuniões será só sobre estratégia, sem decisão de juros.
+Em 28 de outubro, o Fed manteve os juros entre 3,75% e 4,00%, numa votação de 10 a 2: Lisa Cook e Beth Hammack queriam subir 0,25 ponto. Na segunda reunião de Kevin Warsh como presidente, o comunicado ficou mais enxuto: nas palavras dele, "um pouco mais curto e mais simples". A atividade deixou de crescer em "solid pace" e passou a "strong pace". E saiu a frase de que a decisão anterior apressaria a volta da inflação à meta: agora o Fed diz que vai esperar mais dados para definir os juros.
 
 ##
 
-Com a fed funds efetiva em 3,88% em outubro e o CPI em 3,7%, o juro real está perto de zero.
+As mudanças de Warsh vão além do comunicado. Na primeira reunião dele, em junho, o Fed criou cinco forças-tarefas, com gente de fora do banco central entre os líderes, como Marc Andreessen e o economista Raj Chetty, para rever a comunicação, o balanço, as fontes de dados, a produtividade e o emprego e o regime de metas de inflação. E, a partir de 2027, uma das oito reuniões do ano será só sobre estratégia, sem decisão de juros.
+
+O balanço tem hoje US$ 4,59 trilhões em títulos do Tesouro e US$ 1,88 trilhão em títulos lastreados em hipotecas. Com a fed funds efetiva em 3,88% em outubro e o PCE em 3,65% em setembro, o juro real está perto de zero.
 
 ##
 
-O diretor Christopher Waller defende subir pelo menos 0,25 ponto em dezembro, e diz que 0,5 ponto deve ser considerado se o núcleo do CPI vier forte: subir só 0,25 poria a credibilidade do Fed em risco. O mercado dá 88,5% de chance de alta de 0,25 ponto em 9 de dezembro e 11,5% de alta de 0,5.
-
-## Bolsa
-
-O S&P 500 está a 24,7 vezes o lucro dos últimos 12 meses, mas a 17,7 vezes o lucro esperado para os próximos 12. O preço depende de um lucro que ainda vai vir: os analistas esperam que ele cresça cerca de 40%, e não se sabe se virá.
+O diretor Christopher Waller defende subir pelo menos 0,25 ponto em dezembro e diz que 0,5 ponto deve ser considerado se o núcleo do CPI subir 0,3% ou mais no mês: subir só 0,25 poria a credibilidade do Fed em risco. O núcleo de outubro subiu exatamente 0,3%, acima dos 0,2% esperados. O mercado dá 88,5% de chance de alta de 0,25 ponto em 9 de dezembro e 11,5% de alta de 0,5, e vê a meta entre 4,50% e 4,75% em abril de 2027 (91%).
 
 ## Juros longos no G7
 parte: Juros no mundo

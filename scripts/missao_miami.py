@@ -1170,23 +1170,54 @@ def grafico_pl_sp500():
                         cf.serie("Projetado (FactSet)", AZUL, proj, 1, largura=4, rotulo=True)])])
 
 
+TESOURO_DIVIDA = ("https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v2/accounting/od/"
+                  "debt_outstanding?sort=-record_date&page%5Bsize%5D=400")
+
+
+def grafico_divida_pib_fy():
+    """Dívida federal ÷ PIB por ano fiscal, como no America's Finance Guide do
+    Tesouro (pedido dele em 15/11/2026): dívida total no fim do ano fiscal
+    (Debt to the Penny / Historical Debt Outstanding) ÷ PIB médio do ano
+    fiscal (média dos 4 trimestres, FRED GDP). O ano fiscal acaba em junho até
+    1976 e em setembro desde 1977. Antes de 1948 não há PIB trimestral: o do
+    ano fiscal é a média dos dois anos-calendário (FRED GDPA, desde 1929)."""
+    import urllib.request
+    req = urllib.request.Request(TESOURO_DIVIDA, headers={"User-Agent": "ftm-analises"})
+    dados = json.loads(urllib.request.urlopen(req, timeout=120).read().decode("utf-8"))["data"]
+    divida = {int(x["record_fiscal_year"]): float(x["debt_outstanding_amt"]) for x in dados}
+    tri = {k[:7]: v for k, v in cf.fred("GDP", mensal=False).items()}
+    anual = {int(k[:4]): v for k, v in cf.fred("GDPA", mensal=False).items()}
+
+    def pib_fy(a):
+        qs = (["%d-10" % (a - 1), "%d-01" % a, "%d-04" % a, "%d-07" % a] if a >= 1977
+              else ["%d-07" % (a - 1), "%d-10" % (a - 1), "%d-01" % a, "%d-04" % a])
+        if all(k in tri for k in qs):
+            return sum(tri[k] for k in qs) / 4
+        if a - 1 in anual and a in anual:
+            return (anual[a - 1] + anual[a]) / 2
+        return None
+    serie = {}
+    for a, v in divida.items():
+        pib = pib_fy(a)
+        if pib:
+            serie["%d-%s" % (a, "09" if a >= 1977 else "06")] = 100 * v / (pib * 1e9)
+    u = max(serie)
+    print("  dívida/PIB dos EUA, ano fiscal %s: %.1f%% (desde %s)" % (u[:4], serie[u], min(serie)[:4]))
+    return dict(id="eua-divida-pib", titulo="Dívida federal dos EUA em % do PIB",
+                subtitulo="Dívida total do governo federal no fim do ano fiscal ÷ PIB médio do ano fiscal, em %%; "
+                          "anos fiscais de %s a %s; ano fiscal %s: %s%%"
+                          % (min(serie)[:4], u[:4], u[:4], cf.br(serie[u], 0)),
+                unidade="pct1", buracoMax=15, fonte="Tesouro dos EUA (Fiscal Data) e BEA via FRED e FtM",
+                series=[cf.serie("Dívida federal", BRANCO, serie, 1, largura=5, rotulo=True)])
+
+
 def graficos_divida_eua():
     """Dívida federal dos EUA em % do PIB e quem a detém (FRED: Tesouro, Fed e
     BEA). Detentores: Fed (FDHBFRBN), estrangeiros (FDHBFIN), governo =
     dívida total menos a em poder do público (fundos e agências federais), e
     o resto do público (bancos, fundos, famílias, estados) por diferença."""
-    bruta, publico = cf.fred("GFDEGDQ188S"), cf.fred("FYGFGDQ188S")
     q = lambda d: {"%s-%02d" % (k[:4], int(k[5:7]) + 2): v for k, v in d.items()}   # noqa: E731
-    bruta, publico = q(bruta), q(publico)
-    u = max(bruta)
-    print("  dívida dos EUA %s: bruta %.0f%% do PIB, em poder do público %.0f%%" % (u, bruta[u], publico[u]))
-    g_pib = dict(id="eua-divida-pib", titulo="Dívida federal dos EUA em % do PIB",
-                 subtitulo="Fim de trimestre, em %% do PIB; %s: dívida bruta %s%%, em poder do público %s%%"
-                           % (cf.rot_mes(u), cf.br(bruta[u], 0), cf.br(publico[u], 0)),
-                 unidade="%", buracoMax=3, fonte="Tesouro dos EUA e BEA via FRED (GFDEGDQ188S e FYGFGDQ188S) e FtM",
-                 series=[cf.serie("Dívida bruta (inclui a dos fundos do governo)", BRANCO, bruta, 1, largura=5,
-                                  rotulo=True),
-                         cf.serie("Em poder do público", AZUL, publico, 1, largura=5, rotulo=True)])
+    g_pib = grafico_divida_pib_fy()
     tot, pub = q(cf.fred("GFDEBTN")), q(cf.fred("FYGFDPUN"))
     fed, ext = q(cf.fred("FDHBFRBN")), q(cf.fred("FDHBFIN"))
     ks = sorted(k for k in tot if k in pub and k in fed and k in ext)
@@ -1203,12 +1234,13 @@ def graficos_divida_eua():
                  subtitulo="Fim de trimestre; demais investidores nos EUA por diferença (bancos, fundos, famílias, "
                            "estados); %s: estrangeiros %s%%, Fed %s%%"
                            % (cf.rot_mes(u), cf.br(pct["Estrangeiros"][u], 0), cf.br(pct["Fed"][u], 0)),
-                 unidade="%", barra=3, buracoMax=3,
+                 unidade="pct1", buracoMax=3,
                  fonte="Tesouro dos EUA e Federal Reserve via FRED (GFDEBTN, FYGFDPUN, FDHBFRBN e FDHBFIN) e FtM",
                  variantes=[
-                     dict(rot="% do total", series=[cf.serie(n, cores[n], pct[n], 1, tipo="barra") for n in ordem]),
+                     dict(rot="% do total", series=[cf.serie(n, cores[n], pct[n], 1, largura=4, rotulo=True)
+                                                    for n in ordem]),
                      dict(rot="US$ trilhões", unidade="usd-tri",
-                          series=[cf.serie(n, cores[n], partes[n], 2, tipo="barra") for n in ordem])])
+                          series=[cf.serie(n, cores[n], partes[n], 2, largura=4, rotulo=True) for n in ordem])])
     return [g_pib, g_det]
 
 
@@ -1291,7 +1323,7 @@ def graficos_eua():
 MIDTERMS_IDS = ["midterms-historia-aprovacao", "midterms-resultado-camara", "midterms-resultado-senado",
                 "midterms-resultado-mapa-senado"]
 
-EUA = [("Atividade nos EUA", "ism-pmi"), ("", "pib-eua-contribuicoes"), ("Inteligência artificial", "pib-eua-investimento-ti"), ("", "pib-eua-investimento-importacoes"),
+EUA = [("Atividade nos EUA", "ism-pmi"), ("", "pib-eua-contribuicoes"), ("", "pib-eua-investimento-importacoes"), ("Inteligência artificial", "pib-eua-investimento-ti"),
        ("", "construcao-datacenters-fabricas"), ("", "datacenters-participacao"), ("Crédito corporativo", "spreads-credito"),
        ("", "treasuries-5-10-30"), ("", "ia-divida"), ("", "ia-cds-bloomberg"),
        ("", "ia-cds-reuters"), ("Déficit fiscal", "eua-deficit"), ("", "governo-receita-despesa"),
@@ -1304,8 +1336,7 @@ EUA = [("Atividade nos EUA", "ism-pmi"), ("", "pib-eua-contribuicoes"), ("Inteli
        ("", "anthropic-moat"),
        ("Mercado de trabalho", "payroll-setores"), ("", "eua-payroll-breakeven"), ("", "eua-u3-u6"),
        ("", "eua-participacao"), ("Inflação nos EUA", "cpi-cheio-nucleo"), ("", "cpi-componentes"),
-       ("", "pce-nucleos"), ("", "pce-componentes"), ("Fed", "fomc-comunicados"), ("", "fed-ativos-juros-cpi"), ("", "fed-fedwatch"),
-       ("Bolsa", "sp500-pl")]
+       ("", "pce-nucleos"), ("Fed", "fomc-comunicados"), ("", "fed-ativos-juros-pce"), ("", "fed-fedwatch")]
 PARTE_EUA = "Cenário econômico dos EUA"
 
 
@@ -1318,18 +1349,39 @@ EMPRESAS = [("SpaceX", "spacex-receita-trimestral"), ("", "spacex-caixa-9m"), ("
             ("Anthropic", "anthropic-receita-trimestral"), ("", "anthropic-dre-acumulado"),
             ("", "anthropic-despesas-receita"), ("", "anthropic-valor-mercado"), ("", "anthropic-preco-vendas"),
             ("", "anthropic-moat")]
-# CME FedWatch (probabilidades condicionais por reunião), copiado à mão do
+# CME FedWatch (probabilidades agregadas por reunião), copiado à mão do
 # print que ele mandou em 15/11/2026: o CME bloqueia acesso automático.
 # Intervalos em pontos-base; None = o CME não mostra o intervalo naquela reunião.
-FEDWATCH_INTERVALOS = [375, 400, 425, 450, 475, 500, 525, 550]
-FEDWATCH = [("09/12/2026", [0.0, 88.5, 11.5, 0.0, 0.0, 0.0, None, None]),
-            ("27/01/2027", [0.0, 23.5, 68.1, 8.5, 0.0, 0.0, 0.0, 0.0]),
-            ("17/03/2027", [0.0, 7.1, 37.0, 49.9, 5.9, 0.0, 0.0, 0.0]),
-            ("28/04/2027", [0.0, 4.5, 26.1, 45.2, 21.9, 2.1, 0.0, 0.0]),
-            ("09/06/2027", [0.0, 2.7, 17.4, 37.5, 31.4, 10.2, 0.9, 0.0]),
-            ("28/07/2027", [0.0, 2.3, 15.1, 34.4, 32.3, 13.4, 2.3, 0.1]),
-            ("15/09/2027", [0.0, 2.0, 13.3, 31.7, 32.6, 16.1, 3.9, 0.4]),
-            ("17/11/2027", [0.3, 3.5, 15.9, 31.8, 30.3, 14.4, 3.4, 0.4])]
+FEDWATCH_INTERVALOS = [400, 425, 450, 475]
+FEDWATCH = [("09/12/2026", [88.48, 11.52, 0.0, 0.0]),
+            ("27/01/2027", [15.0, 85.0, 0.0, 0.0]),
+            ("17/03/2027", [0.0, 45.43, 54.57, 0.0]),
+            ("28/04/2027", [0.0, 9.0, 91.0, 0.0]),
+            ("09/06/2027", [0.0, 0.0, 68.5, 31.5]),
+            ("28/07/2027", [0.0, 0.0, 53.0, 47.0]),
+            ("15/09/2027", [0.0, 0.0, 39.0, 61.0]),
+            ("17/11/2027", [0.0, 0.0, 52.85, 47.15])]
+
+
+def balanco_fed_pce():
+    """O gráfico de ativos do Fed do relatório de 28/10, com o PCE no lugar do CPI."""
+    g = cf.balanco_fed()
+    pce = cf.desde(cf.var(cf.fred("PCEPI")), "2003-01")
+    g["series"] = [x for x in g["series"] if not x["nome"].startswith("CPI")] + [
+        cf.serie("PCE, % em 12 meses", VERDE, pce, 2, rotulo=True, unidade="pct1")]
+    g.update(id="fed-ativos-juros-pce", titulo="Ativos do Fed, fed funds e PCE",
+             fonte="Federal Reserve e BEA (via FRED) e FtM")
+    return g
+
+
+def ultimos_5_anos(g, **extra):
+    """Recortes "Série inteira" e "Últimos 5 anos" (pedido dele em 15/11/2026)."""
+    ult = max(p[0] for x in g["series"] for p in x["dados"])
+    ini = "%d-%s" % (int(ult[:4]) - 5, ult[5:7])
+    recente = [dict(x, dados=[p for p in x["dados"] if p[0] > ini]) for x in g["series"]]
+    g["variantes"] = [dict(rot="Série inteira", series=g.pop("series")),
+                      dict(rot="Últimos 5 anos", series=recente, **extra)]
+    return g
 
 
 def tabela_fedwatch():
@@ -1343,12 +1395,12 @@ def tabela_fedwatch():
     for data, ps in FEDWATCH:
         mx = max(p for p in ps if p is not None)
         linhas.append([dict(t=data[:6] + data[8:], forte=True)] + [
-            None if p is None else dict(t=cf.br(p, 1), **(dict(forte=True, cor="#8EB4E3") if p == mx else {}))
+            None if p is None else dict(t=cf.br(p, 2), **(dict(forte=True, cor="#8EB4E3") if p == mx else {}))
             for p in ps])
     return dict(id="fed-fedwatch", tipo="tabela", titulo="Probabilidades para os juros nas próximas reuniões do Fed",
-                subtitulo="Probabilidade, em %, de cada intervalo da meta dos fed funds (em % ao ano) depois de cada "
-                          "reunião, implícita nos futuros; em destaque, o intervalo mais provável; hoje a meta é de "
-                          "3,75% a 4,00%",
+                subtitulo="Probabilidade agregada, em %, de cada intervalo da meta dos fed funds (em % ao ano) depois "
+                          "de cada reunião, implícita nos futuros; em destaque, o intervalo mais provável; hoje a meta "
+                          "é de 3,75% a 4,00%",
                 fonte="CME FedWatch, consulta de novembro de 2026",
                 colunas=[dict(rot="Reunião")] + [dict(rot=faixa(b), num=True) for b in FEDWATCH_INTERVALOS],
                 linhas=linhas)
@@ -1395,16 +1447,42 @@ def grafico_pib_investimento_importacoes():
                         mc.linha("PIB", BRANCO, pib, 1, largura=4)])
 
 
+# Valor de mercado da Anthropic: as ações em circulação depois do IPO, como
+# estão no S-1/A nº 2 (SEC, 10/11/2026), e não os 16,94 bi "totalmente
+# diluídos" que o ftm-dados estima pelo fundo de benefício público (pedido
+# dele em 15/11/2026: conferir o número de ações). Preço: meio da faixa.
+ANTHROPIC_ACOES_POS_IPO = 13086672593
+ANTHROPIC_PRECO = 74.0
+
+
+def ajustar_anthropic(gs):
+    vm = gs["anthropic-valor-mercado"]
+    serie = next(x for x in vm["series"] if x["nome"] == "Anthropic")
+    antes = serie["dados"][0][1]
+    novo = ANTHROPIC_ACOES_POS_IPO * ANTHROPIC_PRECO / 1e9
+    serie["dados"] = [[serie["dados"][0][0], round(novo, 2)]]
+    vm["subtitulo"] = ("Em US$; a Anthropic pelo meio da faixa do IPO (US$ 70 a 78) × 13,09 bi de ações em circulação "
+                       "depois da oferta (S-1/A de 10/11/2026)")
+    fator = novo / antes
+    for v in gs["anthropic-preco-vendas"]["variantes"]:
+        x = next(x for x in v["series"] if x["nome"] == "Anthropic")
+        x["dados"] = [[p[0], round(p[1] * fator, 2)] for p in x["dados"]]
+    print("  Anthropic a US$ %.0f: US$ %.1f bi (antes %.1f); P/V %s" % (ANTHROPIC_PRECO, novo, antes, [
+        next(x for x in v["series"] if x["nome"] == "Anthropic")["dados"][0][1]
+        for v in gs["anthropic-preco-vendas"]["variantes"]]))
+
+
 def graficos_empresas():
     gs = graficos_ftm_dados("dados/acoes-eua.json")
-    out = []
+    out = {}
     for _, gid in EMPRESAS:
         g = json.loads(json.dumps(gs[gid]))
         if g.get("trimestral"):
             g = trimestre_em_categoria(g)
         g["unidade"] = UNIDADES_EMPRESAS.get(g.get("unidade"), g.get("unidade"))
-        out.append(g)
-    return out
+        out[gid] = g
+    ajustar_anthropic(out)
+    return list(out.values())
 
 
 # ================================================================ bitcoin e stablecoins
@@ -2035,8 +2113,9 @@ def main():
     for k in ("periodoPadrao", "selecao"):
         pe.pop(k, None)
     pe.update(barra=3, fonte=pe.get("fonte") or eua["pib-eua-contribuicoes"]["fonte"],
-              subtitulo=pe["subtitulo"] + "; desde 1947; arraste no gráfico para escolher o período")
-    eua["pib-eua-contribuicoes"] = pe
+              subtitulo=pe["subtitulo"])
+    eua["pib-eua-contribuicoes"] = ultimos_5_anos(pe, barra=0.8)
+    eua["ism-pmi"] = ultimos_5_anos(eua["ism-pmi"])
     # desemprego só com o U-3 (sem os recortes do U-6); a participação é a da Wealth (cenário de novembro)
     u = eua["eua-u3-u6"]
     u3 = [x for x in u["variantes"][0]["series"] if "U-3" in x["nome"]]
@@ -2046,7 +2125,7 @@ def main():
                             subtitulo="% da força de trabalho, com ajuste sazonal", series=u3)
     eua.update({g["id"]: g for g in graficos_empresas()})
     eua["pib-eua-investimento-importacoes"] = grafico_pib_investimento_importacoes()
-    eua["fed-ativos-juros-cpi"] = cf.balanco_fed()
+    eua["fed-ativos-juros-pce"] = balanco_fed_pce()
     eua["fed-fedwatch"] = tabela_fedwatch()
     if "eua-participacao" not in eua:
         eua["eua-participacao"] = cn.graficos_ftm_dados_eua()["participacao"]
