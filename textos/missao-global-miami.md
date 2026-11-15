@@ -194,9 +194,11 @@ O comunicado de novembro muda o tom. Ele diz que a atividade mostra "uma modera�
 ## Atividade nos EUA
 parte: Cenário econômico dos EUA
 
-O índice de gerentes de compras (PMI) da manufatura subiu para 55,5 em outubro, o 10º mês seguido acima de 50, e o de serviços ficou em 54,5. O que puxa a manufatura é a IA, não o petróleo. Computadores e eletrônicos foi o 2º setor que mais cresceu em produção e está entre os 12 (de 18) que cresceram no mês; petróleo e carvão não aparece entre eles. Memória, componentes eletrônicos e circuitos integrados estão na lista de itens em falta, e um dos entrevistados resume: "qualquer commodity consumida por IA e data centers está em aperto, de oferta e de preço".
+O índice de gerentes de compras (PMI) da manufatura subiu para 55,5 em outubro, o 10º mês seguido acima de 50, e o de serviços ficou em 54,5.
 
-O petróleo entra pelo custo: diesel e derivados estão entre os itens que subiram de preço, e a guerra no Irã aparece em 21% dos comentários negativos. Parte da alta do índice vem de gargalo: a produção chegou a 59,0, a maior desde novembro de 2021, mas as entregas dos fornecedores também ficaram mais lentas (59,1), e entrega lenta soma pontos ao PMI.
+O que puxa a manufatura é a IA. Computadores e eletrônicos foi o 2º setor que mais cresceu em produção e está entre os 12 (de 18) que cresceram no mês. Memória, componentes eletrônicos e circuitos integrados estão na lista de itens em falta, e um dos entrevistados resume: "qualquer commodity consumida por IA e data centers está em aperto, de oferta e de preço".
+
+Parte da alta do índice vem de gargalo: a produção chegou a 59,0, a maior desde novembro de 2021, mas as entregas dos fornecedores também ficaram mais lentas (59,1), o que soma pontos ao PMI.
 
 ##
 
