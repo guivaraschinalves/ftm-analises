@@ -639,8 +639,41 @@ DESDE_2023 = ["pmc-pms-trimestre", "pms-volume-inflacao-tri", "credito-direciona
               "ipca-difusao-grupos", "servicos"]
 
 
+JUROS_REAIS = [4.0, 5.0, 6.0, 7.0, 8.0, 9.0]
+CRESCIMENTOS = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0]
+DESTAQUE_RG = {(7.0, 1.5), (7.0, 2.0)}
+
+
+def tabela_primario_estabiliza(brasil):
+    """Primário que estabiliza a dívida bruta, por juro real r e crescimento
+    real g (pedido dele em 15/11/2026): p = d × (r − g) ÷ (1 + g), com d = a
+    dívida bruta do governo geral (metodologia a partir de 2008) mais recente."""
+    v = next(v for v in brasil["divida-duas-metodologias"]["variantes"] if v["rot"] == "Em % do PIB")
+    x = next(x for x in v["series"] if "2008" in x["nome"])
+    mes, d = x["dados"][-1]
+    linhas = []
+    for r in JUROS_REAIS:
+        linha = [dict(t=cf.br(r, 1) + "%", forte=True)]
+        for g in CRESCIMENTOS:
+            p = d * (r - g) / (100 + g)
+            linha.append(dict(t=cf.br(p, 1), **(dict(forte=True, cor="#8EB4E3") if (r, g) in DESTAQUE_RG else {})))
+        linhas.append(linha)
+    print("  primário que estabiliza: d = %.1f%% (%s); r 7%%, g 2%%: %.1f%%" % (d, mes, d * 5 / 102))
+    return dict(id="primario-estabiliza-divida", tipo="tabela",
+                titulo="Primário que estabiliza a dívida bruta, por juro real e crescimento",
+                subtitulo="Em %% do PIB; linhas = juro real r, colunas = crescimento real do PIB g; dívida bruta do "
+                          "governo geral de %s%% do PIB (%s, metodologia a partir de 2008); primário = receitas menos "
+                          "despesas, sem juros; em destaque, r de 7%% com g entre 1,5%% e 2,0%%"
+                          % (cf.br(d, 1), cf.rot_mes(mes)),
+                fonte="Banco Central (SGS 13762) e FtM",
+                nota="Primário que estabiliza a dívida: p = d × (r − g) ÷ (1 + g), com d a dívida em % do PIB.",
+                colunas=[dict(rot="r \\ g")] + [dict(rot=cf.br(g, 1) + "%", num=True) for g in CRESCIMENTOS],
+                linhas=linhas)
+
+
 def ajustes_brasil(brasil):
     """Pedidos dele de 14/11/2026 para a parte Brasil."""
+    brasil["primario-estabiliza-divida"] = tabela_primario_estabiliza(brasil)
     # concessões: contribuições em 12 meses, livre e direcionado num cartão só, PF e PJ
     for novo, quem, livre, direc in (("credito-concessoes-pf-contribuicoes", "pessoas físicas",
                                       "credito-concessoes-tab11", "credito-concessoes-tab13"),
@@ -1904,7 +1937,7 @@ BRASIL = [("Atividade", "pmc-pms-trimestre"), ("", "pms-volume-inflacao-tri"), (
           ("Inflação", "contribuicao-ipca-grupos"), ("", "ipca-projecoes-focus"), ("", "ipca-distancia-meta"), ("", "ipca-alimentacao-contribuicao"),
           ("", "ipca-alimentacao-itens"), ("", "ipca-difusao-grupos"), ("", "servicos"),
           ("", "administrados-livres"),
-          ("Fiscal", "resultado-primario"), ("", "receita-rfb-pib"), ("", "despesa-juros-pib"), ("", "divida-duas-metodologias"),
+          ("Fiscal", "resultado-primario"), ("", "receita-rfb-pib"), ("", "despesa-juros-pib"), ("", "divida-duas-metodologias"), ("", "primario-estabiliza-divida"),
           ("", "despesa-por-presidente"), ("", "credito-ampliado-contribuicoes-total"), ("", "divida-composicao"), ("", "divida-detentores"),
           ("Setor externo e câmbio", "bp-12m"), ("", "bp-cc-12m"), ("", "petroleo-derivados-12m"),
           ("", "bp-reservas-composicao"), ("", "bp-reservas-divida"), ("", "bp-reservas-moeda"),

@@ -119,6 +119,12 @@ A dívida bruta sobe nas duas metodologias. Pela oficial, está em 82,9% do PIB.
 
 ##
 
+O tão falado ajuste fiscal é fazer o governo voltar a poupar o suficiente para a dívida parar de subir em relação ao PIB. A conta tem três peças. O juro real faz a dívida crescer. O crescimento da economia a dilui, porque aumenta o PIB que fica no denominador. E o resultado primário, receitas menos despesas sem contar os juros, é a parte que o governo controla. Quanto maior o juro real e menor o crescimento, maior o primário necessário.
+
+Num cenário de juro real de 7% e crescimento entre 1,5% e 2,0% ao ano, o primário que estabiliza a dívida bruta fica entre 4,1% e 4,5% do PIB. Hoje o governo tem déficit primário de 0,5% do PIB. O ajuste, portanto, seria de 4,6 a 5,0 pontos do PIB, algo entre R$ 620 bilhões e R$ 670 bilhões por ano.
+
+##
+
 No mandato atual, a despesa obrigatória subiu R$ 355 bilhões e a discricionária, R$ 74 bilhões, a preços de julho de 2026. É o único mandato desde 2008 em que a despesa discricionária cresceu.
 
 ##
