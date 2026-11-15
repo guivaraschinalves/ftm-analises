@@ -2149,7 +2149,7 @@ def graficos_zona_euro():
     print("  França %s: não residentes %.0f%%, banco central %.0f%%" % (ua[:4], nr["FR"][ua], bc["FR"].get(ua, 0)))
     cores = {"FR": "#9BBB59", "IT": "#8EB4E3", "DE": CINZA}
     nomes = {"FR": "França", "IT": "Itália", "DE": "Alemanha"}
-    g_det = dict(id="franca-detentores", titulo="Quem detém a dívida da França, da Itália e da Alemanha",
+    g_det = dict(id="franca-detentores", titulo="Detentores da dívida pública: França, Itália e Alemanha",
                  subtitulo="Em % da dívida bruta do governo geral, fim de ano", unidade="pct1", buracoMax=12,
                  fonte="BCE (estatísticas de finanças públicas) e FtM", variantes=[
                      dict(rot="Não residentes", series=[cf.serie(nomes[c], cores[c], nr[c], 1, largura=5 if c == "FR" else 3,
@@ -2179,7 +2179,7 @@ def graficos_zona_euro():
     idx = {a: str(k) for k, a in enumerate(anos)}
     def cat(dd):
         return [[idx[a], round(dd[a], 2)] for a in anos]
-    g_rg = dict(id="franca-r-g", titulo="França: o que mexe na dívida a cada ano",
+    g_rg = dict(id="franca-r-g", titulo="França: decomposição da variação da dívida pública",
                 subtitulo="Variação da dívida bruta do governo geral, em pontos do PIB; barras = contribuição do déficit "
                           "primário, dos juros menos o crescimento nominal (r − g) e dos ajustes estoque-fluxo",
                 unidade="pp", categorias=anos, fonte="BCE (estatísticas de finanças públicas) e FtM",
@@ -2272,6 +2272,7 @@ def main():
     eua.update({g["id"]: g for g in graficos_empresas()})
     eua["pib-eua-investimento-importacoes"] = grafico_pib_investimento_importacoes()
     eua["fed-ativos-juros-pce"] = balanco_fed_pce()
+    eua["despesa-contribuicao"]["titulo"] = "Despesa do governo federal dos EUA: contribuição por função"
     eua["fed-fedwatch"] = tabela_fedwatch()
     if "eua-participacao" not in eua:
         eua["eua-participacao"] = cn.graficos_ftm_dados_eua()["participacao"]

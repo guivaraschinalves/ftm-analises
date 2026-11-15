@@ -200,9 +200,7 @@ def graficos_bp_eua(pib):
              ("financeira", "Conta financeira", VERDE), ("reservas", "Reservas internacionais", LARANJA),
              ("erros", "Erros e omissões", VERMELHO)]
     g_pct = dict(id="eua-bp-pib", titulo="Balanço de pagamentos dos EUA em % do PIB",
-                 subtitulo="Acumulado em 4 trimestres, em %% do PIB, desde 1973; conta financeira sem as "
-                           "reservas, positiva quando entra capital; %s: conta corrente %s%%, financeira %s%%"
-                           % (rot_tri(u), cf.br(pct["cc"][u], 1), cf.br(pct["financeira"][u], 1)),
+                 subtitulo="Acumulado em 4 trimestres, em % do PIB, desde 1973",
                  unidade="%", barra=3, buracoMax=3,
                  fonte="BEA (desde 1999) e FMI (Balance of Payments, antes) via FRED e DBnomics; FtM",
                  series=[barras(n, c, pct[k], 2, rotulo=k in ("cc", "financeira", "erros"), contorno=k == "reservas") for k, n, c in nomes])
@@ -299,9 +297,7 @@ def graficos_china():
              ("financeira", "Conta financeira", VERDE), ("reservas", "Reservas internacionais", LARANJA),
              ("erros", "Erros e omissões", VERMELHO)]
     g_bp = dict(id="china-bp", titulo="Balanço de pagamentos da China",
-                subtitulo="US$ bilhões, acumulado em 4 trimestres (esq.), desde 1998; conta financeira sem as "
-                          "reservas, negativa quando sai capital; reservas negativas = compra pelo banco central; "
-                          "yuans por dólar (dir.); %s: conta corrente US$ %s bi" % (rot_tri(u), cf.br(q["cc"][u], 0)),
+                subtitulo="US$ bilhões, acumulado em 4 trimestres (esq.), desde 1998",
                 unidade="usd-bi", unidade2="cny", barra=3, buracoMax=3,
                 fonte="SAFE (China), Federal Reserve via FRED (DEXCHUS) e FtM",
                 series=[barras(n, c, q[k], 1, rotulo=k in ("cc", "financeira", "reservas"), contorno=k == "reservas")
@@ -319,9 +315,7 @@ def graficos_china():
     lim_bi = 300 * -(-max(abs(v) for v in saldo.values()) // 300)       # passo de 100 ou mais, 6 intervalos
     lim_pct = 3 * -(-max(abs(v) for v in pct.values()) // 3)
     g_saldo = dict(id="china-bp-saldo", titulo="Saldo do balanço de pagamentos da China",
-                   subtitulo="US$ bilhões por ano (esq.) e em %% do PIB (dir.); saldo = conta corrente + capital + "
-                             "financeira + erros, que é o que o banco central compra (ou vende) de reservas; %s: "
-                             "US$ %s bi, %s%% do PIB" % (ua, cf.br(saldo[ua], 0), cf.br(pct[ua], 1)),
+                   subtitulo="US$ bilhões por ano (esq.) e em % do PIB (dir.)",
                    unidade="usd-bi", unidade2="%", categorias=anos, barra=0.7,
                    # zero na mesma linha dos dois eixos: limites simétricos, 6 intervalos
                    eixo=dict(min=-lim_bi, max=lim_bi), eixo2=dict(min=-lim_pct, max=lim_pct),
