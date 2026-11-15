@@ -690,9 +690,10 @@ def ajustes_brasil(brasil):
         if g.get("variantes"):
             raise RuntimeError("%s já tem recortes; o desde jan/2023 precisa de outro jeito" % gid)
         recente = [dict(x, dados=[p for p in x["dados"] if p[0] >= "2023-01"]) for x in g["series"]]
-        g["variantes"] = [dict(rot="Série inteira", series=g.pop("series")), dict(rot="Desde jan/2023", series=recente)]
+        # o recorte recente abre primeiro; a série inteira fica como a outra opção (pedido dele)
+        g["variantes"] = [dict(rot="Desde jan/2023", series=recente), dict(rot="Série inteira", series=g.pop("series"))]
     # serviços desde jan/2023: o eixo começa em 4% (pedido dele)
-    brasil["servicos"]["variantes"][1]["eixo"] = {"min": 4}
+    brasil["servicos"]["variantes"][0]["eixo"] = {"min": 4}
     # PIB: componentes como está; o segundo recorte vira FBCF e governo
     pp = brasil["pib-participacao"]
     comp = next(v for v in pp["variantes"] if v["rot"] == "Componentes")
@@ -1408,12 +1409,12 @@ def balanco_fed_pce():
 
 
 def ultimos_5_anos(g, **extra):
-    """Recortes "Série inteira" e "Últimos 5 anos" (pedido dele em 15/11/2026)."""
+    """Recortes "Últimos 5 anos" (o que abre) e "Série inteira" (pedido dele em 15/11/2026)."""
     ult = max(p[0] for x in g["series"] for p in x["dados"])
     ini = "%d-%s" % (int(ult[:4]) - 5, ult[5:7])
     recente = [dict(x, dados=[p for p in x["dados"] if p[0] > ini]) for x in g["series"]]
-    g["variantes"] = [dict(rot="Série inteira", series=g.pop("series")),
-                      dict(rot="Últimos 5 anos", series=recente, **extra)]
+    g["variantes"] = [dict(rot="Últimos 5 anos", series=recente, **extra),
+                      dict(rot="Série inteira", series=g.pop("series"))]
     return g
 
 
