@@ -35,3 +35,6 @@ dados/.cache-jodi/
 # Midterms: Michigan, boca de urna da CNN e UCSB, baixados por
 # scripts/midterms_motivos.py (--atualizar baixa de novo).
 dados/.cache-midterms/
+
+# DI1 da B3 (scripts/missao_di.py): duas taxas por pregão, refeitas da B3 se faltar
+dados/.cache-b3/

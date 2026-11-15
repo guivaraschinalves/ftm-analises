@@ -1832,7 +1832,7 @@ BRASIL = [("Atividade", "pmc-pms-trimestre"), ("", "pms-volume-inflacao-tri"), (
           ("", "bp-reservas-composicao"), ("", "bp-reservas-divida"), ("", "bp-reservas-moeda"),
           ("", "bp-necessidade-curto-prazo"), ("", "bp-carteira-dom-3m"), ("", "bp-criptos-12m"),
           ("", "moedas-pp-real"), ("", "moedas-cambio-ppc"),
-          ("Selic", "selic-recessoes"), ("", "selic-ciclos"), ("", "copom-comunicados")]
+          ("Selic", "selic-recessoes"), ("", "selic-ciclos"), ("", "copom-comunicados"), ("", "di1-2027")]
 
 
 # ================================================================ juros no mundo
@@ -2012,6 +2012,8 @@ def main():
               for g in f()}
     brasil.update({g_rec["id"]: g_rec, g_ciclos["id"]: g_ciclos})
     ajustes_brasil(brasil)
+    import missao_di
+    brasil["di1-2027"] = missao_di.grafico_di1()
     import missao_fiscal
     brasil.update({g["id"]: g for g in missao_fiscal.graficos()})
     faltam = [gid for _, gid in BRASIL if gid not in brasil]
