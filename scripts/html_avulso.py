@@ -19,6 +19,8 @@ Como funciona:
   ?t=, que num data URI quebraria o base64);
 - os botões de reordenar somem (gravar a ordem pede a chave do GitHub, e a
   ordem que vale já vem aplicada da gravada);
+- Zoom e Tela cheia saem dos cartões (e da página): no lugar, "Apresentar daqui"
+  abre a apresentação no gráfico;
 - a Bebas Neue dos títulos da Missão vem embutida, baixada uma vez do Google
   Fonts (sem internet, sem ela, o título cai na letra padrão).
 """
@@ -100,7 +102,8 @@ def montar(arquivo):
     if bebas:
         # com a letra embutida, o <link> que o app.js põe para o Google vira folha vazia
         js = js.replace(FONTE_GOOGLE, "data:text/css,")
-    extra_css = ".ordem-controles, .ordem-barra { display: none !important; }\n" + bebas
+    # no avulso, Zoom e Tela cheia saem: cada cartão ganha "Apresentar daqui" (data-so-apresentar)
+    extra_css = (".ordem-controles, .ordem-barra, #tela-cheia-pagina { display: none !important; }\n" + bebas)
     # a fachada do fetch: o app.js pede dados/x.json?t=..., recebe o embutido
     fachada = """
 (function () {
@@ -126,7 +129,8 @@ def montar(arquivo):
                   lambda m: "<style>\n%s\n%s</style>" % (css, extra_css), html)
     html = re.sub(r'<script src="app\.js[^"]*"></script>',
                   lambda m: "%s\n<script>%s</script>\n<script>\n%s\n</script>" % (scripts_json, fachada, js), html)
-    html = re.sub(r"<body([^>]*)>", lambda m: '<body%s data-fontes="%s">' % (m.group(1), arquivo), html, count=1)
+    html = re.sub(r"<body([^>]*)>", lambda m: '<body%s data-fontes="%s" data-so-apresentar>' % (m.group(1), arquivo),
+                  html, count=1)
     html = re.sub(r"<title>.*?</title>", lambda m: "<title>%s</title>" % titulo, html, count=1)
     if "<style>" not in html or 'data-caminho="' not in html:
         raise SystemExit("o index.html mudou: não achei a folha de estilo ou o app.js para embutir")

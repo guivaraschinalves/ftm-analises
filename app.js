@@ -3183,6 +3183,22 @@
               mostrarControles: mostrarControles, slides: [], i: -1, cartao: null, comTexto: false };
   }
 
+  // "Apresentar daqui": no HTML avulso (<body data-so-apresentar>), o botão do
+  // cartão no lugar de Zoom e Tela cheia, que abre a apresentação nele
+  var SO_APRESENTAR = !!(document.body && document.body.hasAttribute("data-so-apresentar"));
+  function botaoApresentarDaqui(cartao) {
+    var b = html("button", { type: "button", "class": "btn", title: "Apresentar em slides a partir deste gráfico" });
+    b.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">' +
+      '<path d="M7 4.5v15l12-7.5z"/></svg>';
+    b.appendChild(html("span", { texto: "Apresentar daqui" }));
+    b.addEventListener("click", function () {
+      var ss = slidesDaPagina(), k = 0;
+      for (var j = 0; j < ss.length; j++) if (ss[j].cartao === cartao) { k = j; break; }
+      abrirApresentacao(k);
+    });
+    return b;
+  }
+
   function abrirApresentacao(inicio) {
     if (!apres) montarApresentacao();
     apres.slides = slidesDaPagina();
@@ -3345,6 +3361,7 @@
     ferramentas.appendChild(esquerda);
 
     var acoes = html("div", { "class": "card-acoes" });
+    if (SO_APRESENTAR) acoes.appendChild(botaoApresentarDaqui(cartao));
     if (g.tipo === "figura") {
       // imagem de terceiros (gráfico de outra fonte): o que dá é ir à origem
       if (g.link) {
@@ -3353,6 +3370,8 @@
       }
       acoes.appendChild(html("a", { "class": "btn", href: g.imagem, target: "_blank", rel: "noopener noreferrer",
                                     texto: "Abrir a imagem" }));
+    } else if (g.tipo === "comunicados" && SO_APRESENTAR) {
+      // no avulso, o comparador se lê na apresentação
     } else if (g.tipo === "comunicados") {
       // nada a baixar: o texto é o do Fed, e o link de cada um fica no
       // comparador. Zoom e tela cheia levam o comparador (o mesmo, com as
@@ -3385,8 +3404,10 @@
       cartao.botaoTelaCheia = btnFs;
       // sem a API (o Safari do iPhone, por exemplo), fica só o Zoom
       if (!fullscreenSuportado(document.documentElement)) btnFs.hidden = true;
-      acoes.appendChild(btnZoom);
-      acoes.appendChild(btnFs);
+      if (!SO_APRESENTAR) {
+        acoes.appendChild(btnZoom);
+        acoes.appendChild(btnFs);
+      }
       acoes.appendChild(menuBaixar(cartao));
     }
     ferramentas.appendChild(acoes);
