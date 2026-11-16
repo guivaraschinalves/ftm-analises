@@ -2373,6 +2373,7 @@ CORES_MISSAO = {
     "china-yuan-ppc": {"Câmbio de mercado": VERMELHO_M, "Câmbio pela PPC": BRANCO_M},   # nas três datas-base
     "eua-tarifa-efetiva": {"Tarifa efetiva": BRANCO_M},
     "tarifas-receita-anos": {"2025": VERDE_M},
+    "tarifas-liquida-anos": {"2025": VERDE_M},
 }
 # gráficos que ficam com as cores de antes da troca automática
 CORES_ORIGINAIS = ["bp-reservas-divida", "spread-franca-italia"]      # no spread, a Itália segue azul claro
