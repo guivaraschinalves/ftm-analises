@@ -2370,6 +2370,7 @@ CORES_MISSAO = {
     "china-reservas": {"Reservas sem ouro": "#F79646"},      # laranja, a cor das reservas no BP
     "china-reservas-pib": {"Reservas / PIB": "#F79646"},
     "china-yuan": {"Yuans por dólar": VERMELHO_M},
+    "china-yuan-ppc": {"Câmbio de mercado": VERMELHO_M},       # nas três datas-base
 }
 # gráficos que ficam com as cores de antes da troca automática
 CORES_ORIGINAIS = ["bp-reservas-divida", "spread-franca-italia"]      # no spread, a Itália segue azul claro
