@@ -272,9 +272,8 @@ def graficos_bp_eua(pib):
         d = {k: v for k, v in fmi_d.items() if k < "1999-01"}
         d.update(bea_d)
         return d
-    cores_fa = {"IED no exterior": AZUL, "IED no país": VERMELHO, "Carteira no exterior": VERDE,
-                "Carteira no país": AZUL_CLARO, "Outros investimentos e derivativos": AMARELO}
-    fa_pct = [(n, cores_fa[n], pct_pib(emenda_fa(d, fa_fmi[n]))) for n, _, d in fa]
+    # as cores da conta financeira em US$ (pedido dele em 16/11/2026: sempre essas)
+    fa_pct = [(n, c, pct_pib(emenda_fa(d, fa_fmi[n]))) for n, c, d in fa]
     s_pct = pct_pib(emenda_fa(saldo, saldo_fmi))
     up = max(s_pct)
     g_fa_pct = dict(id="eua-conta-financeira-pib", titulo="Conta financeira dos EUA por componente em % do PIB",
