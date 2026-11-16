@@ -2360,6 +2360,9 @@ CORES_MISSAO = {
     "pib-eua-investimento-ti": {"Equipamentos de processamento de informação": BRANCO_M},
     "construcao-datacenters-fabricas": {"Data centers": VERDE_M},
     "spread-franca-italia": {"França": VERMELHO_M},
+    "franca-divida-deficit": {"Itália": BRANCO_M},
+    "btc-preco": {"Bitcoin": "#F79646"},
+    "ouro-preco": {"Ouro": "#FFFF00"},
 }
 # gráficos que ficam com as cores de antes da troca automática
 CORES_ORIGINAIS = ["bp-reservas-divida", "spread-franca-italia"]      # no spread, a Itália segue azul claro
@@ -2512,6 +2515,7 @@ def main():
     for titulo, gid in missao_china.CHINA:
         secoes.append(dict(titulo=titulo, texto="", fontes=[], figuras=[], graficos=[china[gid]]))
     cripto = {g["id"]: g for g in graficos_cripto()}
+    cores_missao(cripto)
     for titulo, gid in CRIPTO:
         secoes.append(dict(titulo=titulo, texto="", fontes=[], figuras=[], graficos=[cripto[gid]]))
     hoje = datetime.date.today().isoformat()
