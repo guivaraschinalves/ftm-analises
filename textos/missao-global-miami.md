@@ -452,6 +452,8 @@ parte: Desequilíbrios globais
 
 ##
 
+##
+
 ## Câmbio do yuan
 
 ##
@@ -481,8 +483,6 @@ parte: Desequilíbrios globais
 ## Ouro nas reservas
 
 ## Balanço de pagamentos dos EUA
-
-##
 
 ##
 
