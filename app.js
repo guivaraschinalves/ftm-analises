@@ -173,6 +173,11 @@
   // sublinhado e a fonte vai para a margem na altura dele, ligada por uma
   // linha. A marcação é tratada ANTES do negrito, e o que sobra de cada
   // pedaço continua passando pelo **negrito** normalmente.
+  // Linhas de dados 20% mais grossas na Missão (pedido dele em 16/11/2026); eixos, grades,
+  // legenda e o resto ficam como estão.
+  function espessuraDaLinha(w) {
+    return document.documentElement.getAttribute("data-marca") === "missao" ? w * 1.2 : w;
+  }
   var MARCA_CITA = /\[([^\]]+)\]\(fonte:([\w-]+)\)/g;
 
   // O negrito é resolvido ANTES da citação, e não ao contrário: o ** alterna
@@ -1515,7 +1520,7 @@
       (g.linhas || []).forEach(function (l) {
         var cor = corNoTema(l.cor, pal), pts = [];
         l.v.forEach(function (v, k) { if (v !== null && v !== undefined) pts.push([xg0 + slot * (k + 0.5), Y(v), v]); });
-        if (pts.length > 1) svg.appendChild(el("polyline", { points: pts.map(function (q) { return q[0] + "," + q[1]; }).join(" "), fill: "none", stroke: cor, "stroke-width": 3.5 }));
+        if (pts.length > 1) svg.appendChild(el("polyline", { points: pts.map(function (q) { return q[0] + "," + q[1]; }).join(" "), fill: "none", stroke: cor, "stroke-width": espessuraDaLinha(3.5) }));
         var casasL = l.casas === undefined ? (g.casas === undefined ? 1 : g.casas) : l.casas;
         pts.forEach(function (q) {
           svg.appendChild(el("circle", { cx: q[0], cy: q[1], r: u * 0.32, fill: cor, stroke: pal.bg, "stroke-width": 2 }));
@@ -2168,7 +2173,7 @@
           });
         }
       }
-      var w = s.largura || L.linha;
+      var w = espessuraDaLinha(s.largura || L.linha);
       area.appendChild(el("path", {
         d: d, fill: "none", stroke: corNoTema(s.cor, pal), "stroke-width": w,
         "stroke-linejoin": "round", "stroke-linecap": s.traco ? "butt" : "round",
