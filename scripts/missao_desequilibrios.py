@@ -477,5 +477,7 @@ def fotos():
 def graficos():
     out = fotos() + [grafico_pib_eua_mundo()] + graficos_emprego_industria() + [grafico_va_industria()]
     out += [FIGURA_FMI, grafico_china_reservas_pib(), grafico_yuan_equilibrio(), FIGURA_BYD]
+    import infografico_byd                                    # a lâmina dos carros, com os passos
+    out = [infografico_byd.figura_carros() if g["id"] == "foto-07" else g for g in out]
     out += [grafico_vix_incerteza()] + graficos_tarifas()
     return out

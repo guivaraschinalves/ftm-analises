@@ -3008,6 +3008,7 @@
 
   function pintarSlide(animar) {
     var s = apres.slides[apres.i], palco = apres.palco;
+    apres.passos = null;
     palco.innerHTML = "";
     palco.className = "apres-palco" + (animar && !SEM_MOVIMENTO ? " ap-entra" : "");
     apres.cartao = s.tipo === "grafico" ? s.cartao : null;
@@ -3025,7 +3026,9 @@
     var c = s.cartao, g = graficoDe(c);
     if (g.tipo === "figura" && g.foto) {
       // foto de abertura de assunto: a lâmina inteira, sem cabeçalho
-      lamina("apres-foto").appendChild(html("img", { src: g.imagem, alt: g.titulo }));
+      var lfo = lamina("apres-foto"), imgFoto = html("img", { src: g.imagem, alt: g.titulo });
+      lfo.appendChild(imgFoto);
+      if (g.passos) montarPassos(lfo, imgFoto, g);
       return;
     }
     if (g.tipo === "figura") {
@@ -3049,6 +3052,47 @@
     idsProprios(d.svg);
     palco.appendChild(d.svg);
     if (animar) animarGrafico(d.svg, g.tipo);
+  }
+
+  // Lâmina com passos (a dos carros): cada → acende uma linha numa caixa por cima da foto, e
+  // a foto fica desfocada; com todas acesas, → passa de lâmina. ← apaga a última.
+  function montarPassos(lam, img, g) {
+    var camada = html("div", { "class": "apres-passos" }), caixas = {}, linhas = [];
+    Object.keys(g.caixas).forEach(function (id) {
+      var cx = html("div", { "class": "apres-caixa" }, [html("h3", { texto: g.caixas[id].nome || "" })]);
+      cx.style.left = g.caixas[id].x + "px";
+      caixas[id] = cx;
+      camada.appendChild(cx);
+    });
+    g.passos.forEach(function (passo) {
+      linhas.push(passo.map(function (l) {
+        var li = html("div", { "class": "apres-linha" + (l.cenario ? " apres-linha-cen" : "") }, [
+          html("span", { "class": "apres-linha-rot", texto: l.rot }),
+          html("b", { texto: l.val })
+        ]);
+        if (l.sub) li.appendChild(html("span", { "class": "apres-linha-sub", texto: l.sub }));
+        caixas[l.caixa].appendChild(li);
+        return li;
+      }));
+    });
+    lam.appendChild(camada);
+    apres.passos = { linhas: linhas, img: img, caixas: caixas, n: 0 };
+  }
+  function mostrarPasso(n) {
+    var p = apres.passos;
+    p.n = Math.max(0, Math.min(p.linhas.length, n));
+    p.linhas.forEach(function (ls, i) { ls.forEach(function (li) { li.classList.toggle("on", i < p.n); }); });
+    Object.keys(p.caixas).forEach(function (id) {
+      p.caixas[id].classList.toggle("on", !!p.caixas[id].querySelector(".apres-linha.on"));
+    });
+    p.img.classList.toggle("desfocada", p.n > 0);
+  }
+  function passoOuLamina(dir) {
+    var p = apres.passos;
+    if (p && ((dir > 0 && p.n < p.linhas.length) || (dir < 0 && p.n > 0))) { mostrarPasso(p.n + dir); return; }
+    irNaApresentacao(apres.i + dir);
+    // voltando para a lâmina dos passos, ela aparece completa, como no PowerPoint
+    if (dir < 0 && apres.passos) mostrarPasso(apres.passos.linhas.length);
   }
 
   function irNaApresentacao(i, animar) {
@@ -3121,7 +3165,7 @@
         el("path", { d: dir < 0 ? "M15 5l-7 7 7 7" : "M9 5l7 7-7 7", fill: "none", stroke: "currentColor",
           "stroke-width": "2.4", "stroke-linecap": "round", "stroke-linejoin": "round" })
       ]));
-      b.addEventListener("click", function (ev) { ev.stopPropagation(); irNaApresentacao(apres.i + dir); });
+      b.addEventListener("click", function (ev) { ev.stopPropagation(); passoOuLamina(dir); });
       return b;
     }
     var setaAnt = seta(-1), setaProx = seta(1);
@@ -3164,8 +3208,8 @@
       if (box.hidden || ev.altKey || ev.ctrlKey || ev.metaKey) return;
       if (ev.target && ev.target.tagName === "SELECT") return;
       var k = ev.key, acao = null;
-      if (k === "ArrowRight" || k === "PageDown" || k === " " || k === "Enter") acao = function () { irNaApresentacao(apres.i + 1); };
-      else if (k === "ArrowLeft" || k === "PageUp" || k === "Backspace") acao = function () { irNaApresentacao(apres.i - 1); };
+      if (k === "ArrowRight" || k === "PageDown" || k === " " || k === "Enter") acao = function () { passoOuLamina(1); };
+      else if (k === "ArrowLeft" || k === "PageUp" || k === "Backspace") acao = function () { passoOuLamina(-1); };
       else if (k === "Home") acao = function () { irNaApresentacao(0); };
       else if (k === "End") acao = function () { irNaApresentacao(apres.slides.length - 1); };
       else if (k === "ArrowUp" || k === "ArrowDown") acao = function () {

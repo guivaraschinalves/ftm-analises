@@ -38,16 +38,78 @@ def br(v, casas=0):
     return s.replace(",", "X").replace(".", ",").replace("X", ".")
 
 
-def main():
+def calcula():
     ptax = json.loads(cf.baixar("https://api.bcb.gov.br/dados/serie/bcdata.sgs.1/dados/ultimos/1?formato=json"))[0]
     brl = float(ptax["valor"])
     cny_d = cf.fred("DEXCHUS", mensal=False)
     dia = max(cny_d)
     cny = cny_d[dia]
     brl_cny = brl / cny
-    byd_cn_r = BYD_CN * brl_cny
-    ford_us_r = FORD_US * brl
     cen = [(base, eq, cny / eq - 1, BYD_BR * cny / eq) for base, eq in EQUILIBRIO]
+    return dict(ptax=ptax, brl=brl, dia=dia, cny=cny, brl_cny=brl_cny, byd_cn_r=BYD_CN * brl_cny,
+                ford_us_r=FORD_US * brl, cen=cen)
+
+
+# ---- a lâmina dos carros, com os preços aparecendo a cada clique (pedido dele em 16/11/2026)
+
+CARROS = [("byd", "carro-byd.png", "BYD Song Plus DM-i", "SUV híbrido plug-in, importado da China"),
+          ("equinox", "carro-equinox.png", "Chevrolet Equinox Activ", "SUV a gasolina, americano, feito no México")]
+BASE_Y = 790
+
+
+def imagem_carros():
+    """A foto dos dois carros (assets/missao/foto-07.jpg), a partir dos recortes oficiais
+    que ele mandou (fundo transparente, sombra clara já trocada por sombra escura)."""
+    from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
+    W, H = 1920, 1080
+    pasta = os.path.join(RAIZ, "assets", "missao")
+    fundo = ImageOps.fit(Image.open(os.path.join(pasta, "fundo-grafico.jpg")).convert("RGB"), (W, H)).convert("RGBA")
+    fb = ImageFont.truetype("/usr/share/fonts/truetype/lato/Lato-Bold.ttf", 50)
+    fr = ImageFont.truetype("/usr/share/fonts/truetype/lato/Lato-Regular.ttf", 30)
+    centros = {}
+    for k, (cid, arq, nome, sub) in enumerate(CARROS):
+        cx = 480 + k * 960
+        car = Image.open(os.path.join(pasta, arq)).convert("RGBA")
+        esc = min(840 / car.width, 520 / car.height)
+        car = car.resize((int(car.width * esc), int(car.height * esc)), Image.LANCZOS)
+        luz = Image.new("L", (W, H), 0)
+        ImageDraw.Draw(luz).ellipse((cx - 470, BASE_Y - car.height - 60, cx + 470, BASE_Y + 40), fill=110)
+        luz = luz.filter(ImageFilter.GaussianBlur(90))
+        fundo = Image.composite(Image.new("RGBA", (W, H), (170, 195, 230, 255)), fundo, luz)
+        fundo.alpha_composite(car, (cx - car.width // 2, BASE_Y - car.height))
+        d = ImageDraw.Draw(fundo)
+        for txt, f, cor, y in ((nome, fb, "white", BASE_Y + 60), (sub, fr, "#c9d6e8", BASE_Y + 128)):
+            w = d.textlength(txt, font=f)
+            d.text((cx - w / 2, y), txt, font=f, fill=cor)
+        centros[cid] = (cx, BASE_Y - car.height // 2)
+    fundo.convert("RGB").save(os.path.join(pasta, "foto-07.jpg"), "JPEG", quality=88, optimize=True, progressive=True)
+    return centros
+
+
+def figura_carros():
+    """A figura da lâmina: a foto e, por cima, uma caixa por carro; cada passo (→, espaço ou
+    Enter na apresentação) acende uma linha, e a foto atrás fica desfocada."""
+    v = calcula()
+    centros = imagem_carros()
+    linha = lambda cx, rot, val, sub=None, cen=False: dict(caixa=cx, rot=rot, val=val, sub=sub, cenario=cen)
+    passos = [[linha("byd", "Preço no Brasil", "R$ " + br(BYD_BR))],
+              [linha("equinox", "Preço no Brasil", "R$ " + br(FORD_BR))],
+              [linha("byd", "Preço na China, no câmbio de hoje", "R$ " + br(v["byd_cn_r"]),
+                     "¥ %s a R$ %s por yuan" % (br(BYD_CN), br(v["brl_cny"], 2))),
+               linha("equinox", "Preço nos EUA, no câmbio de hoje", "R$ " + br(v["ford_us_r"]),
+                     "US$ %s a R$ %s por dólar" % (br(FORD_US), br(v["brl"], 2)))]]
+    for base, eq, val, p in v["cen"]:
+        passos.append([linha("byd", "No Brasil, com o yuan a ¥ %s por US$" % br(eq, 2), "R$ %s mil" % br(p / 1000),
+                             "yuan %s%% mais forte (equilíbrio desde %s)" % (br(100 * val), base), True)])
+    return dict(id="foto-07", tipo="figura", foto=True, imagem="assets/missao/foto-07.jpg",
+                titulo="BYD Song Plus DM-i e Chevrolet Equinox Activ",
+                caixas={cid: dict(x=centros[cid][0], nome=nome) for cid, _, nome, _ in CARROS}, passos=passos)
+
+
+def main():
+    v = calcula()
+    ptax, brl, dia, cny, brl_cny = v["ptax"], v["brl"], v["dia"], v["cny"], v["brl_cny"]
+    byd_cn_r, ford_us_r, cen = v["byd_cn_r"], v["ford_us_r"], v["cen"]
     print("PTAX %s: R$ %.4f; yuan %s: ¥ %.4f; R$ %.4f por yuan" % (ptax["data"], brl, dia, cny, brl_cny))
     print("BYD: China R$ %.0f, Brasil %.2fx; Equinox: EUA R$ %.0f, Brasil %.2fx"
           % (byd_cn_r, BYD_BR / byd_cn_r, ford_us_r, FORD_BR / ford_us_r))

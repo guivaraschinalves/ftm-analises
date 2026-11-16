@@ -955,7 +955,21 @@ body.apres-aberta { overflow: hidden; }
 .apres-l-titulo { position: absolute; left: 35px; top: 30px; margin: 0; font-size: 40px; font-weight: 700; }
 .apres-l-sub { position: absolute; left: 36px; top: 84px; margin: 0; font-size: 24px; font-style: italic; color: var(--ink-2); }
 .apres-l-fonte { position: absolute; right: 15px; bottom: 8px; margin: 0; font-size: 16px; color: var(--ink-2); }
-.apres-foto img { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; object-fit: cover; }
+.apres-foto img { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; object-fit: cover; transition: filter .6s ease; }
+.apres-foto img.desfocada { filter: blur(14px) brightness(.55); }
+.apres-passos { position: absolute; inset: 0; }
+.apres-caixa { position: absolute; top: 90px; width: 720px; transform: translateX(-50%); padding: 26px 34px 14px;
+  background: rgba(6, 22, 48, .78); border: 1px solid rgba(255, 255, 255, .18); border-radius: 22px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .45); opacity: 0; transition: opacity .45s ease; }
+.apres-caixa.on { opacity: 1; }
+.apres-caixa h3 { margin: 0 0 14px; font-size: 36px; font-weight: 700; color: #fff; }
+.apres-linha { display: none; padding: 10px 0 14px; border-top: 1px solid rgba(255, 255, 255, .12); }
+.apres-linha.on { display: block; animation: apLinha .5s cubic-bezier(.2, .7, .2, 1) both; }
+.apres-linha-rot { display: block; font-size: 28px; color: #c9d6e8; }
+.apres-linha b { display: block; font-size: 58px; line-height: 1.1; color: #fff; }
+.apres-linha-sub { display: block; font-size: 22px; color: #9fb3cf; }
+.apres-linha-cen b { color: #ff8a80; }
+@keyframes apLinha { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 .apres-figura img { position: absolute; left: 60px; right: 60px; top: 140px; width: 1800px; height: 890px; object-fit: contain; }
 .apres-quadro-corpo { position: absolute; left: 35px; right: 35px; top: 150px; bottom: 50px; overflow: auto; }
 .apres-quadro-corpo .tabela { zoom: 2.1; width: 100%; border-collapse: collapse; line-height: 1.45; color: var(--ink); font-size: 14px; }
