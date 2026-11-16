@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Parte "China e desequilíbrios globais" da Missão Global Miami (chamada pelo
+Parte "Desequilíbrios globais" da Missão Global Miami (chamada pelo
 missao_miami.py). Só biblioteca padrão.
 
 DE ONDE VEM CADA COISA
@@ -485,7 +485,7 @@ CHINA = [("Déficit externo dos EUA", "foto-01"), ("", "foto-02"), ("", "pib-eua
          # fora da ordem que ele mandou em 16/11/2026: ficam no fim da parte até ele dizer
          ("Balanço de pagamentos dos EUA", "eua-bp"), ("", "eua-conta-financeira"), ("", "eua-comercio-paises"),
          ("Ouro nas reservas", "reservas-ouro-tesouros")]      # copiado do ftm-dados (reservas.json)
-PARTE_CHINA = "China e desequilíbrios globais"
+PARTE_CHINA = "Desequilíbrios globais"
 
 
 def graficos():

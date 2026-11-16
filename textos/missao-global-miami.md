@@ -402,7 +402,7 @@ Os não residentes detêm 54% da dívida francesa, contra 34% da italiana, e a f
 Em 2023, a inflação fez o r − g derrubar a dívida em 5,2 pontos do PIB mesmo com déficit primário de 3,5%, mas em 2025 o r − g zerou e o déficit primário de 2,9% passou a subir a dívida quase ponto por ponto.
 
 ## Déficit externo dos EUA
-parte: China e desequilíbrios globais
+parte: Desequilíbrios globais
 
 ##
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Gráficos novos da parte "China e desequilíbrios globais" da Missão Global
+Gráficos novos da parte "Desequilíbrios globais" da Missão Global
 Miami (pedido dele em 16/11/2026), chamados pelo missao_china.py. Só
 biblioteca padrão.
 
