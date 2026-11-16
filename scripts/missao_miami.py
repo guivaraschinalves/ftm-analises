@@ -2368,6 +2368,8 @@ CORES_MISSAO = {
     "eua-cc-dolar": {"Conta corrente / PIB": VERMELHO_M, "Dólar real contra emergentes (dir.)": "#8EB4E3"},
     "eua-va-industria": {"Indústria / PIB": BRANCO_M},
     "china-reservas": {"Reservas sem ouro": "#F79646"},      # laranja, a cor das reservas no BP
+    "china-reservas-pib": {"Reservas / PIB": "#F79646"},
+    "china-yuan": {"Yuans por dólar": VERMELHO_M},
 }
 # gráficos que ficam com as cores de antes da troca automática
 CORES_ORIGINAIS = ["bp-reservas-divida", "spread-franca-italia"]      # no spread, a Itália segue azul claro
