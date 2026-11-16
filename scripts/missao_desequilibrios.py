@@ -192,6 +192,17 @@ def grafico_fmi_desequilibrios():
                 unidade="%", barra=10, buracoMax=13, fonte="FMI (World Economic Outlook) e FtM", series=series)
 
 
+# o gráfico do próprio FMI, no lugar do refeito acima (pedido dele em 16/11/2026);
+# grafico_fmi_desequilibrios() fica para quando ele quiser a versão com dado
+FIGURA_FMI = dict(id="fmi-desequilibrios", tipo="figura", imagem="assets/missao/fmi-desequilibrios.jpg",
+                  titulo="Desequilíbrios globais voltam a crescer depois de anos de queda",
+                  subtitulo="Saldo em conta corrente por país e região, em % do PIB mundial; a linha é a soma dos "
+                            "saldos em valor absoluto",
+                  fonte="FMI (IMF Blog, 6/4/2026)",
+                  link="https://www.imf.org/en/blogs/articles/2026/04/06/global-imbalances-old-questions-new-answers",
+                  rotuloLink="Ver o post")
+
+
 # ---------- China ----------
 
 def grafico_china_reservas_pib():
@@ -353,6 +364,6 @@ def fotos():
 
 def graficos():
     out = fotos() + [grafico_pib_eua_mundo()] + graficos_emprego_industria() + [grafico_va_industria()]
-    out += [grafico_fmi_desequilibrios(), grafico_china_reservas_pib()] + graficos_yuan_equilibrio()
+    out += [FIGURA_FMI, grafico_china_reservas_pib()] + graficos_yuan_equilibrio()
     out += [grafico_vix_incerteza()] + graficos_tarifas()
     return out
