@@ -430,6 +430,8 @@ parte: Desequilíbrios globais
 
 ##
 
+##
+
 ## Desequilíbrios globais
 
 ##
@@ -485,10 +487,6 @@ parte: Desequilíbrios globais
 ## Dólar
 
 ##
-
-##
-
-## Balanço de pagamentos dos EUA
 
 ##
 

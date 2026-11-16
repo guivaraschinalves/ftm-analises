@@ -257,7 +257,35 @@ def graficos_bp_eua(pib):
                           % (rot_tri(u), cf.br(s4[u], 0)),
                 unidade="usd-bi", barra=3, buracoMax=3, fonte=FONTE_BEA,
                 series=[barras(n, c, d, 1) for n, c, d in fa4] + [linha("Saldo da conta financeira", BRANCO, s4, 1)])
-    return g_pct, g_cc, g_bi, g_fa
+    # a mesma conta financeira em % do PIB e desde 1973 (pedido dele em 16/11/2026): FMI antes de
+    # 1999, com os mesmos sinais (ativo comprado lá fora = saída; passivo = entrada)
+    fmi = {c: imf_us(c + "_BP6_USD") for c in ("BFDA", "BFDL", "BFPA", "BFPL", "BFOA", "BFOL", "BFF", "BF", "BFRA")}
+    fa_fmi = {"IED no exterior": {k: -v for k, v in fmi["BFDA"].items()},
+              "IED no país": fmi["BFDL"],
+              "Carteira no exterior": {k: -v for k, v in fmi["BFPA"].items()},
+              "Carteira no país": fmi["BFPL"],
+              "Outros investimentos e derivativos": {k: v - fmi["BFOA"][k] - fmi["BFF"].get(k, 0)
+                                                     for k, v in fmi["BFOL"].items() if k in fmi["BFOA"]}}
+    saldo_fmi = {k: -(v - fmi["BFRA"][k]) for k, v in fmi["BF"].items() if k in fmi["BFRA"]}
+
+    def emenda_fa(bea_d, fmi_d):
+        d = {k: v for k, v in fmi_d.items() if k < "1999-01"}
+        d.update(bea_d)
+        return d
+    cores_fa = {"IED no exterior": AZUL, "IED no país": VERMELHO, "Carteira no exterior": VERDE,
+                "Carteira no país": AZUL_CLARO, "Outros investimentos e derivativos": AMARELO}
+    fa_pct = [(n, cores_fa[n], pct_pib(emenda_fa(d, fa_fmi[n]))) for n, _, d in fa]
+    s_pct = pct_pib(emenda_fa(saldo, saldo_fmi))
+    up = max(s_pct)
+    g_fa_pct = dict(id="eua-conta-financeira-pib", titulo="Conta financeira dos EUA por componente em % do PIB",
+                    subtitulo="Em %% do PIB, acumulado em 4 trimestres, desde 1973, sem as reservas; positivo = "
+                              "entrada de capital; %s: saldo de %s%% do PIB"
+                              % (rot_tri(up), cf.br(s_pct[up], 1)),
+                    unidade="%", barra=3, buracoMax=3,
+                    fonte="BEA (desde 1999) e FMI (Balance of Payments, antes) via FRED e DBnomics; FtM",
+                    series=[barras(n, c, d, 2) for n, c, d in fa_pct]
+                    + [linha("Saldo da conta financeira", BRANCO, s_pct, 2)])
+    return g_pct, g_cc, g_bi, g_fa, g_fa_pct
 
 
 PAISES = [("Brasil", "3510", AMARELO), ("Canadá", "CA", AZUL_ESCURO), ("China", "CH", VERMELHO),
@@ -466,7 +494,7 @@ def grafico_tarifa():
 
 
 CHINA = [("Déficit externo dos EUA", "foto-01"), ("", "foto-02"), ("", "pib-eua-mundo"), ("", "eua-cc-pib"),
-         ("", "eua-cc-dolar"), ("", "eua-bp-pib"), ("", "eua-cc-componentes"), ("", "eua-emprego-industria"),
+         ("", "eua-cc-dolar"), ("", "eua-bp-pib"), ("", "eua-cc-componentes"), ("", "eua-conta-financeira-pib"), ("", "eua-emprego-industria"),
          ("", "eua-emprego-metal-primario"), ("", "eua-emprego-metal-fabricado"), ("", "eua-emprego-eletronicos"),
          ("", "eua-va-industria"),
          ("Desequilíbrios globais", "foto-03"), ("", "foto-04"), ("", "foto-05"), ("", "foto-06"),
@@ -480,8 +508,7 @@ CHINA = [("Déficit externo dos EUA", "foto-01"), ("", "foto-02"), ("", "pib-eua
          ("", "tarifas-liquida-anos"),
          ("Dólar", "foto-10"), ("", "dxy"),
          ("", "reservas-ouro-tesouros"),      # copiado do ftm-dados (reservas.json)
-         # fora da ordem que ele mandou em 16/11/2026: ficam no fim da parte até ele dizer
-         ("Balanço de pagamentos dos EUA", "eua-bp"), ("", "eua-conta-financeira")]
+]
 PARTE_CHINA = "Desequilíbrios globais"
 
 
