@@ -2359,7 +2359,7 @@ CORES_MISSAO = {
     "eua-participacao": {"Observada": BRANCO_M},
     "treasuries-5-10-30": {"5 anos": VERDE_M},
     "pib-eua-investimento-ti": {"Equipamentos de processamento de informação": BRANCO_M},
-    "construcao-datacenters-fabricas": {"Data centers": VERDE_M},
+    "construcao-datacenters-fabricas": {"Data centers": BRANCO_M},
     "spread-franca-italia": {"França": VERMELHO_M},
     "franca-divida-deficit": {"Alemanha": BRANCO_M},
     "btc-preco": {"Bitcoin": "#F79646"},
