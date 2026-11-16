@@ -377,7 +377,7 @@ Contra a receita do último trimestre anualizada, ela vale 14,3 vezes as vendas,
 A Anthropic superou as expectativas, mas a pergunta para quem investe é se a vantagem dura. Torsten Slok, da Apollo, propõe três perguntas para a era da IA.
 
 ## Juros longos no G7
-parte: Juros no mundo
+parte: Alta de juros no mundo
 
 Os juros longos do G7 voltaram a 3,7% em média em 2026, o dobro dos 1,9% de 2009 a 2021, mas ainda abaixo da média histórica de 5,5%.
 

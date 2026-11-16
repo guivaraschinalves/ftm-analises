@@ -2333,7 +2333,7 @@ def graficos_zona_euro():
                         dict(nome="Ajustes estoque-fluxo", cor=CINZA, tipo="barra", dados=cat(cout)),
                         dict(nome="Variação da dívida", cor=BRANCO, dados=cat(var), largura=4, rotulo=True)])
     return [g_sp, g_rank, g_det, g_rg]
-PARTE_JUROS = "Juros no mundo"
+PARTE_JUROS = "Alta de juros no mundo"
 
 
 def main():
