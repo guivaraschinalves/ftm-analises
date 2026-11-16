@@ -173,10 +173,10 @@
   // sublinhado e a fonte vai para a margem na altura dele, ligada por uma
   // linha. A marcação é tratada ANTES do negrito, e o que sobra de cada
   // pedaço continua passando pelo **negrito** normalmente.
-  // Linhas de dados 20% mais grossas na Missão (pedido dele em 16/11/2026); eixos, grades,
-  // legenda e o resto ficam como estão.
+  // Linhas de dados mais grossas na Missão (pedido dele em 16/11/2026: +20% e depois mais 10%,
+  // 1,2 x 1,1); eixos, grades, legenda e o resto ficam como estão.
   function espessuraDaLinha(w) {
-    return document.documentElement.getAttribute("data-marca") === "missao" ? w * 1.2 : w;
+    return document.documentElement.getAttribute("data-marca") === "missao" ? w * 1.32 : w;
   }
   var MARCA_CITA = /\[([^\]]+)\]\(fonte:([\w-]+)\)/g;
 
@@ -332,6 +332,8 @@
                       return Math.abs(v) >= 1000 ? "US$ " + NF_ATE2.format(v / 1000) + " tri" : "US$ " + nf(0).format(v) + " bi";
                     } },
     pct0: { eixo: function (v) { return nf(0).format(v) + "%"; }, valor: function (v) { return nf(0).format(v) + "%"; } },
+    // razão com duas casas (crédito ÷ poupança), como no ftm-dados
+    "x2": { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v) + "x"; }, valor: function (v) { return nf(2).format(v) + "x"; } },
     x1: { eixo: function (v) { return nf(0).format(v) + "x"; }, valor: function (v) { return nf(1).format(v) + "x"; } },
     pts: { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
            valor: function (v) { return nf(1).format(v); } },

@@ -696,6 +696,9 @@ def ajustes_brasil(brasil):
         g["variantes"] = [dict(rot="Desde jan/2023", series=recente), dict(rot="Série inteira", series=g.pop("series"))]
     # serviços desde jan/2023: o eixo começa em 4% (pedido dele)
     brasil["servicos"]["variantes"][0]["eixo"] = {"min": 4}
+    # crédito ÷ poupança financeira: o eixo começa em 1 vez (pedido dele em 16/11/2026)
+    next(v for v in brasil["credito-poupanca-moeda"]["variantes"]
+         if v["rot"].startswith("Crédito ÷ poupança"))["eixo"] = {"min": 1}
     # PIB: componentes como está; o segundo recorte vira FBCF e governo
     pp = brasil["pib-participacao"]
     comp = next(v for v in pp["variantes"] if v["rot"] == "Componentes")
