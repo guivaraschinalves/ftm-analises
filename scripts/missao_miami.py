@@ -2361,7 +2361,7 @@ CORES_MISSAO = {
     "pib-eua-investimento-ti": {"Equipamentos de processamento de informação": BRANCO_M},
     "construcao-datacenters-fabricas": {"Data centers": VERDE_M},
     "spread-franca-italia": {"França": VERMELHO_M},
-    "franca-divida-deficit": {"Itália": BRANCO_M},
+    "franca-divida-deficit": {"Alemanha": BRANCO_M},
     "btc-preco": {"Bitcoin": "#F79646"},
     "ouro-preco": {"Ouro": "#FFFF00"},
 }
