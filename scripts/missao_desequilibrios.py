@@ -308,6 +308,33 @@ def tarifas_mts():
     return out
 
 
+def por_mes_do_ano(d, gid, titulo, o_que):
+    """Uma linha por ano no eixo jan–dez: os dois últimos anos em destaque, os anteriores (cheios) em cinza."""
+    u = max(d)
+    anos = sorted({m[:4] for m in d})
+    series = []
+
+    def meses(a):
+        return {str(i): d["%s-%02d" % (a, i + 1)] for i in range(12) if "%s-%02d" % (a, i + 1) in d}
+    cheios = [a for a in anos[:-2] if len(meses(a)) == 12]
+    for a in cheios:
+        primeiro = not series
+        series.append(dict(nome="%s a %s" % (cheios[0], cheios[-1]) if primeiro else a, cor=CINZA, largura=2,
+                           rotulo=False, dados=[[k, round(v, 1)] for k, v in meses(a).items()],
+                           **({} if primeiro else {"legenda": False})))
+    for a, cor in ((anos[-2], AZUL), (anos[-1], VERMELHO)):
+        series.append(dict(nome=a, cor=cor, largura=5, rotulo=True,
+                           dados=[[k, round(v, 1)] for k, v in meses(a).items()]))
+    ac = {a: sum(v for m, v in d.items() if m[:4] == a and m[5:] <= u[5:]) for a in (anos[-2], anos[-1])}
+    print("  %s: jan a %s, %s US$ %.0f bi, %s US$ %.0f bi" % (gid, u[5:], anos[-1], ac[anos[-1]], anos[-2], ac[anos[-2]]))
+    return dict(id=gid, titulo="%s: %s, %s e anos anteriores" % (titulo, anos[-1], anos[-2]),
+                subtitulo="%s, US$ bilhões por mês; de jan a %s: US$ %s bi em %s e US$ %s bi em %s"
+                          % (o_que, MESES[int(u[5:]) - 1], cf.br(ac[anos[-1]], 0), anos[-1],
+                             cf.br(ac[anos[-2]], 0), anos[-2]),
+                unidade="usd-bi", categorias=MESES,
+                fonte="Tesouro dos EUA (Monthly Treasury Statement, tabela 4) e FtM", series=series)
+
+
 def graficos_tarifas():
     t = tarifas_mts()
     bruta, dev = t["bruta"], t["devolucao"]
@@ -320,32 +347,11 @@ def graficos_tarifas():
                  unidade="usd-bi", fonte="Tesouro dos EUA (Monthly Treasury Statement, tabela 4) e FtM", variantes=[
                      dict(rot="Por mês", barra=1, series=[barras("Arrecadação no mês", AZUL, bruta, 1, rotulo=True)]),
                      dict(rot="Em 12 meses", series=[linha("Arrecadação em 12 meses", AZUL, b12, 1)])])
-    # por mês do ano: 2026 e 2025 em destaque, os anos anteriores (cheios) em cinza
-    anos = sorted({m[:4] for m in bruta})
-    series = []
-    for a in anos:
-        meses = {str(i): bruta["%s-%02d" % (a, i + 1)] for i in range(12) if "%s-%02d" % (a, i + 1) in bruta}
-        if a in (anos[-1], anos[-2]):
-            continue
-        if len(meses) < 12:
-            continue
-        primeiro = not series
-        series.append(dict(nome="%s a %s" % (anos[1], anos[-3]) if primeiro else a, cor=CINZA, largura=2,
-                           rotulo=False, dados=[[k, round(v, 1)] for k, v in meses.items()],
-                           **({} if primeiro else {"legenda": False})))
-    for a, cor in ((anos[-2], AZUL), (anos[-1], VERMELHO)):
-        meses = {str(i): bruta["%s-%02d" % (a, i + 1)] for i in range(12) if "%s-%02d" % (a, i + 1) in bruta}
-        series.append(dict(nome=a, cor=cor, largura=5, rotulo=True,
-                           dados=[[k, round(v, 1)] for k, v in meses.items()]))
-    ac = {a: sum(v for m, v in bruta.items() if m[:4] == a and m[5:] <= u[5:]) for a in (anos[-2], anos[-1])}
-    g_anos = dict(id="tarifas-receita-anos", titulo="Receitas tarifárias dos EUA por mês: %s, %s e anos anteriores"
-                  % (anos[-1], anos[-2]),
-                  subtitulo="Impostos de importação arrecadados (customs duties, bruto), US$ bilhões por mês; "
-                            "de jan a %s: US$ %s bi em %s e US$ %s bi em %s"
-                            % (MESES[int(u[5:]) - 1], cf.br(ac[anos[-1]], 0), anos[-1], cf.br(ac[anos[-2]], 0),
-                               anos[-2]),
-                  unidade="usd-bi", categorias=MESES,
-                  fonte="Tesouro dos EUA (Monthly Treasury Statement, tabela 4) e FtM", series=series)
+    g_anos = por_mes_do_ano(bruta, "tarifas-receita-anos", "Receitas tarifárias dos EUA por mês",
+                            "Impostos de importação arrecadados (customs duties, bruto)")
+    # líquido = bruto menos devoluções (pedido dele em 16/11/2026)
+    g_liq = por_mes_do_ano(t["liquida"], "tarifas-liquida-anos", "Receitas tarifárias líquidas dos EUA por mês",
+                           "Impostos de importação arrecadados menos as devoluções")
     ini_dev = min(m for m, v in dev.items() if m >= "2026-01" and v > 10)
     acum = sum(v for m, v in dev.items() if m >= ini_dev)
     print("  tarifas %s: bruta US$ %.1f bi, 12 meses US$ %.0f bi; devoluções desde %s: US$ %.0f bi"
@@ -355,7 +361,7 @@ def graficos_tarifas():
                            % (cf.rot_mes(ini_dev), cf.rot_mes(u), cf.br(acum, 0)),
                  unidade="usd-bi", barra=1, fonte="Tesouro dos EUA (Monthly Treasury Statement, tabela 4) e FtM",
                  series=[barras("Devoluções no mês", VERMELHO, cf.desde(dev, "2024-01"), 1, rotulo=True)])
-    return [g_rec, g_anos, g_dev]
+    return [g_rec, g_anos, g_dev, g_liq]
 
 
 # ---------- fotos ----------

@@ -472,17 +472,19 @@ parte: Desequilíbrios globais
 
 ##
 
+##
+
 ## Dólar
 
 ##
+
+## Ouro nas reservas
 
 ## Balanço de pagamentos dos EUA
 
 ##
 
 ##
-
-## Ouro nas reservas
 
 ## Bitcoin
 parte: Bitcoin e stablecoins
