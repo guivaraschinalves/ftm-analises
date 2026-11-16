@@ -2365,6 +2365,8 @@ CORES_MISSAO = {
     "btc-preco": {"Bitcoin": "#F79646"},
     "ouro-preco": {"Ouro": "#FFFF00"},
     "eua-cc-pib": {"Conta corrente / PIB": VERMELHO_M},
+    "eua-cc-dolar": {"Conta corrente / PIB": VERMELHO_M, "Dólar real contra emergentes (dir.)": "#8EB4E3"},
+    "eua-va-industria": {"Indústria / PIB": BRANCO_M},
 }
 # gráficos que ficam com as cores de antes da troca automática
 CORES_ORIGINAIS = ["bp-reservas-divida", "spread-franca-italia"]      # no spread, a Itália segue azul claro
