@@ -2359,9 +2359,20 @@ CORES_MISSAO = {
     "treasuries-5-10-30": {"5 anos": VERDE_M},
     "pib-eua-investimento-ti": {"Equipamentos de processamento de informação": BRANCO_M},
     "construcao-datacenters-fabricas": {"Data centers": VERDE_M},
+    "spread-franca-italia": {"França": VERMELHO_M},
 }
 # gráficos que ficam com as cores de antes da troca automática
-CORES_ORIGINAIS = ["bp-reservas-divida"]
+CORES_ORIGINAIS = ["bp-reservas-divida", "spread-franca-italia"]      # no spread, a Itália segue azul claro
+
+
+def engrossar_linhas(graficos, mais=1.5):
+    """Linhas mais grossas nos gráficos de juros no mundo (pedido dele em 16/11/2026): os
+    gráficos de muitos países nasceram com linhas finas (2 e 3)."""
+    for g in graficos:
+        for v in (g.get("variantes") or []) + [g]:
+            for x in v.get("series") or []:
+                if x.get("tipo") not in ("barra", "faixa") and x.get("largura"):
+                    x["largura"] = x["largura"] + mais
 
 
 def cores_missao(graficos):
@@ -2486,6 +2497,8 @@ def main():
         secoes.append(sec)
     juros = {g["id"]: g for g in graficos_juros_mundo()}
     juros.update({g["id"]: g for g in graficos_zona_euro()})      # spread pelo BCE (chega a outubro)
+    engrossar_linhas(juros.values())
+    cores_missao(juros)
     for titulo, gid in JUROS_MUNDO:
         secoes.append(dict(titulo=titulo, texto="", fontes=[], figuras=[], graficos=[juros[gid]]))
     import missao_china
