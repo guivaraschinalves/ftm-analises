@@ -278,8 +278,10 @@ def focus_pib_4tri():
             for i in range(7, len(ks)) if oficial <= ks[i] <= fim}
     anual = {x["DataReferencia"]: x["Mediana"] for x in json.loads(cf.baixar(OLINDA_ANO))["value"]
              if x["Data"] == data}
+    if not anual:      # o anual às vezes atrasa no Olinda (16/11/2026: anual em 6/11, trimestral em 13/11)
+        print("  aviso: Focus anual de %s ainda não saiu no Olinda; o trimestral fica sem conferência" % data)
     for k, v in acum.items():
-        if k[5:] == "12" and k > oficial and abs(v - anual[k[:4]]) > 0.1:
+        if anual and k[5:] == "12" and k > oficial and abs(v - anual[k[:4]]) > 0.1:
             raise RuntimeError("Focus de %s: o trimestral dá %.2f%% em %s; o anual, %.2f%%"
                                % (data, v, k[:4], anual[k[:4]]))
     print("  Focus do PIB (%s): %s" % (data, ", ".join("%s %.2f%%" % kv for kv in sorted(acum.items()))))
@@ -1230,19 +1232,25 @@ def grafico_divida_pib_fy():
         if a - 1 in anual and a in anual:
             return (anual[a - 1] + anual[a]) / 2
         return None
-    serie = {}
+    serie, tri_us = {}, {}
     for a, v in divida.items():
         pib = pib_fy(a)
         if pib:
-            serie["%d-%s" % (a, "09" if a >= 1977 else "06")] = 100 * v / (pib * 1e9)
+            m = "%d-%s" % (a, "09" if a >= 1977 else "06")
+            serie[m] = 100 * v / (pib * 1e9)
+            tri_us[m] = v / 1e12
     u = max(serie)
-    print("  dívida/PIB dos EUA, ano fiscal %s: %.1f%% (desde %s)" % (u[:4], serie[u], min(serie)[:4]))
-    return dict(id="eua-divida-pib", titulo="Dívida federal dos EUA em % do PIB",
-                subtitulo="Dívida total do governo federal no fim do ano fiscal ÷ PIB médio do ano fiscal, em %%; "
-                          "anos fiscais de %s a %s; ano fiscal %s: %s%%"
-                          % (min(serie)[:4], u[:4], u[:4], cf.br(serie[u], 0)),
-                unidade="pct1", buracoMax=15, fonte="Tesouro dos EUA (Fiscal Data) e BEA via FRED e FtM",
-                series=[cf.serie("Dívida federal", BRANCO, serie, 1, largura=5, rotulo=True)])
+    print("  dívida/PIB dos EUA, ano fiscal %s: %.1f%%, US$ %.1f tri (desde %s)"
+          % (u[:4], serie[u], tri_us[u], min(serie)[:4]))
+    # em % do PIB e em US$ trilhões (pedido dele em 16/11/2026)
+    return dict(id="eua-divida-pib", titulo="Dívida federal dos EUA",
+                subtitulo="Dívida total do governo federal no fim do ano fiscal, anos fiscais de %s a %s"
+                          % (min(serie)[:4], u[:4]),
+                buracoMax=15, fonte="Tesouro dos EUA (Fiscal Data) e BEA via FRED e FtM", variantes=[
+                    dict(rot="Em % do PIB médio do ano fiscal", unidade="pct1",
+                         series=[cf.serie("Dívida federal", BRANCO, serie, 1, largura=5, rotulo=True)]),
+                    dict(rot="Em US$ trilhões", unidade="usd-tri",
+                         series=[cf.serie("Dívida federal", BRANCO, tri_us, 2, largura=5, rotulo=True)])])
 
 
 def graficos_divida_eua():
@@ -1286,7 +1294,7 @@ def grafico_deficit_eua():
     mts = cf.fred("MTSDS133FMS")
     pib = cf.fred("GDP", mensal=False)
     tri = sorted(pib)
-    doze = {}
+    doze, doze_us = {}, {}
     ks = sorted(mts)
     for i in range(11, len(ks)):
         m = ks[i]
@@ -1296,18 +1304,27 @@ def grafico_deficit_eua():
         if not q:
             continue
         doze[m] = 100 * sum(mts[k] for k in ks[i - 11:i + 1]) / (pib[q[-1]] * 1000)
+        doze_us[m] = sum(mts[k] for k in ks[i - 11:i + 1]) / 1e6
     anual = {k[:4] + "-09": v for k, v in cf.fred("FYFSGDA188S", mensal=False).items()}
+    # FYFSD: resultado do ano fiscal em US$ milhões (desde 1901; aqui desde 1929, como o % do PIB)
+    anual_us = {k[:4] + "-09": v / 1e6 for k, v in cf.fred("FYFSD", mensal=False).items() if k[:4] >= "1929"}
     u = max(doze)
     print("  déficit federal dos EUA em 12 meses: %s %.1f%% do PIB; ano fiscal %s %.1f%%"
           % (u, doze[u], max(anual)[:4], anual[max(anual)]))
+    # em % do PIB e em US$ trilhões (pedido dele em 16/11/2026)
     return dict(id="eua-deficit", titulo="Resultado do governo federal dos EUA",
-                subtitulo="Em % do PIB; negativo = déficit", unidade="%",
+                subtitulo="Negativo = déficit", unidade="%",
                 fonte="Tesouro dos EUA (Monthly Treasury Statement) e BEA, via FRED", variantes=[
-                    dict(rot="Em 12 meses, desde 2000", series=[
+                    dict(rot="Em 12 meses, % do PIB", series=[
                         cf.serie("Resultado em 12 meses", VERMELHO, desde(doze, "2000-01"), 1, largura=5,
                                  rotulo=True)]),
-                    dict(rot="Por ano fiscal, desde 1929", buracoMax=12, series=[
-                        cf.serie("Resultado do ano fiscal", VERMELHO, anual, 1, largura=4, rotulo=True)])])
+                    dict(rot="Em 12 meses, US$ trilhões", unidade="usd-tri", series=[
+                        cf.serie("Resultado em 12 meses", VERMELHO, desde(doze_us, "2000-01"), 2, largura=5,
+                                 rotulo=True)]),
+                    dict(rot="Por ano fiscal, % do PIB", buracoMax=12, series=[
+                        cf.serie("Resultado do ano fiscal", VERMELHO, anual, 1, largura=4, rotulo=True)]),
+                    dict(rot="Por ano fiscal, US$ trilhões", unidade="usd-tri", buracoMax=12, series=[
+                        cf.serie("Resultado do ano fiscal", VERMELHO, anual_us, 2, largura=4, rotulo=True)])])
 
 
 def graficos_eua():
@@ -1415,6 +1432,44 @@ def ultimos_5_anos(g, **extra):
     recente = [dict(x, dados=[p for p in x["dados"] if p[0] > ini]) for x in g["series"]]
     g["variantes"] = [dict(rot="Últimos 5 anos", series=recente, **extra),
                       dict(rot="Série inteira", series=g.pop("series"))]
+    return g
+
+
+def so_variacao_em_bilhoes(g):
+    """Despesa por função: só o recorte em US$ bilhões (pedido dele em 16/11/2026)."""
+    v = next(x for x in g["variantes"] if "bilhões" in x["rot"])
+    g = dict({k: x for k, x in g.items() if k != "variantes"}, **{k: x for k, x in v.items() if k != "rot"})
+    g["titulo"] = "Despesa do governo federal dos EUA: contribuição por função"
+    g["subtitulo"] += "; variação em US$ bilhões"
+    return g
+
+
+# marcos no VIX (pedido dele em 16/11/2026): o Liberation Day (tarifas de
+# 2/4/2025) e o início da guerra com o Irã (ataques de 28/2/2026, um sábado:
+# o marco fica no pregão seguinte, 2/3, o do salto do VIX)
+VIX_EVENTOS = [dict(em="2025-04-02", rot="Liberation Day"), dict(em="2026-03-02", rot="Início da guerra")]
+
+
+def cpi_com_outubro_estimado(g):
+    """CPI cheio e núcleo com out/2025 reconstruído (pedido dele em 16/11/2026,
+    só na Missão): o BLS não publicou o índice de outubro de 2025 (paralisação
+    do governo), o que tira out/25 e out/26 da variação em 12 meses. Como na
+    metodologia da Bloomberg: o índice de out/25 é a média geométrica de set/25
+    e nov/25, nas séries sem ajuste sazonal."""
+    novo = []
+    for x, sid in zip(g["series"], ("CPIAUCNS", "CPILFENS")):
+        idx = dict(cf.fred(sid))
+        if idx.get("2025-10") is None:
+            idx["2025-10"] = (idx["2025-09"] * idx["2025-11"]) ** 0.5
+        idx = {k: v for k, v in idx.items() if v is not None}
+        ini = x["dados"][0][0]
+        novo.append(cf.serie(x["nome"], x["cor"], cf.desde(cf.var(idx), ini),
+                             **{k: v for k, v in x.items() if k not in ("nome", "cor", "dados")}))
+        d = dict(novo[-1]["dados"])
+        print("  %s com out/25 estimado: out/25 %.2f%%, out/26 %.2f%%" % (x["nome"], d["2025-10"], d.get("2026-10", 0)))
+    g = dict(g, series=novo)
+    g["nota"] = ("Outubro de 2025 estimado: o BLS não publicou o índice daquele mês, e ele é a média geométrica de "
+                 "setembro e novembro de 2025, como na estimativa da Bloomberg. Não é um número oficial do BLS.")
     return g
 
 
@@ -2268,12 +2323,15 @@ def main():
     u3 = [x for x in u["variantes"][0]["series"] if "U-3" in x["nome"]]
     if len(u3) != 1:
         raise RuntimeError("desemprego dos EUA: série do U-3 não encontrada")
-    eua["eua-u3-u6"] = dict({k: v for k, v in u.items() if k != "variantes"}, titulo="Taxa de desemprego (U-3)",
-                            subtitulo="% da força de trabalho, com ajuste sazonal", series=u3)
+    eua["eua-u3-u6"] = ultimos_5_anos(dict({k: v for k, v in u.items() if k != "variantes"},
+                                           titulo="Taxa de desemprego (U-3)",
+                                           subtitulo="% da força de trabalho, com ajuste sazonal", series=u3))
     eua.update({g["id"]: g for g in graficos_empresas()})
     eua["pib-eua-investimento-importacoes"] = grafico_pib_investimento_importacoes()
     eua["fed-ativos-juros-pce"] = balanco_fed_pce()
-    eua["despesa-contribuicao"]["titulo"] = "Despesa do governo federal dos EUA: contribuição por função"
+    eua["despesa-contribuicao"] = so_variacao_em_bilhoes(eua["despesa-contribuicao"])
+    eua["ia-vix"]["eventos"] = VIX_EVENTOS + eua["ia-vix"].get("eventos", [])
+    eua["cpi-cheio-nucleo"] = cpi_com_outubro_estimado(eua["cpi-cheio-nucleo"])
     eua["fed-fedwatch"] = tabela_fedwatch()
     if "eua-participacao" not in eua:
         eua["eua-participacao"] = cn.graficos_ftm_dados_eua()["participacao"]
