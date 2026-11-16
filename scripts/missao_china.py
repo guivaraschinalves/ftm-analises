@@ -456,13 +456,22 @@ def grafico_tarifa():
                 series=[linha("Tarifa efetiva", AZUL, t, 2)])
 
 
-CHINA = [("Déficit externo dos EUA", "eua-cc-pib"), ("", "eua-bp-pib"), ("", "eua-cc-dolar"),
-         ("", "eua-emprego-industria"),
-         ("China: reservas e balanço de pagamentos", "china-reservas"), ("", "china-bp"), ("", "china-bp-saldo"),
-         ("", "china-cc"), ("", "china-comercio"), ("", "china-comercio-eua"), ("", "china-yuan"),
-         ("Balanço de pagamentos dos EUA", "eua-cc-componentes"), ("", "eua-bp"), ("", "eua-conta-financeira"),
-         ("", "eua-comercio-paises"),
-         ("Dólar e tarifas", "miran-conclusao"), ("", "dxy"), ("", "eua-tarifa-efetiva"),
+CHINA = [("Déficit externo dos EUA", "foto-01"), ("", "foto-02"), ("", "pib-eua-mundo"), ("", "eua-cc-pib"),
+         ("", "eua-cc-dolar"), ("", "eua-bp-pib"), ("", "eua-cc-componentes"), ("", "eua-emprego-industria"),
+         ("", "eua-emprego-metal-primario"), ("", "eua-emprego-metal-fabricado"), ("", "eua-emprego-eletronicos"),
+         ("", "eua-va-industria"),
+         ("Desequilíbrios globais", "foto-03"), ("", "foto-04"), ("", "foto-05"), ("", "foto-06"),
+         ("", "fmi-desequilibrios"),
+         ("China: balanço de pagamentos e comércio", "china-bp"), ("", "china-bp-saldo"), ("", "china-cc"),
+         ("", "china-comercio"), ("", "china-comercio-eua"), ("", "china-reservas"), ("", "china-reservas-pib"),
+         ("", "foto-07"),
+         ("Câmbio do yuan", "china-yuan"), ("", "china-yuan-ppc-2014"), ("", "china-yuan-ppc-2019"),
+         ("", "china-yuan-ppc-2020"),
+         ("Tarifas", "miran-conclusao"), ("", "foto-08"), ("", "vix-incerteza"), ("", "eua-tarifa-efetiva"),
+         ("", "tarifas-receita"), ("", "tarifas-receita-anos"), ("", "tarifas-devolucoes"), ("", "foto-09"),
+         ("Dólar", "foto-10"), ("", "dxy"),
+         # fora da ordem que ele mandou em 16/11/2026: ficam no fim da parte até ele dizer
+         ("Balanço de pagamentos dos EUA", "eua-bp"), ("", "eua-conta-financeira"), ("", "eua-comercio-paises"),
          ("Ouro nas reservas", "reservas-ouro-tesouros")]      # copiado do ftm-dados (reservas.json)
 PARTE_CHINA = "China e desequilíbrios globais"
 
@@ -471,6 +480,8 @@ def graficos():
     pib = bea("GDP")
     out = list(graficos_eua_externo(pib)) + list(graficos_bp_eua(pib)) + list(graficos_china())
     out += list(graficos_china_comercio()) + [grafico_yuan()]
+    import missao_desequilibrios
+    out += missao_desequilibrios.graficos()
     out += [grafico_comercio_paises(), FIGURA_MIRAN, grafico_dxy(), grafico_tarifa()]
     return out
 

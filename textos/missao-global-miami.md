@@ -410,7 +410,33 @@ parte: China e desequilíbrios globais
 
 ##
 
-## China: reservas e balanço de pagamentos
+##
+
+##
+
+##
+
+##
+
+##
+
+##
+
+##
+
+##
+
+## Desequilíbrios globais
+
+##
+
+##
+
+##
+
+##
+
+## China: balanço de pagamentos e comércio
 
 ##
 
@@ -421,18 +447,40 @@ parte: China e desequilíbrios globais
 ##
 
 ##
+
+##
+
+##
+
+## Câmbio do yuan
+
+##
+
+##
+
+##
+
+## Tarifas
+
+##
+
+##
+
+##
+
+##
+
+##
+
+##
+
+##
+
+## Dólar
 
 ##
 
 ## Balanço de pagamentos dos EUA
-
-##
-
-##
-
-##
-
-## Dólar e tarifas
 
 ##
 

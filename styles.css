@@ -955,6 +955,7 @@ body.apres-aberta { overflow: hidden; }
 .apres-l-titulo { position: absolute; left: 35px; top: 30px; margin: 0; font-size: 40px; font-weight: 700; }
 .apres-l-sub { position: absolute; left: 36px; top: 84px; margin: 0; font-size: 24px; font-style: italic; color: var(--ink-2); }
 .apres-l-fonte { position: absolute; right: 15px; bottom: 8px; margin: 0; font-size: 16px; color: var(--ink-2); }
+.apres-foto img { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; object-fit: cover; }
 .apres-figura img { position: absolute; left: 60px; right: 60px; top: 140px; width: 1800px; height: 890px; object-fit: contain; }
 .apres-quadro-corpo { position: absolute; left: 35px; right: 35px; top: 150px; bottom: 50px; overflow: auto; }
 .apres-quadro-corpo .tabela { zoom: 2.1; width: 100%; border-collapse: collapse; line-height: 1.45; color: var(--ink); font-size: 14px; }

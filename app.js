@@ -3023,6 +3023,11 @@
       return;
     }
     var c = s.cartao, g = graficoDe(c);
+    if (g.tipo === "figura" && g.foto) {
+      // foto de abertura de assunto: a lâmina inteira, sem cabeçalho
+      lamina("apres-foto").appendChild(html("img", { src: g.imagem, alt: g.titulo }));
+      return;
+    }
     if (g.tipo === "figura") {
       var lf = lamina("apres-figura");
       cabecalhoLamina(lf, g);
@@ -4559,7 +4564,7 @@
         secao.appendChild(p);
       });
       sec.graficos.forEach(function (g) {
-        g.fonte = g.fonte || dados.fonte;
+        if (!g.foto) g.fonte = g.fonte || dados.fonte;      // foto não tem fonte
         // o mapa dos estados vem uma vez só, no topo do arquivo
         if (g.tipo === "estados" && !g.formas) g.formas = dados.formas;
         g._comentarios = dados.comentarios || null;
@@ -4626,7 +4631,7 @@
       var listaGraficos = html("div", { "class": "secao-graficos" });
       var daSecao = [];
       sec.graficos.forEach(function (g) {
-        g.fonte = g.fonte || dados.fonte;
+        if (!g.foto) g.fonte = g.fonte || dados.fonte;      // foto não tem fonte
         // o mapa dos estados vem uma vez só, no topo do arquivo
         if (g.tipo === "estados" && !g.formas) g.formas = dados.formas;
         g._comentarios = dados.comentarios || null;
