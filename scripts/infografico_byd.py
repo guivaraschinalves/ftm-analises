@@ -92,12 +92,13 @@ def figura_carros():
     v = calcula()
     centros = imagem_carros()
     linha = lambda cx, rot, val, sub=None, cen=False: dict(caixa=cx, rot=rot, val=val, sub=sub, cenario=cen)
-    passos = [[linha("byd", "Preço no Brasil", "R$ " + br(BYD_BR))],
-              [linha("equinox", "Preço no Brasil", "R$ " + br(FORD_BR))],
-              [linha("byd", "Preço na China, no câmbio de hoje", "R$ " + br(v["byd_cn_r"]),
-                     "¥ %s a R$ %s por yuan" % (br(BYD_CN), br(v["brl_cny"], 2))),
-               linha("equinox", "Preço nos EUA, no câmbio de hoje", "R$ " + br(v["ford_us_r"]),
-                     "US$ %s a R$ %s por dólar" % (br(FORD_US), br(v["brl"], 2)))]]
+    # primeiro o preço de origem (China, depois EUA), depois os dois no Brasil (pedido dele em 16/11/2026)
+    passos = [[linha("byd", "Preço na China, no câmbio de hoje", "R$ " + br(v["byd_cn_r"]),
+                     "¥ %s a R$ %s por yuan" % (br(BYD_CN), br(v["brl_cny"], 2)))],
+              [linha("equinox", "Preço nos EUA, no câmbio de hoje", "R$ " + br(v["ford_us_r"]),
+                     "US$ %s a R$ %s por dólar" % (br(FORD_US), br(v["brl"], 2)))],
+              [linha("byd", "Preço no Brasil", "R$ " + br(BYD_BR)),
+               linha("equinox", "Preço no Brasil", "R$ " + br(FORD_BR))]]
     for base, eq, val, p in v["cen"]:
         passos.append([linha("byd", "No Brasil, com o yuan a ¥ %s por US$" % br(eq, 2), "R$ %s mil" % br(p / 1000),
                              "yuan %s%% mais forte (equilíbrio desde %s)" % (br(100 * val), base), True)])
