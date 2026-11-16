@@ -458,9 +458,9 @@ parte: Desequilíbrios globais
 
 ##
 
-##
-
 ## Câmbio do yuan
+
+##
 
 ##
 

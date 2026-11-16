@@ -465,7 +465,7 @@ FOTOS = [(1, "Foto 1"), (2, "Foto 2"), (3, "Foto 3"),
          (4, "G7 Economists Memo on Global Imbalances (28/3/2026)"),
          (5, "Desequilíbrios globais: G7, Bank of England e FMI"),
          (6, "Desequilíbrios globais: G7, Bank of England, FMI, Caixin e South China Morning Post"),
-         (7, "BYD Dolphin Mini"), (8, "Reciprocal Tariffs"),
+         (7, "BYD Song Plus DM-i e Chevrolet Equinox Activ"), (8, "Reciprocal Tariffs"),
          (9, "Devolução de US$ 166 bilhões em tarifas (Fox Business, 20/4/2026)"), (10, "Foto 10")]
 
 
