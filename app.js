@@ -4902,6 +4902,9 @@
       });
     });
     return Promise.all(Object.keys(caminhos).map(function (url) {
+      // no HTML avulso a imagem já vem como data URI; o fetch dela é barrado
+      // pelo CSP do visualizador do claude.ai, e a nota sumia
+      if (url.indexOf("data:") === 0) { IMAGENS[url] = url; return Promise.resolve(); }
       return fetch(url).then(function (r) {
         if (!r.ok) throw new Error(r.status);
         return r.blob();
