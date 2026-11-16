@@ -1473,6 +1473,92 @@ def cpi_com_outubro_estimado(g):
     return g
 
 
+def cpi_componentes_com_outubro_estimado(g):
+    """Contribuição por componente do Fed de San Francisco com out/2025
+    reconstruído (pedido dele em 16/11/2026, só na Missão). Sem o índice de
+    out/25, o FRBSF deixa vazios out/25 e out/26 em 12 meses e out/25 e nov/25
+    no mês. Como na Bloomberg: o índice de out/25 de cada grupo é a média
+    geométrica de set/25 e nov/25, e o peso de out/25 é o de set/25, que é o de
+    dez/2024 atualizado pelos preços. Os pesos de dezembro saem dos próprios
+    dados do FRBSF (mínimos quadrados sobre os 12 meses seguintes); o erro de
+    ajuste fica no arredondamento, e o script para se passar de 0,05 p.p.
+    Serviços sem moradia = serviços sem energia (SASLE) menos moradia."""
+    NSA = dict(todos="CPIAUCNS", bens="CUUR0000SACL1E", serv="CUUR0000SASLE", mor="CUUR0000SAH1",
+               ali="CPIUFDNS", ene="CPIENGNS")
+    SA = dict(todos="CPIAUCSL", bens="CUSR0000SACL1E", serv="CUSR0000SASLE", mor="CUSR0000SAH1",
+              ali="CPIUFDSL", ene="CPIENGSL")
+    NOMES = dict(bens=["Bens do núcleo"], serv=["Serviços sem moradia", "Moradia"], mor=["Moradia"],
+                 ali=["Alimentos"], ene=["Energia"])
+    idx = {}
+    for base, tab in (("nsa", NSA), ("sa", SA)):
+        for k, sid in tab.items():
+            x = dict(cf.fred(sid))
+            if x.get("2025-10") is None:
+                x["2025-10"] = (x["2025-09"] * x["2025-11"]) ** 0.5
+            idx[(base, k)] = x
+
+    def atualiza(k, s):
+        """peso de dez/Y levado até o mês s pelos preços; out/25 usa o de set/25"""
+        s = "2025-09" if s == "2025-10" else s
+        dez = "%d-12" % (int(s[:4]) - 1)
+        i, a = idx[("nsa", k)], idx[("nsa", "todos")]
+        return (i[s] / i[dez]) / (a[s] / a[dez])
+
+    def var(base, k, t, n):
+        i = idx[(base, k)]
+        return 100 * (i[t] / i[cf.mes_mais(t, -n)] - 1) if t in i and cf.mes_mais(t, -n) in i else None
+
+    v12, vm = g["variantes"]
+    contr = {}
+    for nome_v, v in (("12m", v12), ("mes", vm)):
+        por_nome = {x["nome"]: dict(x["dados"]) for x in v["series"]}
+        contr[nome_v] = {k: {t: sum(por_nome[n][t] for n in ns) for t in por_nome[ns[0]]
+                             if all(t in por_nome[n] for n in ns)} for k, ns in NOMES.items()}
+    vazios = dict(mes=["2025-10", "2025-11"], **{"12m": ["2025-10", "2026-10"]})
+    pesos = {}
+    for k in NOMES:
+        for y in (2023, 2024):
+            pts = []
+            for mm in range(1, 13):
+                s = "%d-%02d" % (y + 1, mm)
+                for q, n, base in (("12m", 12, "nsa"), ("mes", 1, "sa")):
+                    t = cf.mes_mais(s, n)
+                    c, gr = contr[q][k].get(t), var(base, k, t, n)
+                    if s != "2025-10" and t not in vazios[q] and c is not None and gr is not None:
+                        pts.append((atualiza(k, s) * gr / 100, c))
+            w = sum(x * c for x, c in pts) / sum(x * x for x, c in pts)
+            erro = max(abs(c - w * x) for x, c in pts)
+            if erro > 0.05:
+                raise RuntimeError("peso de %s em dez/%d não fecha com o FRBSF (erro %.3f p.p.)" % (k, y, erro))
+            pesos[(k, y)] = w
+
+    def estimativa(k, t, n, base):
+        s = cf.mes_mais(t, -n)
+        return pesos[(k, int(s[:4]) - 1)] * atualiza(k, s) * var(base, k, t, n) / 100
+
+    for q, v, n, base in (("12m", v12, 12, "nsa"), ("mes", vm, 1, "sa")):
+        for t in vazios[q]:
+            if var(base, "todos", t, n) is None:
+                continue
+            est = {k: estimativa(k, t, n, base) for k in NOMES}
+            est["Serviços sem moradia"] = est["serv"] - est["mor"]
+            est.update({NOMES[k][0]: est[k] for k in ("bens", "mor", "ali", "ene")})
+            est["CPI cheio"] = var(base, "todos", t, n)
+            soma = sum(est[n_] for n_ in ("Bens do núcleo", "Serviços sem moradia", "Moradia", "Alimentos", "Energia"))
+            for x in v["series"]:
+                d = dict(x["dados"])
+                if d.get(t) is None:
+                    d[t] = round(est[x["nome"]], 2)
+                    x["dados"] = [[m, d[m]] for m in sorted(d)]
+            print("  FRBSF com out/25 estimado, %s %s: componentes somam %.2f, CPI cheio %.2f"
+                  % (q, t, soma, est["CPI cheio"]))
+    g["nota"] = ("Outubro de 2025 estimado (no mês, também novembro): o BLS não publicou o índice daquele mês. "
+                 "O índice de cada componente é a média geométrica de setembro e novembro de 2025, e o peso de "
+                 "outubro é o de setembro, estimado pelos pesos de dezembro de 2024 atualizados pelos preços, como "
+                 "na estimativa da Bloomberg. Não é um número oficial do BLS nem do Fed de San Francisco.")
+    return g
+
+
 def tabela_fedwatch():
     def faixa(b):
         return "%s–%s" % (cf.br(b / 100, 2), cf.br((b + 25) / 100, 2))
@@ -2332,6 +2418,7 @@ def main():
     eua["despesa-contribuicao"] = so_variacao_em_bilhoes(eua["despesa-contribuicao"])
     eua["ia-vix"]["eventos"] = VIX_EVENTOS + eua["ia-vix"].get("eventos", [])
     eua["cpi-cheio-nucleo"] = cpi_com_outubro_estimado(eua["cpi-cheio-nucleo"])
+    eua["cpi-componentes"] = cpi_componentes_com_outubro_estimado(eua["cpi-componentes"])
     eua["fed-fedwatch"] = tabela_fedwatch()
     if "eua-participacao" not in eua:
         eua["eua-participacao"] = cn.graficos_ftm_dados_eua()["participacao"]
