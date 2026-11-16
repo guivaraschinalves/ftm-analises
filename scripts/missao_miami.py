@@ -2505,6 +2505,8 @@ def main():
     if "eua-participacao" not in eua:
         eua["eua-participacao"] = cn.graficos_ftm_dados_eua()["participacao"]
     cores_missao(eua)
+    # spreads: o high yield com o eixo a partir de 2 p.p. (pedido dele em 16/11/2026)
+    next(v for v in eua["spreads-credito"]["variantes"] if v["rot"] == "High yield")["eixo"] = {"min": 2}
     faltam = [gid for _, gid in EUA if gid not in eua]
     if faltam:
         raise RuntimeError("gráficos dos EUA que ninguém gerou: %s" % faltam)
