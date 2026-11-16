@@ -710,6 +710,7 @@ def ajustes_brasil(brasil):
     # contribuição por grupo, em 12 e em 3 meses, num gráfico só (no lugar do IPCA × Focus)
     ipca = graficos_ftm_dados("dados/ipca.json")
     c12, c3 = (adaptar(json.loads(json.dumps(ipca[i]))) for i in ("contribuicao-12m", "contribuicao-3m"))
+    ipca_oficial(c12, c3)
     brasil["contribuicao-ipca-grupos"] = dict(
         {k: v for k, v in c12.items() if k not in ("series", "variantes", "subtitulo")},
         id="contribuicao-ipca-grupos", fonte=c12.get("fonte") or "IBGE (IPCA) e FtM",
@@ -2376,6 +2377,20 @@ def engrossar_linhas(graficos, mais=1.5):
             for x in v.get("series") or []:
                 if x.get("tipo") not in ("barra", "faixa") and x.get("largura"):
                     x["largura"] = x["largura"] + mais
+
+
+def ipca_oficial(c12, c3):
+    """A linha do IPCA no gráfico de contribuição: o número oficial (pedido dele em 16/11/2026),
+    não a soma das contribuições. 12 meses: SGS 13522; 3 meses: SGS 433, composto."""
+    doze = cn.mensal(cn.sgs(13522, "01/01/1999"))
+    mes = cn.mensal(cn.sgs(433, "01/01/1999"))
+    ks = sorted(mes)
+    tres = {ks[i]: 100 * ((1 + mes[ks[i]] / 100) * (1 + mes[ks[i - 1]] / 100) * (1 + mes[ks[i - 2]] / 100) - 1)
+            for i in range(2, len(ks)) if cf.mes_mais(ks[i - 2], 2) == ks[i]}
+    for g, oficial in ((c12, doze), (c3, tres)):
+        x = next(x for x in g["series"] if x["nome"] == "IPCA")
+        ini = x["dados"][0][0]
+        x["dados"] = [[k, round(v, 2)] for k, v in sorted(oficial.items()) if k >= ini]
 
 
 def cores_missao(graficos):
