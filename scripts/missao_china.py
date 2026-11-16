@@ -211,19 +211,28 @@ def graficos_bp_eua(pib):
                 unidade="usd-bi", barra=3, buracoMax=3, fonte=FONTE_BEA,
                 series=[barras(n, c, bi[k], 1, rotulo=k in ("cc", "financeira", "erros"), contorno=k == "reservas") for k, n, c in nomes])
     # conta corrente por componente
-    comp = [("Balança comercial (bens)", AZUL, "IEABCG"), ("Serviços", VERMELHO, "IEABCS"),
-            ("Renda primária", VERDE, "IEABCPI"), ("Renda secundária", AZUL_CLARO, "IEABCSI")]
+    comp = [("Balança comercial (bens)", AZUL, "IEABCG", "BG_BP6_USD"), ("Serviços", VERMELHO, "IEABCS", "BS_BP6_USD"),
+            ("Renda primária", VERDE, "IEABCPI", "BIP_BP6_USD"),
+            ("Renda secundária", AZUL_CLARO, "IEABCSI", "BIS_BP6_USD")]
+
+    def emenda(s_bea, s_fmi):
+        """BEA desde 1999 e FMI antes, como no BP em % do PIB (pedido dele em 16/11/2026: mais
+        história). Em 4 trimestres os dois batem; só serviços diferem, em uns 0,1% do PIB."""
+        d = {k: v for k, v in imf_us(s_fmi).items() if k < "1999-01"}
+        d.update(bea(s_bea))
+        return d
     # em % do PIB (pedido dele em 16/11/2026), como o BP em % do PIB que vem antes
     def pct_pib(d):
         return {k: 100 * v / (pib4[k] * 1000 / 4) for k, v in soma4(d).items() if k in pib4}
-    cc4 = {n: pct_pib(bea(s)) for n, _, s in comp}
-    tot = pct_pib(bea("IEABC"))
+    cc4 = {n: pct_pib(emenda(s, f)) for n, _, s, f in comp}
+    tot = pct_pib(emenda("IEABC", "BCA_BP6_USD"))
     u = max(tot)
     g_cc = dict(id="eua-cc-componentes", titulo="Conta corrente dos EUA por componente",
-                subtitulo="Em %% do PIB, acumulado em 4 trimestres, desde 1999; %s: saldo de %s%% do PIB, "
+                subtitulo="Em %% do PIB, acumulado em 4 trimestres, desde 1973; %s: saldo de %s%% do PIB, "
                           "bens %s%%" % (rot_tri(u), cf.br(tot[u], 1), cf.br(cc4["Balança comercial (bens)"][u], 1)),
-                unidade="%", barra=3, buracoMax=3, fonte="BEA (International Transactions e PIB) via FRED e FtM",
-                series=[barras(n, c, cc4[n], 2) for n, c, _ in comp]
+                unidade="%", barra=3, buracoMax=3,
+                fonte="BEA (desde 1999) e FMI (Balance of Payments, antes) via FRED e DBnomics; FtM",
+                series=[barras(n, c, cc4[n], 2) for n, c, _, _ in comp]
                 + [linha("Saldo em conta corrente", BRANCO, tot, 2)])
     # conta financeira por componente (sem reservas), sinal de entrada de capital
     a = {s: bea(s) for s in ("IEAADI", "IEAIDI", "IEAAPI", "IEAIPI", "IEAAOI", "IEAIOI", "IEAFD", "IEANLF", "IEAAR")}
