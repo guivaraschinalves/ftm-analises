@@ -93,7 +93,7 @@ def grafico_pib_eua_mundo():
           % (un, nominal[un], nominal["1960"], ate, ppc[ate]))
     return dict(id="pib-eua-mundo", titulo="PIB dos EUA em % do PIB mundial", unidade="%", buracoMax=13,
                 subtitulo="Anual", variantes=[
-                    dict(rot="Em dólares correntes, desde 1960", fonte="Banco Mundial e FtM",
+                    dict(rot="Em dólares correntes, desde 1960", fonte="Banco Mundial e FtM", eixo=dict(min=20),
                          series=[linha("EUA / mundo", AZUL, anual(nominal), 1)]),
                     dict(rot="Pela paridade do poder de compra, desde 1980",
                          fonte="FMI (World Economic Outlook; %s = estimativa) e FtM" % ate,
