@@ -175,6 +175,28 @@
   // pedaço continua passando pelo **negrito** normalmente.
   // Linhas de dados mais grossas na Missão (pedido dele em 16/11/2026: +20% e depois mais 10%,
   // 1,2 x 1,1); eixos, grades, legenda e o resto ficam como estão.
+  // Na Missão, linha azul some no fundo azul-escuro (pedido do chefe, 16/11/2026): a linha azul
+  // vira azul claro e a azul clara vira verde, como no varejo ampliado. Só linhas (barras não
+  // mudam). Se o recorte já tem linha verde e azul clara, ele fica como está, para não repetir cor.
+  var LINHA_CLARA = { "#4F81BD": "#8EB4E3", "#8EB4E3": "#9BBB59" };
+  function clarearLinhasAzuis(g) {
+    if (g._linhasClaras) return;
+    g._linhasClaras = true;
+    function ehLinha(x) { return x && typeof x.cor === "string" && x.tipo !== "barra" && x.tipo !== "faixa"; }
+    function recorte(series) {
+      if (!series) return;
+      var linhas = series.filter(ehLinha), cores = linhas.map(function (x) { return x.cor.toUpperCase(); });
+      var temVerde = cores.indexOf("#9BBB59") >= 0, temClaro = cores.indexOf("#8EB4E3") >= 0;
+      linhas.forEach(function (x) {
+        var c = x.cor.toUpperCase();
+        // azul claro só vira verde se não houver verde; azul só vira azul claro se o azul claro sair
+        if (c === "#8EB4E3" && !temVerde) x.cor = LINHA_CLARA[c];
+        else if (c === "#4F81BD" && (!temClaro || !temVerde)) x.cor = LINHA_CLARA[c];
+      });
+    }
+    if (g.variantes) g.variantes.forEach(function (v) { recorte(v.series || g.series); });
+    recorte(g.series);
+  }
   function espessuraDaLinha(w) {
     return document.documentElement.getAttribute("data-marca") === "missao" ? w * 1.32 : w;
   }
@@ -4616,6 +4638,7 @@
       });
       sec.graficos.forEach(function (g) {
         if (!g.foto) g.fonte = g.fonte || dados.fonte;      // foto não tem fonte
+        if (dados.marca === "missao") clarearLinhasAzuis(g);
         // o mapa dos estados vem uma vez só, no topo do arquivo
         if (g.tipo === "estados" && !g.formas) g.formas = dados.formas;
         g._comentarios = dados.comentarios || null;
@@ -4683,6 +4706,7 @@
       var daSecao = [];
       sec.graficos.forEach(function (g) {
         if (!g.foto) g.fonte = g.fonte || dados.fonte;      // foto não tem fonte
+        if (dados.marca === "missao") clarearLinhasAzuis(g);
         // o mapa dos estados vem uma vez só, no topo do arquivo
         if (g.tipo === "estados" && !g.formas) g.formas = dados.formas;
         g._comentarios = dados.comentarios || null;
