@@ -2437,6 +2437,10 @@ def main():
     import missao_china
     china = {g["id"]: g for g in missao_china.graficos()}
     ouro = adaptar(json.loads(json.dumps(graficos_ftm_dados("dados/reservas.json")["reservas-ouro-tesouros"])))
+    # só o recorte sem os EUA (pedido dele em 16/11/2026, só na Missão)
+    v = next(x for x in ouro["variantes"] if x["rot"] == "Exc. EUA")
+    ouro = dict({k: x for k, x in ouro.items() if k != "variantes"}, series=v["series"])
+    ouro["subtitulo"] += ", excluindo as reservas dos EUA"
     china[ouro["id"]] = ouro
     for titulo, gid in missao_china.CHINA:
         secoes.append(dict(titulo=titulo, texto="", fontes=[], figuras=[], graficos=[china[gid]]))
