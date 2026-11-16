@@ -479,7 +479,7 @@ CHINA = [("Déficit externo dos EUA", "foto-01"), ("", "foto-02"), ("", "pib-eua
          ("", "tarifas-receita"), ("", "tarifas-receita-anos"), ("", "foto-09"), ("", "tarifas-devolucoes"),
          ("", "tarifas-liquida-anos"),
          ("Dólar", "foto-10"), ("", "dxy"),
-         ("Ouro nas reservas", "reservas-ouro-tesouros"),      # copiado do ftm-dados (reservas.json)
+         ("", "reservas-ouro-tesouros"),      # copiado do ftm-dados (reservas.json)
          # fora da ordem que ele mandou em 16/11/2026: ficam no fim da parte até ele dizer
          ("Balanço de pagamentos dos EUA", "eua-bp"), ("", "eua-conta-financeira")]
 PARTE_CHINA = "Desequilíbrios globais"

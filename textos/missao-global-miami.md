@@ -484,7 +484,7 @@ parte: Desequilíbrios globais
 
 ##
 
-## Ouro nas reservas
+##
 
 ## Balanço de pagamentos dos EUA
 
