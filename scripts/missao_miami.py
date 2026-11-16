@@ -2364,6 +2364,7 @@ CORES_MISSAO = {
     "franca-divida-deficit": {"Alemanha": BRANCO_M},
     "btc-preco": {"Bitcoin": "#F79646"},
     "ouro-preco": {"Ouro": "#FFFF00"},
+    "eua-cc-pib": {"Conta corrente / PIB": VERMELHO_M},
 }
 # gráficos que ficam com as cores de antes da troca automática
 CORES_ORIGINAIS = ["bp-reservas-divida", "spread-franca-italia"]      # no spread, a Itália segue azul claro
@@ -2529,6 +2530,7 @@ def main():
     ouro = dict({k: x for k, x in ouro.items() if k != "variantes"}, series=v["series"])
     ouro["subtitulo"] += ", excluindo as reservas dos EUA"
     china[ouro["id"]] = ouro
+    cores_missao(china)
     for titulo, gid in missao_china.CHINA:
         secoes.append(dict(titulo=titulo, texto="", fontes=[], figuras=[], graficos=[china[gid]]))
     cripto = {g["id"]: g for g in graficos_cripto()}
