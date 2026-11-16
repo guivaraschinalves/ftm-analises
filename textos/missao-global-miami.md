@@ -456,10 +456,6 @@ parte: Desequilíbrios globais
 
 ##
 
-##
-
-##
-
 ## Tarifas
 
 ##

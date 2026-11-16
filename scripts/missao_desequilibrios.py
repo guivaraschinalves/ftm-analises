@@ -256,6 +256,17 @@ def graficos_yuan_equilibrio():
     return out
 
 
+def grafico_yuan_equilibrio():
+    """As três datas-base num card só, com um botão para cada (pedido dele em 16/11/2026)."""
+    gs = graficos_yuan_equilibrio()
+    u = gs[0]["series"][0]["dados"][-1]
+    return dict(id="china-yuan-ppc", titulo="A taxa de câmbio de equilíbrio do yuan",
+                subtitulo="Yuans por dólar, de mercado e pela paridade do poder de compra; %s: ¥ %s de mercado"
+                          % (cf.rot_mes(u[0]), cf.br(u[1], 2)),
+                unidade="cny", eixo=dict(zero=False), fonte=gs[0]["fonte"],
+                variantes=[dict(rot=g["titulo"].split(": ")[1].capitalize(), series=g["series"]) for g in gs])
+
+
 # ---------- incerteza e tarifas ----------
 
 def grafico_vix_incerteza():
@@ -364,6 +375,6 @@ def fotos():
 
 def graficos():
     out = fotos() + [grafico_pib_eua_mundo()] + graficos_emprego_industria() + [grafico_va_industria()]
-    out += [FIGURA_FMI, grafico_china_reservas_pib()] + graficos_yuan_equilibrio()
+    out += [FIGURA_FMI, grafico_china_reservas_pib(), grafico_yuan_equilibrio()]
     out += [grafico_vix_incerteza()] + graficos_tarifas()
     return out
