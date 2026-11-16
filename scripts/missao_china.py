@@ -144,10 +144,10 @@ def graficos_eua_externo(pib):
     broad = cf.fred("TWEXBPA")
     eme = cf.fred("RTWEXEMEGS")
     g_dol = dict(id="eua-cc-dolar", titulo="Conta corrente dos EUA e dólar real",
-                 subtitulo="Conta corrente em % do PIB (esq.); índices do dólar real do Fed (dir.): amplo, só "
+                 subtitulo="Desde 1971; conta corrente em % do PIB (esq.); índices do dólar real do Fed (dir.): amplo, só "
                            "bens (mar/1973 = 100, encerrado em 2019), e contra emergentes (jan/2006 = 100)",
                  unidade="%", unidade2="ind", buracoMax=3, fonte="BEA e Federal Reserve via FRED e FtM",
-                 series=[linha("Conta corrente / PIB", AZUL, cc, 2),
+                 series=[linha("Conta corrente / PIB", AZUL, cf.desde(cc, "1971-01"), 2),
                          linha("Dólar real amplo, só bens (dir.)", VERDE, broad, 1, largura=3, dir=True,
                                unidade="ind", rotulo=False),         # acabou em 2019: sem número na ponta
                          linha("Dólar real contra emergentes (dir.)", VERMELHO, eme, 1, largura=3, dir=True,
@@ -212,16 +212,19 @@ def graficos_bp_eua(pib):
                 series=[barras(n, c, bi[k], 1, rotulo=k in ("cc", "financeira", "erros"), contorno=k == "reservas") for k, n, c in nomes])
     # conta corrente por componente
     comp = [("Balança comercial (bens)", AZUL, "IEABCG"), ("Serviços", VERMELHO, "IEABCS"),
-            ("Renda primária", VERDE, "IEABCPI"), ("Renda secundária", AZUL_ESCURO, "IEABCSI")]
-    cc4 = {n: {k: v / 1000 for k, v in soma4(bea(s)).items()} for n, _, s in comp}
-    tot = {k: v / 1000 for k, v in soma4(bea("IEABC")).items()}
+            ("Renda primária", VERDE, "IEABCPI"), ("Renda secundária", AZUL_CLARO, "IEABCSI")]
+    # em % do PIB (pedido dele em 16/11/2026), como o BP em % do PIB que vem antes
+    def pct_pib(d):
+        return {k: 100 * v / (pib4[k] * 1000 / 4) for k, v in soma4(d).items() if k in pib4}
+    cc4 = {n: pct_pib(bea(s)) for n, _, s in comp}
+    tot = pct_pib(bea("IEABC"))
     u = max(tot)
     g_cc = dict(id="eua-cc-componentes", titulo="Conta corrente dos EUA por componente",
-                subtitulo="US$ bilhões, acumulado em 4 trimestres, desde 1999; %s: saldo de US$ %s bi"
-                          % (rot_tri(u), cf.br(tot[u], 0)),
-                unidade="usd-bi", barra=3, buracoMax=3, fonte=FONTE_BEA,
-                series=[barras(n, c, cc4[n], 1) for n, c, _ in comp]
-                + [linha("Saldo em conta corrente", BRANCO, tot, 1)])
+                subtitulo="Em %% do PIB, acumulado em 4 trimestres, desde 1999; %s: saldo de %s%% do PIB, "
+                          "bens %s%%" % (rot_tri(u), cf.br(tot[u], 1), cf.br(cc4["Balança comercial (bens)"][u], 1)),
+                unidade="%", barra=3, buracoMax=3, fonte="BEA (International Transactions e PIB) via FRED e FtM",
+                series=[barras(n, c, cc4[n], 2) for n, c, _ in comp]
+                + [linha("Saldo em conta corrente", BRANCO, tot, 2)])
     # conta financeira por componente (sem reservas), sinal de entrada de capital
     a = {s: bea(s) for s in ("IEAADI", "IEAIDI", "IEAAPI", "IEAIPI", "IEAAOI", "IEAIOI", "IEAFD", "IEANLF", "IEAAR")}
     outros = {k: a["IEAIOI"][k] - a["IEAAOI"][k] - a["IEAFD"].get(k, 0) for k in a["IEAIOI"]}

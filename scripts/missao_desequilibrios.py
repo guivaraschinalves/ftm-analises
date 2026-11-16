@@ -6,8 +6,8 @@ biblioteca padrão.
 
 DE ONDE VEM CADA COISA
 
-  - PIB dos EUA no PIB mundial: FMI (WEO, datamapper), em dólares correntes
-    (NGDPD dos EUA ÷ mundo) e pela paridade do poder de compra (PPPSH).
+  - PIB dos EUA no PIB mundial: em dólares correntes, Banco Mundial
+    (NY.GDP.MKTP.CD, desde 1960); pela paridade do poder de compra, FMI (PPPSH).
   - Emprego na indústria por segmento: BLS (CES, com ajuste sazonal) via FRED.
   - Indústria em % do PIB: BEA (GDP by industry, tabela TVA110, anual desde
     1997; o arquivo histórico de 1947 a 1997 saiu do ar).
@@ -73,17 +73,31 @@ def ano_weo():
 
 # ---------- EUA no mundo e indústria ----------
 
+BM_PIB = ("https://api.worldbank.org/v2/country/WLD;USA/indicator/NY.GDP.MKTP.CD"
+          "?format=json&per_page=500&date=1960:2100")
+
+
 def grafico_pib_eua_mundo():
-    usd, mundo = weo("NGDPD")["USA"], weo("NGDPD")["WEOWORLD"]
+    """Em dólares: Banco Mundial desde 1960 (o mesmo do gráfico do FRED que ele
+    mandou); pela PPC: FMI desde 1980."""
+    r = json.loads(cf.baixar(BM_PIB, headers={"User-Agent": "ftm-analises"}))
+    bm = {}
+    for x in r[1]:
+        if x["value"] is not None:
+            bm.setdefault(x["countryiso3code"], {})[x["date"]] = x["value"]
+    nominal = {a: 100 * v / bm["WLD"][a] for a, v in bm["USA"].items() if a in bm["WLD"]}
     ate = ano_weo()
-    nominal = {a: 100 * v / mundo[a] for a, v in usd.items() if a in mundo and a <= ate}
     ppc = {a: v for a, v in weo("PPPSH")["USA"].items() if a <= ate}
-    print("  PIB dos EUA / mundo em %s: %.1f%% em dólares, %.1f%% em PPC" % (ate, nominal[ate], ppc[ate]))
-    return dict(id="pib-eua-mundo", titulo="PIB dos EUA em % do PIB mundial",
-                subtitulo="Anual, de 1980 a %s (%s = estimativa do FMI)" % (ate, ate),
-                unidade="%", buracoMax=13, fonte="FMI (World Economic Outlook) e FtM", variantes=[
-                    dict(rot="Em dólares correntes", series=[linha("EUA / mundo", AZUL, anual(nominal), 1)]),
-                    dict(rot="Pela paridade do poder de compra", series=[linha("EUA / mundo", AZUL, anual(ppc), 1)])])
+    un = max(nominal)
+    print("  PIB dos EUA / mundo: %s %.1f%% em dólares (1960 %.1f%%); %s %.1f%% em PPC"
+          % (un, nominal[un], nominal["1960"], ate, ppc[ate]))
+    return dict(id="pib-eua-mundo", titulo="PIB dos EUA em % do PIB mundial", unidade="%", buracoMax=13,
+                subtitulo="Anual", variantes=[
+                    dict(rot="Em dólares correntes, desde 1960", fonte="Banco Mundial e FtM",
+                         series=[linha("EUA / mundo", AZUL, anual(nominal), 1)]),
+                    dict(rot="Pela paridade do poder de compra, desde 1980",
+                         fonte="FMI (World Economic Outlook; %s = estimativa) e FtM" % ate,
+                         series=[linha("EUA / mundo", AZUL, anual(ppc), 1)])])
 
 
 EMPREGO = [("eua-emprego-metal-primario", "CES3133100001", "metais primários",
@@ -104,6 +118,8 @@ def graficos_emprego_industria():
                         subtitulo="Empregados em milhares, com ajuste sazonal, desde 1990; %s: %s mil"
                                   % (cf.rot_mes(u), cf.br(d[u], 0)),
                         unidade="mil", fonte="BLS (CES) via FRED (%s)" % sid,
+                        # eixo sem o zero: a queda aparece melhor (pedido dele em 16/11/2026)
+                        **({"eixo": dict(zero=False)} if gid != "eua-emprego-metal-fabricado" else {}),
                         series=[linha("Empregados", AZUL, d, 1)]))
         print("  emprego em %s: %s %.0f mil (pico %s, %.0f mil)" % (nome, u, d[u], pico, d[pico]))
     return out
@@ -127,7 +143,7 @@ def grafico_va_industria():
     return dict(id="eua-va-industria", titulo="Indústria de transformação em % do PIB dos EUA",
                 subtitulo="Valor adicionado da indústria de transformação, anual, de %s a %s; %s: %s%%"
                           % (a0, u, u, cf.br(va[u], 1)),
-                unidade="%", buracoMax=13, fonte="BEA (GDP by Industry, tabela TVA110)",
+                unidade="%", buracoMax=13, eixo=dict(zero=False), fonte="BEA (GDP by Industry, tabela TVA110)",
                 series=[linha("Indústria / PIB", AZUL, anual(va), 1)])
 
 
