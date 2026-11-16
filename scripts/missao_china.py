@@ -474,7 +474,7 @@ CHINA = [("Déficit externo dos EUA", "foto-01"), ("", "foto-02"), ("", "pib-eua
          ("China: balanço de pagamentos e comércio", "eua-comercio-paises"), ("", "china-bp"), ("", "china-bp-saldo"), ("", "china-cc"),
          ("", "china-comercio"), ("", "china-comercio-eua"), ("", "china-reservas"), ("", "china-reservas-pib"),
          ("", "foto-07"),
-         ("Câmbio do yuan", "china-yuan"), ("", "china-yuan-ppc"),
+         ("Câmbio do yuan", "china-yuan"), ("", "china-yuan-ppc"), ("", "byd-yuan"),
          ("Tarifas", "miran-conclusao"), ("", "foto-08"), ("", "vix-incerteza"), ("", "eua-tarifa-efetiva"),
          ("", "tarifas-receita"), ("", "tarifas-receita-anos"), ("", "foto-09"), ("", "tarifas-devolucoes"),
          ("", "tarifas-liquida-anos"),

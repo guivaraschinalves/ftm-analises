@@ -454,6 +454,11 @@ def graficos_asia():
                                    "Central Bank of the Republic of China (Taiwan) e FtM")]
 
 
+# infográfico do BYD (scripts/infografico_byd.py gera o HTML; a imagem sai do Chrome headless)
+FIGURA_BYD = dict(id="byd-yuan", tipo="figura", foto=True, imagem="assets/missao/byd-yuan.jpg",
+                  titulo="BYD Song Plus: o preço no Brasil e com o yuan no equilíbrio")
+
+
 # ---------- fotos ----------
 
 FOTOS = [(1, "Foto 1"), (2, "Foto 2"), (3, "Foto 3"),
@@ -471,6 +476,6 @@ def fotos():
 
 def graficos():
     out = fotos() + [grafico_pib_eua_mundo()] + graficos_emprego_industria() + [grafico_va_industria()]
-    out += [FIGURA_FMI, grafico_china_reservas_pib(), grafico_yuan_equilibrio()]
+    out += [FIGURA_FMI, grafico_china_reservas_pib(), grafico_yuan_equilibrio(), FIGURA_BYD]
     out += [grafico_vix_incerteza()] + graficos_tarifas()
     return out
