@@ -2355,13 +2355,20 @@ CORES_MISSAO = {
     "selic-recessoes": {"Selic meta": BRANCO_M},
     "selic-ciclos": {"Selic meta": BRANCO_M},
     "di1-2027": {"DI1 jul/27": VERDE_M},
+    "eua-participacao": {"Observada": BRANCO_M},
+    "treasuries-5-10-30": {"5 anos": VERDE_M},
+    "pib-eua-investimento-ti": {"Equipamentos de processamento de informação": BRANCO_M},
+    "construcao-datacenters-fabricas": {"Data centers": VERDE_M},
 }
 # gráficos que ficam com as cores de antes da troca automática
 CORES_ORIGINAIS = ["bp-reservas-divida"]
 
 
 def cores_missao(graficos):
+    """Aplica as cores dos gráficos que estão neste dicionário (Brasil ou EUA)."""
     for gid, cores in CORES_MISSAO.items():
+        if gid not in graficos:
+            continue
         g = graficos[gid]
         achou = set()
         for v in (g.get("variantes") or []) + [g]:
@@ -2372,7 +2379,8 @@ def cores_missao(graficos):
         if achou != set(cores):
             raise RuntimeError("cores da Missão: %s sem a série %s" % (gid, set(cores) - achou))
     for gid in CORES_ORIGINAIS:
-        graficos[gid]["coresOriginais"] = True
+        if gid in graficos:
+            graficos[gid]["coresOriginais"] = True
 
 
 def main():
@@ -2467,6 +2475,7 @@ def main():
     eua["fed-fedwatch"] = tabela_fedwatch()
     if "eua-participacao" not in eua:
         eua["eua-participacao"] = cn.graficos_ftm_dados_eua()["participacao"]
+    cores_missao(eua)
     faltam = [gid for _, gid in EUA if gid not in eua]
     if faltam:
         raise RuntimeError("gráficos dos EUA que ninguém gerou: %s" % faltam)
