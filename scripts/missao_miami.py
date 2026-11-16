@@ -2339,6 +2339,42 @@ def graficos_zona_euro():
 PARTE_JUROS = "Alta de juros no mundo"
 
 
+# Cores escolhidas por ele para a Missão (16/11/2026), por gráfico e série, em todos os
+# recortes. Elas valem por cima da troca automática do app (azul -> azul claro -> verde).
+BRANCO_M, VERDE_M, VERMELHO_M = "#FFFFFF", "#9BBB59", "#C0504D"
+CORES_MISSAO = {
+    "credito-juros-selic": {"Comprometimento da renda com juros da dívida (dir.)": VERMELHO_M},
+    "credito-direcionado-livre": {"Direcionado / livre": VERMELHO_M},
+    "desemprego": {"Taxa de desemprego": VERDE_M},
+    "participacao": {"Taxa de participação": VERDE_M},
+    "ipca-projecoes-focus": {"IPCA (Var. % 12m)": BRANCO_M},
+    "ipca-difusao-grupos": {"Índice sem alimentação e bebidas": VERDE_M},
+    "divida-composicao": {"Taxa Flutuante": VERDE_M},
+    "bp-reservas-moeda": {"% do M2": VERDE_M},
+    "moedas-cambio-ppc": {"Câmbio pela PPC": BRANCO_M},
+    "selic-recessoes": {"Selic meta": BRANCO_M},
+    "selic-ciclos": {"Selic meta": BRANCO_M},
+    "di1-2027": {"DI1 jul/27": VERDE_M},
+}
+# gráficos que ficam com as cores de antes da troca automática
+CORES_ORIGINAIS = ["bp-reservas-divida"]
+
+
+def cores_missao(graficos):
+    for gid, cores in CORES_MISSAO.items():
+        g = graficos[gid]
+        achou = set()
+        for v in (g.get("variantes") or []) + [g]:
+            for x in v.get("series") or []:
+                if x.get("nome") in cores:
+                    x["cor"] = cores[x["nome"]]
+                    achou.add(x["nome"])
+        if achou != set(cores):
+            raise RuntimeError("cores da Missão: %s sem a série %s" % (gid, set(cores) - achou))
+    for gid in CORES_ORIGINAIS:
+        graficos[gid]["coresOriginais"] = True
+
+
 def main():
     selic = cn.sgs(432, "05/03/1999")
     ult = max(selic)
@@ -2391,6 +2427,7 @@ def main():
     faltam = [gid for _, gid in BRASIL if gid not in brasil]
     if faltam:
         raise RuntimeError("gráficos do Brasil que ninguém gerou: %s" % faltam)
+    cores_missao(brasil)
     secoes = [dict(titulo=titulo, texto="", fontes=[], figuras=[], graficos=[brasil[gid]]) for titulo, gid in BRASIL]
     eua = {g["id"]: g for g in graficos_eua()}
     for g in graficos_divida_eua():

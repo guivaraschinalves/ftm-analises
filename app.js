@@ -180,7 +180,7 @@
   // mudam). Se o recorte já tem linha verde e azul clara, ele fica como está, para não repetir cor.
   var LINHA_CLARA = { "#4F81BD": "#8EB4E3", "#8EB4E3": "#9BBB59" };
   function clarearLinhasAzuis(g) {
-    if (g._linhasClaras) return;
+    if (g._linhasClaras || g.coresOriginais) return;
     g._linhasClaras = true;
     function ehLinha(x) { return x && typeof x.cor === "string" && x.tipo !== "barra" && x.tipo !== "faixa"; }
     function recorte(series) {
