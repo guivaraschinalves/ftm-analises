@@ -25,8 +25,8 @@ import cenario_fomc as cf                                     # noqa: E402
 DATA_PRECOS = "16/11/2026"
 BYD_BR = 249990          # BYD Song Plus DM-i 2027, tabela BYD Brasil (versão única)
 BYD_CN = 175800          # 宋PLUS DM-i 智驾版, versão mais cara (faixa oficial de ¥ 135.800 a ¥ 175.800)
-FORD_BR = 229900         # Ford Maverick Hybrid, tabela Ford Brasil desde 2/10/2026 (feita no México)
-FORD_US = 39785          # Maverick Lariat Hybrid AWD 2026, MSRP com frete
+FORD_BR = 296090         # Chevrolet Equinox Activ, preço público sugerido em out/2026 (feito no México)
+FORD_US = 35600          # Equinox ACTIV AWD 2026, MSRP sem o frete (Cars.com)
 # câmbio de equilíbrio do yuan (gráfico china-yuan-ppc, out/26), por data-base
 EQUILIBRIO = [("dez/2019", 5.60), ("dez/2020", 5.28), ("dez/2014", 5.07)]
 
@@ -49,7 +49,7 @@ def main():
     ford_us_r = FORD_US * brl
     cen = [(base, eq, cny / eq - 1, BYD_BR * cny / eq) for base, eq in EQUILIBRIO]
     print("PTAX %s: R$ %.4f; yuan %s: ¥ %.4f; R$ %.4f por yuan" % (ptax["data"], brl, dia, cny, brl_cny))
-    print("BYD: China R$ %.0f, Brasil %.2fx; Ford: EUA R$ %.0f, Brasil %.2fx"
+    print("BYD: China R$ %.0f, Brasil %.2fx; Equinox: EUA R$ %.0f, Brasil %.2fx"
           % (byd_cn_r, BYD_BR / byd_cn_r, ford_us_r, FORD_BR / ford_us_r))
     for base, eq, val, p in cen:
         print("  yuan a ¥ %.2f (%s): +%.0f%% -> R$ %.0f" % (eq, base, 100 * val, p))
@@ -85,9 +85,10 @@ h1 { position: absolute; left: 60px; top: 46px; font-size: 54px; font-weight: 70
 .c .l .conv { font-size: 22px; color: #c9d6e8; }
 .c .mult { margin-top: 18px; font-size: 28px; }
 .c .mult b { font-size: 40px; color: #8EB4E3; }
-.cen { position: absolute; left: 60px; right: 60px; top: 560px; }
+.c .imp { margin-top: 6px; font-size: 23px; color: #c9d6e8; }
+.cen { position: absolute; left: 60px; right: 60px; top: 585px; }
 .cen h3 { font-size: 34px; font-weight: 700; margin-bottom: 18px; }
-.b { display: flex; align-items: center; height: 84px; }
+.b { display: flex; align-items: center; height: 80px; }
 .b-rot { width: 380px; display: flex; flex-direction: column; }
 .b-rot b { font-size: 30px; }
 .b-rot span { font-size: 21px; color: #c9d6e8; }
@@ -104,18 +105,20 @@ h1 { position: absolute; left: 60px; top: 46px; font-size: 54px; font-weight: 70
       <div class="l"><p class="onde">China</p><p class="preco">¥ %(byd_cn)s</p><p class="conv">= R$ %(byd_cn_r)s</p></div>
       <div class="l"><p class="onde">Brasil</p><p class="preco">R$ %(byd_br)s</p></div>
     </div>
-    <p class="mult">No Brasil, <b>%(byd_mult)sx</b> o preço na China</p></div>
-  <div class="c"><h2>Ford Maverick Hybrid</h2><p class="tipo">picape híbrida americana, feita no México</p>
+    <p class="mult">No Brasil, <b>%(byd_mult)sx</b> o preço na China</p>
+    <p class="imp">Imposto de importação: 35%%</p></div>
+  <div class="c"><h2>Chevrolet Equinox Activ</h2><p class="tipo">SUV americano a gasolina, feito no México</p>
     <div class="linhas">
       <div class="l"><p class="onde">EUA</p><p class="preco">US$ %(ford_us)s</p><p class="conv">= R$ %(ford_us_r)s</p></div>
       <div class="l"><p class="onde">Brasil</p><p class="preco">R$ %(ford_br)s</p></div>
     </div>
-    <p class="mult">No Brasil, <b>%(ford_mult)sx</b> o preço nos EUA</p></div>
+    <p class="mult">No Brasil, <b>%(ford_mult)sx</b> o preço nos EUA</p>
+    <p class="imp">Imposto de importação: 0%% (acordo automotivo Brasil-México)</p></div>
 </div>
 <div class="cen"><h3>O Song Plus no Brasil se o yuan fosse ao câmbio de equilíbrio (PPC)</h3>%(barras)s</div>
 <p class="nota">Cenário: o preço no Brasil acompanha o custo em dólar do carro chinês, com o real, os impostos e as margens
 constantes; é o teto do repasse. China: versão mais cara do 宋PLUS DM-i (faixa oficial de ¥ 135.800 a ¥ 175.800).
-EUA: Maverick Lariat Hybrid AWD, com frete. Fontes: BYD, Ford, Banco Central, Federal Reserve e FtM.</p>
+EUA: Equinox ACTIV AWD, sem o frete. Fontes: BYD, Chevrolet, Banco Central, Federal Reserve e FtM.</p>
 </body></html>""" % dict(
         data=DATA_PRECOS, brl=br(brl, 2), cny=br(cny, 2), brlcny=br(brl_cny, 2),
         byd_cn=br(BYD_CN), byd_cn_r=br(byd_cn_r), byd_br=br(BYD_BR), byd_mult=br(BYD_BR / byd_cn_r, 2),
