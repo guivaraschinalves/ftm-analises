@@ -1374,20 +1374,22 @@ def graficos_eua():
 MIDTERMS_IDS = ["midterms-historia-aprovacao", "midterms-resultado-camara", "midterms-resultado-senado",
                 "midterms-resultado-mapa-senado"]
 
-EUA = [("Atividade nos EUA", "ism-pmi"), ("", "pib-eua-contribuicoes"), ("", "pib-eua-investimento-importacoes"), ("Inteligência artificial", "pib-eua-investimento-ti"),
-       ("", "construcao-datacenters-fabricas"), ("", "datacenters-participacao"), ("Crédito corporativo", "spreads-credito"),
-       ("", "treasuries-5-10-30"), ("", "ia-divida"), ("", "ia-cds-bloomberg"),
-       ("", "ia-cds-reuters"), ("Déficit fiscal", "eua-deficit"), ("", "governo-receita-despesa"),
+EUA = [("Atividade nos EUA", "ism-pmi"), ("", "pib-eua-contribuicoes"), ("", "pib-eua-investimento-importacoes"),
+       ("Mercado de trabalho", "payroll-setores"), ("", "eua-payroll-breakeven"), ("", "eua-u3-u6"),
+       ("", "eua-participacao"), ("Inflação nos EUA", "cpi-cheio-nucleo"), ("", "cpi-componentes"),
+       ("", "pce-nucleos"), ("Fed", "fomc-comunicados"), ("", "fed-ativos-juros-pce"), ("", "fed-fedwatch"),
+       ("Crédito corporativo", "spreads-credito"),
+       ("", "treasuries-5-10-30"), ("", "ia-divida"), ("", "ia-cds-bloomberg"), ("", "ia-cds-reuters"),
+       ("Inteligência artificial", "pib-eua-investimento-ti"),
+       ("", "construcao-datacenters-fabricas"), ("", "datacenters-participacao"),
+       ("Déficit fiscal", "eua-deficit"), ("", "governo-receita-despesa"),
        ("", "despesa-contribuicao"), ("", "eua-divida-pib"), ("", "eua-divida-detentores"),
        ("Midterms", "midterms-historia-aprovacao"), ("", "midterms-resultado-camara"), ("", "midterms-resultado-senado"),
        ("", "midterms-resultado-mapa-senado"), ("", "ia-indices"), ("", "ia-vix"),
        ("SpaceX", "spacex-receita-trimestral"), ("", "spacex-caixa-9m"), ("", "spacex-capex-trimestral"),
        ("", "spacex-3t-comparacao"), ("Anthropic", "anthropic-receita-trimestral"), ("", "anthropic-dre-acumulado"),
        ("", "anthropic-despesas-receita"), ("", "anthropic-valor-mercado"), ("", "anthropic-preco-vendas"),
-       ("", "anthropic-moat"),
-       ("Mercado de trabalho", "payroll-setores"), ("", "eua-payroll-breakeven"), ("", "eua-u3-u6"),
-       ("", "eua-participacao"), ("Inflação nos EUA", "cpi-cheio-nucleo"), ("", "cpi-componentes"),
-       ("", "pce-nucleos"), ("Fed", "fomc-comunicados"), ("", "fed-ativos-juros-pce"), ("", "fed-fedwatch")]
+       ("", "anthropic-moat")]
 PARTE_EUA = "Cenário econômico dos EUA"
 
 

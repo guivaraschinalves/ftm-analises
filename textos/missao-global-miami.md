@@ -214,17 +214,47 @@ No 3º trimestre, o PIB cresceu 3,4% em ritmo anualizado. O investimento privado
 
 Em 12 meses, o investimento fixo privado cresceu 6,1%, e as importações, 10,3%, contra 2,1% do PIB. Muito do equipamento é importado, como as memórias da Coreia do Sul: entra no PIB pelo investimento e sai pelas importações.
 
-## Inteligência artificial
+## Mercado de trabalho
 
-Os equipamentos de processamento de informação, onde entram computadores e servidores, chegaram a 15,3% do investimento fixo privado no 3º trimestre, acima do pico da bolha da internet (15,1% no fim de 2000).
-
-##
-
-A construção de data centers chegou a US$ 96 bilhões por ano em setembro, quase o dobro de um ano antes (US$ 51 bilhões). A de fábricas caiu de US$ 204 bilhões para US$ 167 bilhões no mesmo período.
+O payroll acelerou: a média de 3 meses foi de 79 mil vagas em setembro para 137 mil em outubro, puxada pelos serviços privados (99 mil).
 
 ##
 
-Os data centers já são 12,2% da construção privada não residencial e crescem 90% em 12 meses. A construção não residencial como um todo cresce só 2,3%.
+O ritmo de vagas parece fraco, mas o breakeven, o número de vagas que mantém o desemprego estável, também caiu: de 111 mil em janeiro para 69 mil em outubro, com a população envelhecendo e a imigração menor no governo Trump. Com a média de 3 meses acima do breakeven, o desemprego caiu.
+
+##
+
+O desemprego caiu de 4,5% em novembro de 2025 para 4,1% em outubro. O ponto ruim da última divulgação: as pessoas em meio período por motivos econômicos subiram de 4,50 milhões para 4,84 milhões em um mês, e o U-6, que as inclui, foi de 7,6% para 7,9%. Costuma ser um sinal antecedente de piora do emprego.
+
+##
+
+Como vimos no breakeven, a mudança demográfica pode distorcer o sinal desses indicadores. A taxa de participação observada, de 61,9% em outubro, está bem abaixo do pico de 67,3% de 2000, mas boa parte da queda é o envelhecimento da população. Ajustada pela composição por idade e sexo de hoje, a participação está a 0,1 ponto da máxima da série, que começa em 1977 (62,0%, em abril de 2000).
+
+## Inflação nos EUA
+
+O CPI acelerou para 3,74% em 12 meses em setembro, contra 3,36% em julho. O núcleo, sem alimentos e energia, está em 2,56%.
+
+##
+
+Quem puxa é a energia, com 1,31 ponto dos 3,74%. Lá o governo não segura o preço dos combustíveis: há reservas estratégicas, mas elas não são usadas para conter o preço. As tarifas quase não aparecem: os bens do núcleo contribuem com só 0,14 ponto.
+
+##
+
+O PCE, a medida de inflação que o Fed persegue, está acima da meta de 2% em todos os meses desde março de 2021: são 5 anos e 7 meses seguidos, até os 3,65% em 12 meses de setembro. O núcleo também está acima de 2% desde março de 2021 e chegou a 3,12%, e o supercore, a 3,60%. A média aparada do Fed de Dallas, que tira os itens de variação mais extrema, dá uma leitura bem mais baixa: 2,26%. É uma medida de que Kevin Warsh já disse gostar, mas da qual não fala há um tempo.
+
+## Fed
+
+Em 28 de outubro, o Fed manteve os juros entre 3,75% e 4,00%, numa votação de 10 a 2: Lisa Cook e Beth Hammack queriam subir 0,25 ponto. Na segunda reunião de Kevin Warsh como presidente, o comunicado ficou mais enxuto: nas palavras dele, "um pouco mais curto e mais simples". A atividade deixou de crescer em "solid pace" e passou a "strong pace". E saiu a frase de que a decisão anterior apressaria a volta da inflação à meta: agora o Fed diz que vai esperar mais dados para definir os juros.
+
+##
+
+As mudanças de Warsh vão além do comunicado. Na primeira reunião dele, em junho, o Fed criou cinco forças-tarefas, com gente de fora do banco central entre os líderes, como Marc Andreessen e o economista Raj Chetty, para rever a comunicação, o balanço, as fontes de dados, a produtividade e o emprego e o regime de metas de inflação. E, a partir de 2027, uma das oito reuniões do ano será só sobre estratégia, sem decisão de juros.
+
+O balanço tem hoje US$ 4,59 trilhões em títulos do Tesouro e US$ 1,88 trilhão em títulos lastreados em hipotecas. Com a fed funds efetiva em 3,88% em outubro e o PCE em 3,65% em setembro, o juro real está perto de zero.
+
+##
+
+O diretor Christopher Waller defende subir pelo menos 0,25 ponto em dezembro e diz que 0,5 ponto deve ser considerado se o núcleo do CPI subir 0,3% ou mais no mês: subir só 0,25 poria a credibilidade do Fed em risco. O núcleo de outubro subiu exatamente 0,3%, acima dos 0,2% esperados. O mercado dá 88,5% de chance de alta de 0,25 ponto em 9 de dezembro e 11,5% de alta de 0,5, e vê a meta entre 4,50% e 4,75% em abril de 2027 (91%).
 
 ## Crédito corporativo
 
@@ -245,6 +275,18 @@ Os credores já cobram mais para se proteger contra um calote. O CDS de 5 anos d
 ##
 
 O caso extremo é a CoreWeave. O CDS dela subiu mais de 500 pontos-base desde novembro de 2025, quase tudo desde junho, e bateu o recorde de cerca de 1.195 pontos-base em 15 de outubro. Isso embute uma probabilidade de calote de cerca de 63% em cinco anos.
+
+## Inteligência artificial
+
+Os equipamentos de processamento de informação, onde entram computadores e servidores, chegaram a 15,3% do investimento fixo privado no 3º trimestre, acima do pico da bolha da internet (15,1% no fim de 2000).
+
+##
+
+A construção de data centers chegou a US$ 96 bilhões por ano em setembro, quase o dobro de um ano antes (US$ 51 bilhões). A de fábricas caiu de US$ 204 bilhões para US$ 167 bilhões no mesmo período.
+
+##
+
+Os data centers já são 12,2% da construção privada não residencial e crescem 90% em 12 meses. A construção não residencial como um todo cresce só 2,3%.
 
 ## Déficit fiscal
 
@@ -330,48 +372,6 @@ Contra a receita do último trimestre anualizada, ela vale 14,3 vezes as vendas,
 
 A Anthropic superou as expectativas, mas a pergunta para quem investe é se a vantagem dura. Torsten Slok, da Apollo, propõe três perguntas para a era da IA.
 
-## Mercado de trabalho
-
-O payroll acelerou: a média de 3 meses foi de 79 mil vagas em setembro para 137 mil em outubro, puxada pelos serviços privados (99 mil).
-
-##
-
-O ritmo de vagas parece fraco, mas o breakeven, o número de vagas que mantém o desemprego estável, também caiu: de 111 mil em janeiro para 69 mil em outubro, com a população envelhecendo e a imigração menor no governo Trump. Com a média de 3 meses acima do breakeven, o desemprego caiu.
-
-##
-
-O desemprego caiu de 4,5% em novembro de 2025 para 4,1% em outubro. O ponto ruim da última divulgação: as pessoas em meio período por motivos econômicos subiram de 4,50 milhões para 4,84 milhões em um mês, e o U-6, que as inclui, foi de 7,6% para 7,9%. Costuma ser um sinal antecedente de piora do emprego.
-
-##
-
-Como vimos no breakeven, a mudança demográfica pode distorcer o sinal desses indicadores. A taxa de participação observada, de 61,9% em outubro, está bem abaixo do pico de 67,3% de 2000, mas boa parte da queda é o envelhecimento da população. Ajustada pela composição por idade e sexo de hoje, a participação está a 0,1 ponto da máxima da série, que começa em 1977 (62,0%, em abril de 2000).
-
-## Inflação nos EUA
-
-O CPI acelerou para 3,74% em 12 meses em setembro, contra 3,36% em julho. O núcleo, sem alimentos e energia, está em 2,56%.
-
-##
-
-Quem puxa é a energia, com 1,31 ponto dos 3,74%. Lá o governo não segura o preço dos combustíveis: há reservas estratégicas, mas elas não são usadas para conter o preço. As tarifas quase não aparecem: os bens do núcleo contribuem com só 0,14 ponto.
-
-##
-
-O PCE, a medida de inflação que o Fed persegue, está acima da meta de 2% em todos os meses desde março de 2021: são 5 anos e 7 meses seguidos, até os 3,65% em 12 meses de setembro. O núcleo também está acima de 2% desde março de 2021 e chegou a 3,12%, e o supercore, a 3,60%. A média aparada do Fed de Dallas, que tira os itens de variação mais extrema, dá uma leitura bem mais baixa: 2,26%. É uma medida de que Kevin Warsh já disse gostar, mas da qual não fala há um tempo.
-
-## Fed
-
-Em 28 de outubro, o Fed manteve os juros entre 3,75% e 4,00%, numa votação de 10 a 2: Lisa Cook e Beth Hammack queriam subir 0,25 ponto. Na segunda reunião de Kevin Warsh como presidente, o comunicado ficou mais enxuto: nas palavras dele, "um pouco mais curto e mais simples". A atividade deixou de crescer em "solid pace" e passou a "strong pace". E saiu a frase de que a decisão anterior apressaria a volta da inflação à meta: agora o Fed diz que vai esperar mais dados para definir os juros.
-
-##
-
-As mudanças de Warsh vão além do comunicado. Na primeira reunião dele, em junho, o Fed criou cinco forças-tarefas, com gente de fora do banco central entre os líderes, como Marc Andreessen e o economista Raj Chetty, para rever a comunicação, o balanço, as fontes de dados, a produtividade e o emprego e o regime de metas de inflação. E, a partir de 2027, uma das oito reuniões do ano será só sobre estratégia, sem decisão de juros.
-
-O balanço tem hoje US$ 4,59 trilhões em títulos do Tesouro e US$ 1,88 trilhão em títulos lastreados em hipotecas. Com a fed funds efetiva em 3,88% em outubro e o PCE em 3,65% em setembro, o juro real está perto de zero.
-
-##
-
-O diretor Christopher Waller defende subir pelo menos 0,25 ponto em dezembro e diz que 0,5 ponto deve ser considerado se o núcleo do CPI subir 0,3% ou mais no mês: subir só 0,25 poria a credibilidade do Fed em risco. O núcleo de outubro subiu exatamente 0,3%, acima dos 0,2% esperados. O mercado dá 88,5% de chance de alta de 0,25 ponto em 9 de dezembro e 11,5% de alta de 0,5, e vê a meta entre 4,50% e 4,75% em abril de 2027 (91%).
-
 ## Juros longos no G7
 parte: Juros no mundo
 
@@ -411,6 +411,12 @@ parte: China e desequilíbrios globais
 ##
 
 ## China: reservas e balanço de pagamentos
+
+##
+
+##
+
+##
 
 ##
 

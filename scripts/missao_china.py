@@ -344,6 +344,81 @@ def graficos_china():
     return g_res, g_bp, g_saldo, g_cc
 
 
+IMTS_CHINA = ("https://api.imf.org/external/sdmx/2.1/data/IMF.STA,IMTS/"
+              "CHN.XG_FOB_USD+MG_CIF_USD.USA.M?startPeriod=1997-01")
+
+
+def imts_china_eua():
+    """Saldo mensal da China com os EUA, em US$ bi, nos dados da alfândega
+    chinesa (FMI, IMTS): exportação FOB menos importação CIF."""
+    r = json.loads(cf.baixar(IMTS_CHINA, headers={"User-Agent": "ftm-analises", "Accept": "application/json"}))
+    dims = r["structure"]["dimensions"]
+    tempo = [v["id"].replace("-M", "-") for v in dims["observation"][0]["values"]]
+    ind = [v["id"] for v in dims["series"][1]["values"]]
+    fluxo = {}
+    for k, ser in r["dataSets"][0]["series"].items():
+        fluxo[ind[int(k.split(":")[1])]] = {tempo[int(o)]: float(v[0]) / 1e9 for o, v in ser["observations"].items()
+                                            if v[0] not in (None, "")}
+    x, m = fluxo["XG_FOB_USD"], fluxo["MG_CIF_USD"]
+    return {k: x[k] - m[k] for k in x if k in m}
+
+
+def graficos_china_comercio():
+    """Balança comercial da China (pedido dele em 16/11/2026, nos moldes dos
+    dois slides que ele mandou): saldo em 12 meses e saldo por ano, total e com
+    os EUA. Total: exportação e importação da alfândega em US$, sem ajuste
+    (OCDE, MEI, pelo FRED), que bate com a alfândega (2008 US$ 297 bi, 2015
+    US$ 594 bi). Com os EUA: FMI (IMTS), também com os dados da alfândega; o
+    "mundo" do IMTS não serve para o total (dá US$ 679 bi em 2015)."""
+    x, m = cf.fred("XTEXVA01CNM667N"), cf.fred("XTIMVA01CNM667N")
+    total = {k: (x[k] - m[k]) / 1e9 for k in x if k in m}
+    eua = imts_china_eua()
+    t12 = cf.soma12(total)
+    u = max(t12)
+    g12 = dict(id="china-comercio", titulo="Balança comercial da China",
+               subtitulo="Saldo acumulado em 12 meses, US$ bilhões, desde 1998; %s: US$ %s bi"
+                         % (cf.rot_mes(u), cf.br(t12[u], 0)),
+               unidade="usd-bi", fonte="Alfândega da China (GACC), via OCDE (MEI) e FRED, e FtM",
+               series=[linha("Saldo em 12 meses", VERMELHO, {k: v for k, v in t12.items() if k >= "1998-12"}, 1)])
+    # por ano, de 1998 ao último ano cheio, e o último ponto em 12 meses até o mês mais recente dos dois
+    fim = min(max(total), max(eua))
+    anos = [str(a) for a in range(1998, int(fim[:4])) if "%d-12" % a <= fim]
+    def por_ano(d):
+        out = [sum(v for k, v in d.items() if k[:4] == a) for a in anos]
+        return out + [cf.soma12(d)[fim]] if fim[5:] != "12" else out
+    cats = anos + ([fim[:4]] if fim[5:] != "12" else [])
+    tot_a, eua_a = por_ano(total), por_ano(eua)
+    print("  balança da China: 12 meses até %s US$ %.0f bi; até %s total US$ %.0f bi, com os EUA US$ %.0f bi"
+          % (u, t12[u], fim, tot_a[-1], eua_a[-1]))
+    ganho = dict(largura=5, rotulo=True)
+    gano = dict(id="china-comercio-eua", titulo="Balança comercial da China: total e com os EUA",
+                subtitulo="Saldo por ano, US$ bilhões; %s = 12 meses até %s (total de US$ %s bi; com os EUA, US$ %s bi)"
+                          % (fim[:4], cf.rot_mes(fim), cf.br(tot_a[-1], 0), cf.br(eua_a[-1], 0)),
+                unidade="usd-bi", categorias=cats,
+                fonte="Alfândega da China (GACC), via OCDE (MEI), FRED e FMI (IMTS), e FtM",
+                series=[dict(nome="Saldo com os EUA", cor=AZUL, dados=[[str(i), round(v, 1)] for i, v in enumerate(eua_a)], **ganho),
+                        dict(nome="Saldo total", cor=VERMELHO, dados=[[str(i), round(v, 1)] for i, v in enumerate(tot_a)], **ganho)])
+    return g12, gano
+
+
+def grafico_yuan():
+    """Yuans por dólar desde 1980 (pedido dele em 16/11/2026): média do mês do
+    Fed (H.10, EXCHUS, desde 1981) e, em 1980, a da OCDE (CCUSMA02CNM618N),
+    que difere do Fed em no máximo 0,09 yuan nos anos de câmbio duplo."""
+    fed, ocde = cf.fred("EXCHUS"), cf.fred("CCUSMA02CNM618N")
+    cny = dict({k: v for k, v in ocde.items() if "1980-01" <= k < min(fed)}, **fed)
+    u = max(cny)
+    print("  yuan %s: %.4f por dólar" % (u, cny[u]))
+    return dict(id="china-yuan", titulo="Taxa de câmbio do yuan",
+                subtitulo="Yuans por dólar, média do mês, desde 1980; %s: ¥ %s"
+                          % (cf.rot_mes(u), cf.br(cny[u], 2)),
+                unidade="cny", fonte="Federal Reserve (H.10) e OCDE (MEI), via FRED",
+                eventos=[dict(em="1994-01", rot="Unificação"),
+                         dict(em="2005-07", rot="Fim da paridade"),
+                         dict(em="2015-08", rot="Desvalorização")],
+                series=[linha("Yuans por dólar", AZUL, cny, 2)])
+
+
 # ---------- dólar e tarifas ----------
 
 DXY_PESOS = [("DEXUSEU", -0.576), ("DEXJPUS", 0.136), ("DEXUSUK", -0.119), ("DEXCAUS", 0.091),
@@ -384,7 +459,7 @@ def grafico_tarifa():
 CHINA = [("Déficit externo dos EUA", "eua-cc-pib"), ("", "eua-bp-pib"), ("", "eua-cc-dolar"),
          ("", "eua-emprego-industria"),
          ("China: reservas e balanço de pagamentos", "china-reservas"), ("", "china-bp"), ("", "china-bp-saldo"),
-         ("", "china-cc"),
+         ("", "china-cc"), ("", "china-comercio"), ("", "china-comercio-eua"), ("", "china-yuan"),
          ("Balanço de pagamentos dos EUA", "eua-cc-componentes"), ("", "eua-bp"), ("", "eua-conta-financeira"),
          ("", "eua-comercio-paises"),
          ("Dólar e tarifas", "miran-conclusao"), ("", "dxy"), ("", "eua-tarifa-efetiva"),
@@ -395,6 +470,7 @@ PARTE_CHINA = "China e desequilíbrios globais"
 def graficos():
     pib = bea("GDP")
     out = list(graficos_eua_externo(pib)) + list(graficos_bp_eua(pib)) + list(graficos_china())
+    out += list(graficos_china_comercio()) + [grafico_yuan()]
     out += [grafico_comercio_paises(), FIGURA_MIRAN, grafico_dxy(), grafico_tarifa()]
     return out
 
