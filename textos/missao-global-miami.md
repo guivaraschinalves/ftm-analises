@@ -214,6 +214,10 @@ No 3º trimestre, o PIB cresceu 3,4% em ritmo anualizado. O investimento privado
 
 Em 12 meses, o investimento fixo privado cresceu 6,1%, e as importações, 10,3%, contra 2,1% do PIB. Muito do equipamento é importado, como as memórias da Coreia do Sul: entra no PIB pelo investimento e sai pelas importações.
 
+##
+
+##
+
 ## Mercado de trabalho
 
 O payroll acelerou: a média de 3 meses foi de 79 mil vagas em setembro para 137 mil em outubro, puxada pelos serviços privados (99 mil).

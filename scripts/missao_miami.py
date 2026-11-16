@@ -1375,6 +1375,7 @@ MIDTERMS_IDS = ["midterms-historia-aprovacao", "midterms-resultado-camara", "mid
                 "midterms-resultado-mapa-senado"]
 
 EUA = [("Atividade nos EUA", "ism-pmi"), ("", "pib-eua-contribuicoes"), ("", "pib-eua-investimento-importacoes"),
+       ("", "coreia-cc"), ("", "taiwan-cc"),
        ("Mercado de trabalho", "payroll-setores"), ("", "eua-payroll-breakeven"), ("", "eua-u3-u6"),
        ("", "eua-participacao"), ("Inflação nos EUA", "cpi-cheio-nucleo"), ("", "cpi-componentes"),
        ("", "pce-nucleos"), ("Fed", "fomc-comunicados"), ("", "fed-ativos-juros-pce"), ("", "fed-fedwatch"),
@@ -2416,6 +2417,8 @@ def main():
                                            subtitulo="% da força de trabalho, com ajuste sazonal", series=u3))
     eua.update({g["id"]: g for g in graficos_empresas()})
     eua["pib-eua-investimento-importacoes"] = grafico_pib_investimento_importacoes()
+    import missao_desequilibrios                              # Coreia e Taiwan (pedido dele em 16/11/2026)
+    eua.update({g["id"]: g for g in missao_desequilibrios.graficos_asia()})
     eua["fed-ativos-juros-pce"] = balanco_fed_pce()
     eua["despesa-contribuicao"] = so_variacao_em_bilhoes(eua["despesa-contribuicao"])
     eua["ia-vix"]["eventos"] = VIX_EVENTOS + eua["ia-vix"].get("eventos", [])

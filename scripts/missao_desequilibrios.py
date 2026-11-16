@@ -364,6 +364,96 @@ def graficos_tarifas():
     return [g_rec, g_anos, g_dev, g_liq]
 
 
+# ---------- Coreia do Sul e Taiwan: conta corrente por componente ----------
+# Pedido dele em 16/11/2026, refazendo dois slides. Coreia: FMI (BOP, que repete o
+# Bank of Korea; 2025 bate em US$ 123,1 bi), trimestral desde 1976; o mensal do
+# Bank of Korea (ECOS) pede chave de API. Taiwan não está no FMI: base de dados do
+# banco central (cpx.cbc.gov.tw, tabela BPP2Q01), trimestral desde 1984, US$ milhões.
+
+IMF_BOP_KOR = ("https://api.imf.org/external/sdmx/2.1/data/IMF.STA,BOP/"
+               "KOR.NETCD_T.CAB+G+S+IN1+IN2.USD.Q?startPeriod=1970")
+CBC = "https://cpx.cbc.gov.tw/"
+CBC_ITENS = ["經常帳-淨額", "商品-淨額", "服務-淨額", "初次所得-淨額", "二次所得-淨額"]
+COMP_CC = [("bens", "Balança comercial", AZUL), ("servicos", "Serviços", VERMELHO),
+           ("renda1", "Renda primária", VERDE), ("renda2", "Renda secundária", AZUL_CLARO)]
+
+
+def tri(p):
+    """'2026-Q2' ou '2026Q2' -> '2026-06'."""
+    a, q = p.replace("-", "")[:4], int(p[-1])
+    return "%s-%02d" % (a, 3 * q)
+
+
+def cc_coreia():
+    r = json.loads(cf.baixar(IMF_BOP_KOR, headers=JSON_H))
+    tempo = [v["id"] for v in r["structure"]["dimensions"]["observation"][0]["values"]]
+    ind = [v["id"] for v in r["structure"]["dimensions"]["series"][2]["values"]]
+    nomes = {"CAB": "cc", "G": "bens", "S": "servicos", "IN1": "renda1", "IN2": "renda2"}
+    out = {}
+    for k, ser in r["dataSets"][0]["series"].items():
+        out[nomes[ind[int(k.split(":")[2])]]] = {tri(tempo[int(o)]): float(v[0]) / 1e9
+                                                 for o, v in ser["observations"].items() if v[0] not in (None, "")}
+    return out
+
+
+def cc_taiwan():
+    """A base do banco central de Taiwan (PX): escolhe a tabela, manda a seleção e lê os dados,
+    o mesmo caminho da página, com o cookie da sessão."""
+    import http.cookiejar
+    import urllib.request
+    op = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+
+    def post(caminho, corpo):
+        req = urllib.request.Request(CBC + caminho, data=json.dumps(corpo, ensure_ascii=False).encode("utf-8"),
+                                     headers={"Content-Type": "application/json",
+                                              "User-Agent": "Mozilla/5.0 (ftm-analises)"})
+        with op.open(req, timeout=120) as resp:
+            r = json.loads(resp.read().decode("utf-8"))
+        return json.loads(r) if isinstance(r, str) else r
+    faixa = post("Range/GetJsonRangeData", {"pxfilename": "BPP2Q01.px"})
+    periodos = next(v["Value"] for v in faixa["values"] if v["Key"] == "期間")
+    itens = next(v["Value"] for v in faixa["values"] if v["Key"] == "項目")
+    if any(i not in itens for i in CBC_ITENS):
+        raise RuntimeError("Taiwan: itens da conta corrente mudaram de nome")
+    rng = {"values": [{"key": "期間", "value": periodos}, {"key": "項目", "value": CBC_ITENS}], "title": faixa["title"]}
+    post("Data/SetJsonFromArray", {"rotateCnt": 0, "pxfilename": "BPP2Q01.px", "range": rng})
+    d = post("Data/GetJsonFromArray", {"rotateCnt": 0, "pxFileName": "BPP2Q01.px", "range": rng, "zeroRow": False,
+                                       "sumAxisName": None, "floatCnt": None})
+    cab = [h["data"] for h in d["headerSet"]["Table1"]]
+    if cab != CBC_ITENS:
+        raise RuntimeError("Taiwan: colunas inesperadas %s" % cab)
+    out = {k: {} for k in ("cc", "bens", "servicos", "renda1", "renda2")}
+    for linha_ in d["data"]:
+        for k, v in zip(("cc", "bens", "servicos", "renda1", "renda2"), linha_[1:]):
+            if v not in (None, "", "-"):
+                out[k][tri(linha_[0])] = float(v) / 1000
+    pior = max(abs(out["cc"][q] - sum(out[c][q] for c in ("bens", "servicos", "renda1", "renda2"))) for q in out["cc"])
+    if pior > 0.01:
+        raise RuntimeError("Taiwan: componentes não somam a conta corrente (%.3f bi)" % pior)
+    return out
+
+
+def grafico_cc_componentes(gid, pais, d, fonte):
+    from missao_china import soma4
+    q = {k: soma4(v) for k, v in d.items()}
+    u = max(q["cc"])
+    ini = min(q["cc"])
+    print("  conta corrente %s em 4 tri até %s: US$ %.0f bi (bens US$ %.0f bi)" % (pais, u, q["cc"][u], q["bens"][u]))
+    return dict(id=gid, titulo="Balanço de pagamentos %s: conta corrente" % pais,
+                subtitulo="US$ bilhões, acumulado em 4 trimestres, desde %s; %dº tri/%s: saldo de US$ %s bi"
+                          % (ini[:4], int(u[5:]) // 3, u[:4], cf.br(q["cc"][u], 0)),
+                unidade="usd-bi", barra=3, buracoMax=3, fonte=fonte,
+                series=[barras(n, c, q[k], 1) for k, n, c in COMP_CC]
+                + [linha("Saldo em conta corrente", BRANCO, q["cc"], 1)])
+
+
+def graficos_asia():
+    return [grafico_cc_componentes("coreia-cc", "da Coreia do Sul", cc_coreia(),
+                                   "Bank of Korea, via FMI (Balance of Payments), e FtM"),
+            grafico_cc_componentes("taiwan-cc", "de Taiwan", cc_taiwan(),
+                                   "Central Bank of the Republic of China (Taiwan) e FtM")]
+
+
 # ---------- fotos ----------
 
 FOTOS = [(1, "Foto 1"), (2, "Foto 2"), (3, "Foto 3"),
