@@ -833,6 +833,102 @@
     return y + (linhas.length - 1) * L.legenda.passo + fs / 2;
   }
 
+  // Pirâmide etária bilateral: barras horizontais espelhadas (esquerda/direita
+  // do eixo central de faixas etárias) e contorno em degraus opcional para a
+  // população nativa de comparação.
+  function construirPiramide(cartao, L0, nomeTema) {
+    var g = graficoDe(cartao), pal = PALETAS[nomeTema], F = unidade(g);
+    var L = Object.assign({}, L0), svg = svgNovo(g, L);
+    var subFim = moldura(svg, g, L, pal);
+    var cats = g.categorias || [], n = cats.length || 1;
+    var sEsq = (g.series && g.series[0]) || { nome: "Homens", cor: "#4F81BD", dados: [] };
+    var sDir = (g.series && g.series[1]) || { nome: "Mulheres", cor: "#C0504D", dados: [] };
+    var nEsq = g.series && g.series[2], nDir = g.series && g.series[3];
+    var itensLeg = [
+      { cor: g.esqCor || sEsq.cor || "#4F81BD", rot: g.esqRot || sEsq.nome },
+      { cor: g.dirCor || sDir.cor || "#C0504D", rot: g.dirRot || sDir.nome }
+    ];
+    if (nEsq && nDir) itensLeg.push({ cor: "borda", rot: g.linhaRot || "Residentes nativos" });
+    var legFim = legendaLinha(svg, itensLeg, subFim + L.legenda.fs * 2.1, L, pal, false);
+    var y0 = legFim + 24, y1 = L.y1 - 10;
+    var x0 = L.titulo.x + 36, x1 = L.W - L.titulo.x - 36;
+    var fsCat = Math.min(L.tick, (y1 - y0) / n * 0.72);
+    var maxCatW = Math.max.apply(null, [28].concat(cats.map(function (c) { return largura(c, fsCat); })));
+    var gapC = maxCatW + 24, xc = (x0 + x1) / 2;
+    var ladoW = Math.max(40, (x1 - x0 - gapC) / 2);
+    var xE0 = xc - gapC / 2, xD0 = xc + gapC / 2;
+
+    var mx = 0;
+    [sEsq, sDir, nEsq, nDir].forEach(function (s) {
+      if (!s || !s.dados) return;
+      s.dados.forEach(function (d) { if (d[1] > mx) mx = d[1]; });
+    });
+    var esc = escalaY(0, mx || 1, g.eixo);
+    var passo = (y1 - y0) / n, alt = passo * 0.74;
+    var corEsq = corNoTema(g.esqCor || sEsq.cor || "#4F81BD", pal);
+    var corDir = corNoTema(g.dirCor || sDir.cor || "#C0504D", pal);
+    var corLin = corNoTema(g.linhaCor || "#FFFFFF", pal);
+
+    // grade vertical simétrica e rótulos do eixo X
+    esc.ticks.forEach(function (t) {
+      var dx = (t / esc.max) * ladoW;
+      if (t === 0) {
+        [xE0, xD0].forEach(function (gx) {
+          svg.appendChild(el("line", { x1: gx, x2: gx, y1: y0, y2: y1, stroke: pal.zero, "stroke-width": 1.4 }));
+        });
+        svg.appendChild(texto(F.eixo(0, esc.passo), {
+          x: xc, y: y1 + 14, "font-size": L.tick, fill: pal.eixo,
+          "text-anchor": "middle", "dominant-baseline": "hanging"
+        }));
+        return;
+      }
+      [-1, 1].forEach(function (sgn) {
+        var gx = (sgn < 0 ? xE0 : xD0) + sgn * dx;
+        svg.appendChild(el("line", {
+          x1: gx, x2: gx, y1: y0, y2: y1,
+          stroke: pal.grade, "stroke-width": 1, "stroke-dasharray": "4 4"
+        }));
+        svg.appendChild(texto(F.eixo(t, esc.passo), {
+          x: gx, y: y1 + 14, "font-size": L.tick, fill: pal.eixo,
+          "text-anchor": "middle", "dominant-baseline": "hanging"
+        }));
+      });
+    });
+
+    // barras horizontais (k = 0 embaixo .. n - 1 no topo)
+    var ptsE = [], ptsD = [];
+    for (var k = 0; k < n; k++) {
+      var yc = y1 - passo * (k + 0.5), yb = y1 - passo * k, yt = yb - passo;
+      var vE = (sEsq.dados[k] && sEsq.dados[k][1]) || 0;
+      var vD = (sDir.dados[k] && sDir.dados[k][1]) || 0;
+      var wE = (vE / esc.max) * ladoW, wD = (vD / esc.max) * ladoW;
+      var rE = el("rect", { x: xE0 - wE, y: yc - alt / 2, width: Math.max(0.8, wE), height: alt, rx: 2, fill: corEsq });
+      var tE = el("title"); tE.textContent = cats[k] + " · " + (g.esqRot || sEsq.nome) + ": " + F.valor(vE);
+      rE.appendChild(tE);
+      svg.appendChild(rE);
+      var rD = el("rect", { x: xD0, y: yc - alt / 2, width: Math.max(0.8, wD), height: alt, rx: 2, fill: corDir });
+      var tD = el("title"); tD.textContent = cats[k] + " · " + (g.dirRot || sDir.nome) + ": " + F.valor(vD);
+      rD.appendChild(tD);
+      svg.appendChild(rD);
+      svg.appendChild(texto(cats[k], {
+        x: xc, y: yc, "font-size": fsCat, fill: pal.texto,
+        "text-anchor": "middle", "dominant-baseline": "central"
+      }));
+      if (nEsq && nDir) {
+        var vnE = (nEsq.dados[k] && nEsq.dados[k][1]) || 0;
+        var vnD = (nDir.dados[k] && nDir.dados[k][1]) || 0;
+        var xnE = xE0 - (vnE / esc.max) * ladoW, xnD = xD0 + (vnD / esc.max) * ladoW;
+        ptsE.push(xnE.toFixed(1) + "," + yb.toFixed(1), xnE.toFixed(1) + "," + yt.toFixed(1));
+        ptsD.push(xnD.toFixed(1) + "," + yb.toFixed(1), xnD.toFixed(1) + "," + yt.toFixed(1));
+      }
+    }
+    if (ptsE.length) {
+      svg.appendChild(el("polyline", { points: ptsE.join(" "), fill: "none", stroke: corLin, "stroke-width": 2.4, "stroke-linejoin": "miter" }));
+      svg.appendChild(el("polyline", { points: ptsD.join(" "), fill: "none", stroke: corLin, "stroke-width": 2.4, "stroke-linejoin": "miter" }));
+    }
+    return { svg: svg, L: L, pal: pal, ranking: true };
+  }
+
   // Mapa dos EUA pintado por estado. As formas vêm uma vez só, no topo do
   // arquivo ("formas": {UF: {d, c}}, na tela de 975 x 610 do us-atlas, com o
   // centroide em c); cada estado do cartão diz a cor ("cor"), ou a
@@ -1688,6 +1784,7 @@
     var g = graficoDe(cartao), pal = PALETAS[nomeTema], F = unidade(g);
     if (g.painel) return construirPainel(cartao, L0, nomeTema);
     if (g.tipo === "ranking") return construirRanking(cartao, L0, nomeTema);
+    if (g.tipo === "piramide") return construirPiramide(cartao, L0, nomeTema);
     if (g.tipo === "mapa") return construirMapa(cartao, L0, nomeTema);
     if (g.tipo === "estados") return construirEstados(cartao, L0, nomeTema);
     if (g.tipo === "hemiciclo") return construirHemiciclo(cartao, L0, nomeTema);
@@ -3492,7 +3589,7 @@
       // com mouse o controle vale em todo gráfico de tempo (o ranking não tem
       // eixo de tempo); sem mouse, só quando há mais de um recorte
       var deTempo = !!efetivo.series && !efetivo.categorias && !efetivo.painel && efetivo.tipo !== "ranking" &&
-                    efetivo.tipo !== "mapa" && efetivo.tipo !== "tabela";
+                    efetivo.tipo !== "piramide" && efetivo.tipo !== "mapa" && efetivo.tipo !== "tabela";
       grupo.hidden = mouseFino() ? !deTempo : periodos.length < 2;
       if (grupo.hidden) {
         cartao.periodo = "tudo";

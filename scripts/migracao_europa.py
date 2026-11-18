@@ -17,7 +17,7 @@ DE ONDE VEM CADA COISA (API de disseminação do Eurostat, JSON-stat)
     emigração por país de destino seguinte (2020–2024, critério uniforme
     pós-Brexit NEU27_2020_FOR para fluxos apenas com países fora da UE-27).
   - migr_pop3ctb: população em 1º/jan/2025 por país de nascimento (total,
-    nascidos no exterior, na UE e fora dela) e por faixa de 5 anos.
+    nativos, nascidos no exterior, na UE e fora dela), sexo e faixa de 5 anos.
   - migr_imm3ctb: imigração de 2024 por país de nascimento e faixa de 5 anos
     (para a idade, a "alcançada no ano", REACH: a única que a França publica).
     A França não abre os países de fora da UE; a UE-27 não abre país nenhum.
@@ -25,9 +25,11 @@ DE ONDE VEM CADA COISA (API de disseminação do Eurostat, JSON-stat)
     que publicam a abertura por idade.
   - Idade média: ponto médio de cada faixa (2,5; 7,5; ...; 82,5) e 88,5 para
     85+, como no md.
-  - Our World in Data (UN DESA, International Migrant Stock 2024):
-    migrant-stock-share e migrant-stock-total (1990–2024), para Europa e
-    América do Norte em % da população e em milhares de pessoas.
+  - demo_gind: crescimento natural (NATGROW, NATGROWRT), população média (AVG)
+    e saldo migratório com ajustes (CNMIGRAT) no Eurostat (2020–2024).
+  - Our World in Data (UN DESA, International Migrant Stock 2024 e UN WPP
+    2024): migrant-stock-share, migrant-stock-total e
+    population-growth-rate-with-and-without-migration.
 """
 import csv
 import datetime
@@ -121,19 +123,32 @@ def conferir(condicao, msg):
         raise RuntimeError("conferência falhou: " + msg)
 
 
-def owid(slug, coluna):
-    """Baixa CSV do Our World in Data e retorna {(entity, year): float}."""
+def owid_cols(slug, colunas):
+    """Baixa CSV do Our World in Data e retorna {(entity, year): {col: float}}."""
     url = OWID + slug + ".csv?v=1&csvType=full&useColumnShortNames=true"
     txt = baixar(url, headers=UA).decode("utf-8")
     out = {}
     for row in csv.DictReader(io.StringIO(txt)):
-        v = row.get(coluna, "").strip()
-        if v:
-            out[(row["entity"], row["year"])] = float(v)
+        vals = {}
+        for c in colunas:
+            v = row.get(c, "").strip()
+            if v:
+                vals[c] = float(v)
+        if vals:
+            out[(row["entity"], row["year"])] = vals
     return out
 
 
+def owid(slug, coluna):
+    """Baixa CSV do Our World in Data e retorna {(entity, year): float}."""
+    return {k: v[coluna] for k, v in owid_cols(slug, [coluna]).items() if coluna in v}
+
+
 ANOS_EXTRA = ["2020", "2021", "2022", "2023", "2024"]
+TERR_PIR = [("IT", "Itália"), ("FR", "França"), ("ES", "Espanha"), ("DE", "Alemanha"), ("EU27_2020", "UE-27")]
+TERR_OWID = [("IT", "Italy", "Itália"), ("FR", "France", "França"),
+             ("ES", "Spain", "Espanha"), ("DE", "Germany", "Alemanha")]
+ROT_PIR = ROT_FAIXAS[:15] + ["75+"]
 
 
 def main():
@@ -147,9 +162,13 @@ def main():
                           age="TOTAL", sex="T", agedef="COMPLET", partner=partes)
     emi_nxt, _ = eurostat("migr_emi3nxt", ["geo", "partner", "time"], geo=geos, time=ANOS_EXTRA,
                           age="TOTAL", sex="T", agedef="COMPLET", partner=partes)
-    # estoque em 1º/jan/2025 por bloco de nascimento e idade (inclui o total da população)
-    est, _ = eurostat("migr_pop3ctb", ["geo", "c_birth", "age"], geo=geos, time="2025", sex="T", age=["TOTAL"] + FAIXAS,
-                      c_birth=["TOTAL", "FOR", "EU27_2020_FOR", "NEU27_2020_FOR"])
+    # indicadores demográficos (população média e saldo natural, 2020–2024)
+    gind, _ = eurostat("demo_gind", ["geo", "indic_de", "time"], geo=geos, time=ANOS_EXTRA,
+                       indic_de=["AVG", "NATGROW", "NATGROWRT"])
+    # estoque em 1º/jan/2025 por bloco de nascimento, sexo e idade (inclui o total e nativos)
+    est, _ = eurostat("migr_pop3ctb", ["geo", "c_birth", "sex", "age"], geo=geos, time="2025",
+                      sex=["T", "M", "F"], age=["TOTAL"] + FAIXAS,
+                      c_birth=["TOTAL", "FOR", "NAT", "EU27_2020_FOR", "NEU27_2020_FOR"])
     # fluxo de 2024 por país de nascimento (todos) no total de idades; e por idade para os nascidos fora
     flu, rot = eurostat("migr_imm3ctb", ["geo", "c_birth"], geo=geos, time="2024", sex="T", age="TOTAL", agedef="COMPLET")
     # idade "alcançada no ano" (REACH): é a que a França publica, e a do md
@@ -184,13 +203,17 @@ def main():
             else:
                 conferir(soma_im == imm_prv[(g, "TOTAL", y)] and soma_em == emi_nxt[(g, "TOTAL", y)],
                          "%s EU + fora UE + UNK != TOTAL em %s" % (g, y))
+            conferir(abs(1000.0 * gind[(g, "NATGROW", y)] / gind[(g, "AVG", y)] - gind[(g, "NATGROWRT", y)]) <= 0.15,
+                     "%s NATGROW/AVG diverge de NATGROWRT em %s" % (g, y))
         anos_por_geo[g] = ys
-        conferir(est[(g, "EU27_2020_FOR", "TOTAL")] + est[(g, "NEU27_2020_FOR", "TOTAL")] == est[(g, "FOR", "TOTAL")],
-                 "%s estoque UE + fora UE != FOR" % g)
-        conferir(sum(est[(g, "TOTAL", f)] for f in FAIXAS) == est[(g, "TOTAL", "TOTAL")],
-                 "%s soma das faixas etárias != TOTAL" % g)
-        conferir(sum(est[(g, "FOR", f)] for f in FAIXAS) == est[(g, "FOR", "TOTAL")],
-                 "%s soma das faixas etárias (FOR) != FOR TOTAL" % g)
+        conferir(est[(g, "EU27_2020_FOR", "T", "TOTAL")] + est[(g, "NEU27_2020_FOR", "T", "TOTAL")]
+                 == est[(g, "FOR", "T", "TOTAL")], "%s estoque UE + fora UE != FOR" % g)
+        for cb in ("TOTAL", "FOR", "NAT"):
+            conferir(est[(g, cb, "M", "TOTAL")] + est[(g, cb, "F", "TOTAL")] == est[(g, cb, "T", "TOTAL")],
+                     "%s %s M + F != T" % (g, cb))
+            for sx in ("T", "M", "F"):
+                conferir(sum(est[(g, cb, sx, f)] for f in FAIXAS) == est[(g, cb, sx, "TOTAL")],
+                         "%s %s %s soma das faixas etárias != TOTAL" % (g, cb, sx))
         conferir(flu.get((g, "EU27_2020_FOR"), 0) + flu.get((g, "NEU27_2020_FOR"), 0) == flu[(g, "FOR")],
                  "%s fluxo UE + fora UE != FOR" % g)
 
@@ -327,9 +350,9 @@ def main():
                              variantes=var_fluxos_fora_qtd)
 
     # 2. estoque de nascidos no exterior (em % da população e em milhares de pessoas, 2025)
-    pct = {b: {g: 100 * est[(g, b, "TOTAL")] / est[(g, "TOTAL", "TOTAL")] for g in geos}
+    pct = {b: {g: 100 * est[(g, b, "T", "TOTAL")] / est[(g, "TOTAL", "T", "TOTAL")] for g in geos}
            for b in ("FOR", "EU27_2020_FOR", "NEU27_2020_FOR")}
-    est_q = {b: {g: est[(g, b, "TOTAL")] / 1000.0 for g in geos}
+    est_q = {b: {g: est[(g, b, "T", "TOTAL")] / 1000.0 for g in geos}
              for b in ("FOR", "EU27_2020_FOR", "NEU27_2020_FOR")}
     tot = "; ".join("%s %s%% (%s mi)" % (n, br(pct["FOR"][g]), br(est_q["FOR"][g] / 1000.0)) for g, n in TERR)
     g_estoque = dict(id="migracao-estoque", titulo="Nascidos no exterior, 1º de janeiro de 2025",
@@ -440,8 +463,8 @@ def main():
         return sum(m * p for m, p in zip(MEIOS, d)) / 100
     var_idade, var_idade_qtd, medias = [], [], {}
     for g, n in TERR:
-        resid_n = [est[(g, "TOTAL", f)] for f in FAIXAS]
-        estoq_n = [est[(g, "FOR", f)] for f in FAIXAS]
+        resid_n = [est[(g, "TOTAL", "T", f)] for f in FAIXAS]
+        estoq_n = [est[(g, "FOR", "T", f)] for f in FAIXAS]
         resid = dist(resid_n)
         estoq = dist(estoq_n)
         if all((g, f) in flu_idade for f in FAIXAS):
@@ -495,6 +518,135 @@ def main():
                            dict(nome="Novos imigrantes", cor=BRANCO, tipo="barra", valores=True,
                                 dados=[[str(i), round(medias[g][2], 1)] for i, g in enumerate(geos)])])
 
+    # 4b. pirâmides etárias (nascidos no exterior x nativos, 1º/jan/2025, % e milhares)
+    def faixas16(g, cb, sx):
+        return [est[(g, cb, sx, f)] for f in FAIXAS[:15]] + [sum(est[(g, cb, sx, f)] for f in FAIXAS[15:])]
+
+    var_pir, var_pir_qtd = [], []
+    for g, n in TERR_PIR:
+        for_m, for_f = faixas16(g, "FOR", "M"), faixas16(g, "FOR", "F")
+        nat_m, nat_f = faixas16(g, "NAT", "M"), faixas16(g, "NAT", "F")
+        for_tot = est[(g, "FOR", "T", "TOTAL")]
+        nat_tot = est[(g, "NAT", "T", "TOTAL")]
+        conferir(sum(for_m) + sum(for_f) == for_tot, "%s pirâmide FOR != TOTAL" % g)
+        conferir(sum(nat_m) + sum(nat_f) == nat_tot, "%s pirâmide NAT != TOTAL" % g)
+        pct_hm = round(100.0 * est[(g, "FOR", "M", "TOTAL")] / for_tot)
+        pct_ml = 100 - pct_hm
+        var_pir.append(dict(
+            rot=n,
+            esqRot="Homens (%d%%)" % pct_hm, dirRot="Mulheres (%d%%)" % pct_ml,
+            linhaRot="Residentes nativos", esqCor=AZUL, dirCor=VERMELHO, linhaCor=BRANCO,
+            series=[
+                dict(nome="Homens (nascidos no exterior)", cor=AZUL,
+                     dados=[[str(i), round(100.0 * v / for_tot, 2)] for i, v in enumerate(for_m)]),
+                dict(nome="Mulheres (nascidos no exterior)", cor=VERMELHO,
+                     dados=[[str(i), round(100.0 * v / for_tot, 2)] for i, v in enumerate(for_f)]),
+                dict(nome="Homens (nativos)", cor=BRANCO,
+                     dados=[[str(i), round(100.0 * v / nat_tot, 2)] for i, v in enumerate(nat_m)]),
+                dict(nome="Mulheres (nativos)", cor=BRANCO,
+                     dados=[[str(i), round(100.0 * v / nat_tot, 2)] for i, v in enumerate(nat_f)]),
+            ],
+        ))
+        var_pir_qtd.append(dict(
+            rot=n,
+            esqRot="Homens (%s mil)" % br(est[(g, "FOR", "M", "TOTAL")] / 1000.0, 0),
+            dirRot="Mulheres (%s mil)" % br(est[(g, "FOR", "F", "TOTAL")] / 1000.0, 0),
+            esqCor=AZUL, dirCor=VERMELHO,
+            series=[
+                dict(nome="Homens (nascidos no exterior)", cor=AZUL,
+                     dados=[[str(i), round(v / 1000.0, 1)] for i, v in enumerate(for_m)]),
+                dict(nome="Mulheres (nascidos no exterior)", cor=VERMELHO,
+                     dados=[[str(i), round(v / 1000.0, 1)] for i, v in enumerate(for_f)]),
+            ],
+        ))
+    g_piramide = dict(
+        id="migracao-piramide", tipo="piramide", unidade="%", categorias=ROT_PIR,
+        titulo="Pirâmide etária dos imigrantes e nativos, 1º de janeiro de 2025",
+        subtitulo="% da população de cada grupo por sexo e faixa etária; barras = nascidos no exterior; linha = nativos",
+        fonte="Eurostat (migr_pop3ctb) e FtM", variantes=var_pir,
+    )
+    g_piramide_qtd = dict(
+        id="migracao-piramide-qtd", tipo="piramide", unidade="mil", categorias=ROT_PIR,
+        titulo="Pirâmide etária dos imigrantes em milhares de pessoas, 1º de janeiro de 2025",
+        subtitulo="Milhares de residentes nascidos no exterior por sexo e faixa etária",
+        fonte="Eurostat (migr_pop3ctb) e FtM", variantes=var_pir_qtd,
+    )
+
+    # 5. crescimento populacional com e sem migração (histórico 1950–2023 e extra-UE 2020–2024)
+    c_com = "growth_rate__sex_all__age_all__variant_estimates"
+    c_sem = "natural_change_rate__sex_all__age_all__variant_estimates"
+    owid_cresc = owid_cols("population-growth-rate-with-and-without-migration", [c_com, c_sem])
+    anos_wpp = [str(y) for y in range(1950, 2024)]
+    var_cresc_hist = []
+    for _, ent, n in TERR_OWID:
+        for y in anos_wpp:
+            d = owid_cresc.get((ent, y), {})
+            conferir(c_com in d and c_sem in d, "OWID WPP sem dado para %s em %s" % (ent, y))
+            conferir(-5.0 < d[c_com] < 5.0 and -5.0 < d[c_sem] < 5.0,
+                     "OWID WPP valor fora da faixa em %s %s" % (ent, y))
+        var_cresc_hist.append(dict(rot=n, series=[
+            dict(nome="Com migração", cor=AZUL, largura=4.5, rotulo=True,
+                 dados=[["%s-01" % y, round(owid_cresc[(ent, y)][c_com], 2)] for y in anos_wpp]),
+            dict(nome="Sem migração", cor=VERMELHO, largura=4.5, rotulo=True,
+                 dados=[["%s-01" % y, round(owid_cresc[(ent, y)][c_sem], 2)] for y in anos_wpp]),
+        ]))
+    g_cresc_hist = dict(
+        id="migracao-crescimento-historico",
+        titulo="Crescimento da população com e sem migração, 1950–2023",
+        subtitulo="Variação anual da população total (%) contra crescimento natural (nascimentos menos óbitos)",
+        unidade="%", buracoMax=12,
+        fonte="ONU (World Population Prospects 2024, via Our World in Data)",
+        variantes=var_cresc_hist,
+    )
+
+    var_cresc_ext, var_cresc_ext_q = [], []
+    for g, n in TERR:
+        s_com, s_sem_neu, s_sem = [], [], []
+        q_com, q_sem_neu, q_sem = [], [], []
+        for i, y in enumerate(ANOS_EXTRA):
+            avg = gind[(g, "AVG", y)]
+            nat = gind[(g, "NATGROW", y)]
+            net_tot = imm_prv[(g, "TOTAL", y)] - emi_nxt[(g, "TOTAL", y)]
+            net_eu = imm_prv[(g, "EU27_2020_FOR", y)] - emi_nxt[(g, "EU27_2020_FOR", y)]
+            c1, c2, c3 = nat + net_tot, nat + net_eu, nat
+            s_com.append([str(i), round(100.0 * c1 / avg, 2)])
+            s_sem_neu.append([str(i), round(100.0 * c2 / avg, 2)])
+            s_sem.append([str(i), round(100.0 * c3 / avg, 2)])
+            q_com.append([str(i), round(c1 / 1000.0, 1)])
+            q_sem_neu.append([str(i), round(c2 / 1000.0, 1)])
+            q_sem.append([str(i), round(c3 / 1000.0, 1)])
+        print("  %s crescimento 2024: com migração %+.2f%% (%+.0f mil), sem fora UE-27 %+.2f%% (%+.0f mil), "
+              "sem migração %+.2f%% (%+.0f mil)"
+              % (n, s_com[-1][1], q_com[-1][1], s_sem_neu[-1][1], q_sem_neu[-1][1], s_sem[-1][1], q_sem[-1][1]))
+        var_cresc_ext.append(dict(rot=n, series=[
+            dict(nome="Com migração", cor=AZUL, largura=4.5, rotulo=True, dados=s_com),
+            dict(nome="Sem migração de fora da UE-27", cor=VERDE, largura=5.0, rotulo=True, dados=s_sem_neu),
+            dict(nome="Sem migração (só crescimento natural)", cor=VERMELHO, largura=4.5, rotulo=True, dados=s_sem),
+        ]))
+        var_cresc_ext_q.append(dict(rot=n, series=[
+            dict(nome="Com migração", cor=AZUL, largura=4.5, rotulo=True, dados=q_com),
+            dict(nome="Sem migração de fora da UE-27", cor=VERDE, largura=5.0, rotulo=True, dados=q_sem_neu),
+            dict(nome="Sem migração (só crescimento natural)", cor=VERMELHO, largura=4.5, rotulo=True, dados=q_sem),
+        ]))
+    g_cresc_extra = dict(
+        id="migracao-crescimento-extra-ue",
+        titulo="Crescimento da população com e sem migração de fora da UE-27, 2020–2024",
+        subtitulo="Variação anual em % da população média: saldo natural mais saldo migratório registrado "
+                  "(total, só intra-UE ou zero)",
+        unidade="%", categorias=ANOS_EXTRA,
+        fonte="Eurostat (demo_gind, migr_imm5prv e migr_emi3nxt) e FtM",
+        variantes=var_cresc_ext,
+    )
+    g_cresc_extra_qtd = dict(
+        id="migracao-crescimento-extra-ue-qtd",
+        titulo="Variação da população com e sem migração de fora da UE-27, 2020–2024 (em milhares)",
+        subtitulo="Milhares de pessoas no ano: saldo natural mais saldo migratório registrado "
+                  "(total, só intra-UE ou zero)",
+        unidade="mil", categorias=ANOS_EXTRA,
+        fonte="Eurostat (demo_gind, migr_imm5prv e migr_emi3nxt) e FtM",
+        variantes=var_cresc_ext_q,
+    )
+
     hoje = datetime.date.today().isoformat()
     doc = dict(assunto="Migração na Europa", grupo="Análises Variadas", fonte="Eurostat e FtM",
                referencia="2025-01", atualizado=hoje, formato="artigo",
@@ -504,7 +656,9 @@ def main():
                             graficos=[g_estoque, g_europa_an]),
                        dict(titulo="De onde vêm", texto="", fontes=[], figuras=[], graficos=[g_origens, g_origens_qtd]),
                        dict(titulo="A idade de quem chega", texto="", fontes=[], figuras=[],
-                            graficos=[g_idade, g_idade_qtd, g_media])])
+                            graficos=[g_idade, g_idade_qtd, g_media, g_piramide, g_piramide_qtd]),
+                       dict(titulo="Crescimento com e sem migração", texto="", fontes=[], figuras=[],
+                            graficos=[g_cresc_hist, g_cresc_extra, g_cresc_extra_qtd])])
     with open(SAIDA, "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
         f.write("\n")
