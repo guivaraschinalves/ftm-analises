@@ -13,6 +13,9 @@ DE ONDE VEM CADA COISA (API de disseminação do Eurostat, JSON-stat)
   - migr_imm8 e migr_emi2: imigração e emigração anuais, totais (idade
     completa). Incluem o retorno de nativos e, na UE-27, a mudança entre países
     da UE.
+  - migr_imm5prv e migr_emi3nxt: imigração por país de residência anterior e
+    emigração por país de destino seguinte (2020–2024, critério uniforme
+    pós-Brexit NEU27_2020_FOR para fluxos apenas com países fora da UE-27).
   - migr_pop3ctb: população em 1º/jan/2025 por país de nascimento (total,
     nascidos no exterior, na UE e fora dela) e por faixa de 5 anos.
   - migr_imm3ctb: imigração de 2024 por país de nascimento e faixa de 5 anos
@@ -112,11 +115,20 @@ def conferir(condicao, msg):
         raise RuntimeError("conferência falhou: " + msg)
 
 
+ANOS_EXTRA = ["2020", "2021", "2022", "2023", "2024"]
+
+
 def main():
     geos = [g for g, _ in TERR]
     pop_t, _ = eurostat("demo_pjan", ["geo", "time"], geo=geos, age="TOTAL", sex="T")
     imi_t, _ = eurostat("migr_imm8", ["geo", "time"], geo=geos, age="TOTAL", sex="T", agedef="COMPLET")
     emi_t, _ = eurostat("migr_emi2", ["geo", "time"], geo=geos, age="TOTAL", sex="T", agedef="COMPLET")
+    # fluxos por residência anterior / destino seguinte (2020–2024: corte uniforme pós-Brexit fora da UE-27)
+    partes = ["TOTAL", "EU27_2020_FOR", "NEU27_2020_FOR", "UNK"]
+    imm_prv, _ = eurostat("migr_imm5prv", ["geo", "partner", "time"], geo=geos, time=ANOS_EXTRA,
+                          age="TOTAL", sex="T", agedef="COMPLET", partner=partes)
+    emi_nxt, _ = eurostat("migr_emi3nxt", ["geo", "partner", "time"], geo=geos, time=ANOS_EXTRA,
+                          age="TOTAL", sex="T", agedef="COMPLET", partner=partes)
     # estoque em 1º/jan/2025 por bloco de nascimento e idade (inclui o total da população)
     est, _ = eurostat("migr_pop3ctb", ["geo", "c_birth", "age"], geo=geos, time="2025", sex="T", age=["TOTAL"] + FAIXAS,
                       c_birth=["TOTAL", "FOR", "EU27_2020_FOR", "NEU27_2020_FOR"])
@@ -139,6 +151,21 @@ def main():
                      "%s sem população ou fluxos em %s" % (g, y))
         conferir(abs(imi_t[(g, "2024")] - flu[(g, "TOTAL")]) <= 1,
                  "%s migr_imm8 2024 (%s) != migr_imm3ctb TOTAL (%s)" % (g, imi_t[(g, "2024")], flu[(g, "TOTAL")]))
+        for y in ANOS_EXTRA:
+            conferir(imm_prv.get((g, "TOTAL", y)) == imi_t[(g, y)],
+                     "%s migr_imm5prv TOTAL %s != migr_imm8" % (g, y))
+            conferir(emi_nxt.get((g, "TOTAL", y)) == emi_t[(g, y)],
+                     "%s migr_emi3nxt TOTAL %s != migr_emi2" % (g, y))
+            conferir(imm_prv.get((g, "NEU27_2020_FOR", y), 0) > 0 and emi_nxt.get((g, "NEU27_2020_FOR", y), 0) > 0,
+                     "%s sem fluxo extra-UE em %s" % (g, y))
+            soma_im = sum(imm_prv.get((g, p, y), 0) for p in ("EU27_2020_FOR", "NEU27_2020_FOR", "UNK"))
+            soma_em = sum(emi_nxt.get((g, p, y), 0) for p in ("EU27_2020_FOR", "NEU27_2020_FOR", "UNK"))
+            if g == "EU27_2020":
+                conferir(soma_im <= imm_prv[(g, "TOTAL", y)] and soma_em <= emi_nxt[(g, "TOTAL", y)],
+                         "%s parcelas extra/intra passam do TOTAL em %s" % (g, y))
+            else:
+                conferir(soma_im == imm_prv[(g, "TOTAL", y)] and soma_em == emi_nxt[(g, "TOTAL", y)],
+                         "%s EU + fora UE + UNK != TOTAL em %s" % (g, y))
         anos_por_geo[g] = ys
         conferir(est[(g, "EU27_2020_FOR", "TOTAL")] + est[(g, "NEU27_2020_FOR", "TOTAL")] == est[(g, "FOR", "TOTAL")],
                  "%s estoque UE + fora UE != FOR" % g)
@@ -149,27 +176,43 @@ def main():
         conferir(flu.get((g, "EU27_2020_FOR"), 0) + flu.get((g, "NEU27_2020_FOR"), 0) == flu[(g, "FOR")],
                  "%s fluxo UE + fora UE != FOR" % g)
 
-    # 1. fluxos em % da população de 2024 e série histórica
+    # 1. fluxos em % da população de 2024 e série histórica (total e só fora da UE-27)
     cats = [n for _, n in TERR]
     im = {g: 100 * imi_t[(g, "2024")] / pop_t[(g, "2024")] for g in geos}
     em = {g: 100 * emi_t[(g, "2024")] / pop_t[(g, "2024")] for g in geos}
+    im_ext = {g: 100 * imm_prv[(g, "NEU27_2020_FOR", "2024")] / pop_t[(g, "2024")] for g in geos}
+    em_ext = {g: 100 * emi_nxt[(g, "NEU27_2020_FOR", "2024")] / pop_t[(g, "2024")] for g in geos}
     for g, n in TERR:
         ys = anos_por_geo[g]
-        print("  %s (%s–%s): imigração %.2f%%, emigração %.2f%%, saldo %+.2f p.p."
-              % (n, ys[0], ys[-1], im[g], em[g], im[g] - em[g]))
+        print("  %s (%s–%s): imigração %.2f%% (fora UE %.2f%%), emigração %.2f%% (fora UE %.2f%%), "
+              "saldo %+.2f p.p. (fora UE %+.2f p.p.)"
+              % (n, ys[0], ys[-1], im[g], im_ext[g], em[g], em_ext[g], im[g] - em[g], im_ext[g] - em_ext[g]))
     g_fluxos = dict(id="migracao-fluxos", titulo="Imigração e emigração em % da população, 2024",
                     subtitulo="Entradas e saídas no ano, sobre a população em 1º de janeiro de 2024; saldo = "
                               "imigração menos emigração, em pontos percentuais",
                     unidade="%", categorias=cats, agrupadas=True, barra=0.8,
                     fonte="Eurostat (migr_imm8, migr_emi2 e demo_pjan) e FtM",
-                    series=[dict(nome="Imigração", cor=AZUL, tipo="barra", valores=True,
-                                 dados=[[str(i), round(im[g], 2)] for i, g in enumerate(geos)]),
-                            dict(nome="Emigração", cor=VERMELHO, tipo="barra", valores=True,
-                                 dados=[[str(i), round(em[g], 2)] for i, g in enumerate(geos)]),
-                            dict(nome="Saldo", cor=VERDE, tipo="barra", valores=True,
-                                 dados=[[str(i), round(im[g] - em[g], 2)] for i, g in enumerate(geos)])])
+                    variantes=[
+                        dict(rot="Total (inclui intra-UE)",
+                             fonte="Eurostat (migr_imm8, migr_emi2 e demo_pjan) e FtM",
+                             series=[dict(nome="Imigração", cor=AZUL, tipo="barra", valores=True,
+                                          dados=[[str(i), round(im[g], 2)] for i, g in enumerate(geos)]),
+                                     dict(nome="Emigração", cor=VERMELHO, tipo="barra", valores=True,
+                                          dados=[[str(i), round(em[g], 2)] for i, g in enumerate(geos)]),
+                                     dict(nome="Saldo", cor=VERDE, tipo="barra", valores=True,
+                                          dados=[[str(i), round(im[g] - em[g], 2)] for i, g in enumerate(geos)])]),
+                        dict(rot="Só fora da UE-27",
+                             fonte="Eurostat (migr_imm5prv, migr_emi3nxt e demo_pjan) e FtM",
+                             series=[dict(nome="Imigração", cor=AZUL, tipo="barra", valores=True,
+                                          dados=[[str(i), round(im_ext[g], 2)] for i, g in enumerate(geos)]),
+                                     dict(nome="Emigração", cor=VERMELHO, tipo="barra", valores=True,
+                                          dados=[[str(i), round(em_ext[g], 2)] for i, g in enumerate(geos)]),
+                                     dict(nome="Saldo", cor=VERDE, tipo="barra", valores=True,
+                                          dados=[[str(i), round(im_ext[g] - em_ext[g], 2)] for i, g in enumerate(geos)])]),
+                    ])
 
     var_fluxos_tempo = []
+    var_fluxos_fora = []
     for g, n in TERR:
         ys = anos_por_geo[g]
         im_s = {y: 100 * imi_t[(g, y)] / pop_t[(g, y)] for y in ys}
@@ -183,13 +226,32 @@ def main():
                  dados=[["%s-01" % y, round(em_s[y], 2)] for y in ys]),
             dict(nome="Saldo", cor=VERDE, largura=5.5, rotulo=True,
                  dados=[["%s-01" % y, round(im_s[y] - em_s[y], 2)] for y in ys])]))
+
+        im_es = {y: 100 * imm_prv[(g, "NEU27_2020_FOR", y)] / pop_t[(g, y)] for y in ANOS_EXTRA}
+        em_es = {y: 100 * emi_nxt[(g, "NEU27_2020_FOR", y)] / pop_t[(g, y)] for y in ANOS_EXTRA}
+        conferir(abs(im_es["2024"] - im_ext[g]) < 1e-9 and abs(em_es["2024"] - em_ext[g]) < 1e-9,
+                 "%s 2024 extra-UE histórico diverge do resumo" % g)
+        var_fluxos_fora.append(dict(rot=n, series=[
+            dict(nome="Imigração de fora da UE-27", cor=AZUL, largura=4.5, rotulo=True,
+                 dados=[[str(i), round(im_es[y], 2)] for i, y in enumerate(ANOS_EXTRA)]),
+            dict(nome="Emigração para fora da UE-27", cor=VERMELHO, largura=4.5, rotulo=True,
+                 dados=[[str(i), round(em_es[y], 2)] for i, y in enumerate(ANOS_EXTRA)]),
+            dict(nome="Saldo", cor=VERDE, largura=5.5, rotulo=True,
+                 dados=[[str(i), round(im_es[y] - em_es[y], 2)] for i, y in enumerate(ANOS_EXTRA)])]))
     g_fluxos_tempo = dict(id="migracao-fluxos-tempo",
                           titulo="Imigração e emigração em % da população ao longo do tempo",
-                          subtitulo="Entradas e saídas anuais, sobre a população em 1º de janeiro; saldo = "
-                                    "imigração menos emigração, em pontos percentuais",
+                          subtitulo="Entradas e saídas anuais (inclui intra-UE), sobre a população em 1º de janeiro; "
+                                    "saldo = imigração menos emigração, em pontos percentuais",
                           unidade="%", buracoMax=12,
                           fonte="Eurostat (migr_imm8, migr_emi2 e demo_pjan) e FtM",
                           variantes=var_fluxos_tempo)
+    g_fluxos_fora = dict(id="migracao-fluxos-fora-ue-tempo",
+                         titulo="Imigração e emigração de fora da UE-27 em % da população, 2020–2024",
+                         subtitulo="Entradas vindas de fora da UE-27 e saídas para fora da UE-27 no ano, sobre a "
+                                   "população em 1º de janeiro; saldo = entradas menos saídas, em pontos percentuais",
+                         unidade="%", categorias=ANOS_EXTRA,
+                         fonte="Eurostat (migr_imm5prv, migr_emi3nxt e demo_pjan) e FtM",
+                         variantes=var_fluxos_fora)
 
     # 2. estoque de nascidos no exterior em % da população de 2025
     pct = {b: {g: 100 * est[(g, b, "TOTAL")] / est[(g, "TOTAL", "TOTAL")] for g in geos}
@@ -284,7 +346,7 @@ def main():
     doc = dict(assunto="Migração na Europa", grupo="Análises Variadas", fonte="Eurostat e FtM",
                referencia="2025-01", atualizado=hoje, formato="artigo",
                secoes=[dict(titulo="Quem chega e quem sai", texto="", fontes=[], figuras=[],
-                            graficos=[g_fluxos, g_fluxos_tempo]),
+                            graficos=[g_fluxos, g_fluxos_tempo, g_fluxos_fora]),
                        dict(titulo="Quantos nasceram fora", texto="", fontes=[], figuras=[], graficos=[g_estoque]),
                        dict(titulo="De onde vêm", texto="", fontes=[], figuras=[], graficos=[g_origens]),
                        dict(titulo="A idade de quem chega", texto="", fontes=[], figuras=[],
