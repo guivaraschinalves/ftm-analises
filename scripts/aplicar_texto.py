@@ -52,7 +52,8 @@ PARES = [("defasagem-combustiveis.md", "defasagem-combustiveis.json"),
          ("cenario-2026-10-28-fomc.md", "cenario-2026-10-28-fomc.json"),
          ("ueno-bank.md", "ueno-bank.json"),
          ("cenario-2026-11-08.md", "cenario-2026-11-08.json"),
-         ("missao-global-miami.md", "missao-global-miami.json")]
+         ("missao-global-miami.md", "missao-global-miami.json"),
+         ("migracao-europa.md", "migracao-europa.json")]
 
 
 def aplicar(nome_texto, nome_json):
