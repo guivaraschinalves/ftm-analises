@@ -2116,6 +2116,8 @@
       vis[k].forEach(function (p) {
         var tx = F.valor(Math.abs(p.v));
         if (p.v < 0) tx = "\u2212" + tx;
+        // "rotulos": {índice: texto} troca o número pelo texto pedido (o valor e o crescimento, por exemplo)
+        if (s.rotulos && s.rotulos[p.i] != null) tx = s.rotulos[p.i];
         var yV = p.v >= 0 ? Y(p.v) - fsV * 0.45 : Y(p.v) + fsV * 1.15;
         svg.appendChild(texto(tx, { x: X(p.i + 0.5), y: yV, "font-size": corpoQueCabe(tx, fsV, Math.max(pxMes * 0.98, 10), "bold"),
           "font-weight": "bold", fill: pal.texto, "text-anchor": "middle" }));
