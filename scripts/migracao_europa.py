@@ -252,8 +252,8 @@ def main():
                secoes=[dict(titulo="Quem chega e quem sai", texto="", fontes=[], figuras=[], graficos=[g_fluxos]),
                        dict(titulo="Quantos nasceram fora", texto="", fontes=[], figuras=[], graficos=[g_estoque]),
                        dict(titulo="De onde vêm", texto="", fontes=[], figuras=[], graficos=[g_origens]),
-                       dict(titulo="A idade de quem chega", texto="", fontes=[], figuras=[], graficos=[g_idade]),
-                       dict(titulo="", texto="", fontes=[], figuras=[], graficos=[g_media])])
+                       dict(titulo="A idade de quem chega", texto="", fontes=[], figuras=[],
+                            graficos=[g_idade, g_media])])
     with open(SAIDA, "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
         f.write("\n")

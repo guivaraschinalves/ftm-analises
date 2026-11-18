@@ -71,7 +71,7 @@ O dono do projeto é daltônico. Respeitar estritamente esta ordem de cores:
 - **Subtítulo:** direto ao que mede, unidade e ressalva após ponto e vírgula (ex.: `"Variação % acumulada em 12 meses; EX1 exclui combustíveis e alimentos com preços mais voláteis"`). Nada didático ou interpretativo.
 - **Nota de rodapé:** só quando pedida explicitamente, e apenas metodológica (código/aba, fórmula, limite de comparação). Nunca explicar como ler o gráfico ou botões.
 - **Fonte no rodapé:** `"Órgão (Pesquisa)"`, terminando em `" e FtM"` quando houver cálculo próprio.
-- **Análises (`ftm-analises`):** um comentário logo antes de cada gráfico (sempre intercalados), com no máximo **3 frases corridas** por parágrafo.
+- **Análises (`ftm-analises`):** nunca adicionar textos ou comentários se não forem pedidos (se o usuário pedir apenas gráficos, deixar `texto` vazio); quando pedidos, colocar um comentário logo antes de cada gráfico (sempre intercalados), com no máximo **3 frases corridas** por parágrafo.
 
 ---
 
