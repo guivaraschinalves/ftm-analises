@@ -176,24 +176,30 @@ def main():
         conferir(flu.get((g, "EU27_2020_FOR"), 0) + flu.get((g, "NEU27_2020_FOR"), 0) == flu[(g, "FOR")],
                  "%s fluxo UE + fora UE != FOR" % g)
 
-    # 1. fluxos em % da população de 2024 e série histórica (total e só fora da UE-27)
+    # 1. fluxos em % da população e em milhares de pessoas (2024 e série histórica; total e fora da UE-27)
     cats = [n for _, n in TERR]
     im = {g: 100 * imi_t[(g, "2024")] / pop_t[(g, "2024")] for g in geos}
     em = {g: 100 * emi_t[(g, "2024")] / pop_t[(g, "2024")] for g in geos}
     im_ext = {g: 100 * imm_prv[(g, "NEU27_2020_FOR", "2024")] / pop_t[(g, "2024")] for g in geos}
     em_ext = {g: 100 * emi_nxt[(g, "NEU27_2020_FOR", "2024")] / pop_t[(g, "2024")] for g in geos}
+    im_q = {g: imi_t[(g, "2024")] / 1000.0 for g in geos}
+    em_q = {g: emi_t[(g, "2024")] / 1000.0 for g in geos}
+    im_ext_q = {g: imm_prv[(g, "NEU27_2020_FOR", "2024")] / 1000.0 for g in geos}
+    em_ext_q = {g: emi_nxt[(g, "NEU27_2020_FOR", "2024")] / 1000.0 for g in geos}
     for g, n in TERR:
         ys = anos_por_geo[g]
-        print("  %s (%s–%s): imigração %.2f%% (fora UE %.2f%%), emigração %.2f%% (fora UE %.2f%%), "
+        print("  %s (%s–%s): imigração %.2f%% (%.0f mil; fora UE %.2f%%, %.0f mil), "
+              "emigração %.2f%% (%.0f mil; fora UE %.2f%%, %.0f mil), "
               "saldo %+.2f p.p. (fora UE %+.2f p.p.)"
-              % (n, ys[0], ys[-1], im[g], im_ext[g], em[g], em_ext[g], im[g] - em[g], im_ext[g] - em_ext[g]))
-    g_fluxos = dict(id="migracao-fluxos", titulo="Imigração e emigração em % da população, 2024",
-                    subtitulo="Entradas e saídas no ano, sobre a população em 1º de janeiro de 2024; saldo = "
-                              "imigração menos emigração, em pontos percentuais",
+              % (n, ys[0], ys[-1], im[g], im_q[g], im_ext[g], im_ext_q[g],
+                 em[g], em_q[g], em_ext[g], em_ext_q[g], im[g] - em[g], im_ext[g] - em_ext[g]))
+    g_fluxos = dict(id="migracao-fluxos", titulo="Imigração e emigração, 2024",
+                    subtitulo="Entradas e saídas no ano (em % da população em 1º/jan/2024 ou milhares de pessoas); "
+                              "saldo = imigração menos emigração",
                     unidade="%", categorias=cats, agrupadas=True, barra=0.8,
                     fonte="Eurostat (migr_imm8, migr_emi2 e demo_pjan) e FtM",
                     variantes=[
-                        dict(rot="Total (inclui intra-UE)",
+                        dict(rot="Total (% pop.)", unidade="%",
                              fonte="Eurostat (migr_imm8, migr_emi2 e demo_pjan) e FtM",
                              series=[dict(nome="Imigração", cor=AZUL, tipo="barra", valores=True,
                                           dados=[[str(i), round(im[g], 2)] for i, g in enumerate(geos)]),
@@ -201,7 +207,7 @@ def main():
                                           dados=[[str(i), round(em[g], 2)] for i, g in enumerate(geos)]),
                                      dict(nome="Saldo", cor=VERDE, tipo="barra", valores=True,
                                           dados=[[str(i), round(im[g] - em[g], 2)] for i, g in enumerate(geos)])]),
-                        dict(rot="Só fora da UE-27",
+                        dict(rot="Fora da UE-27 (% pop.)", unidade="%",
                              fonte="Eurostat (migr_imm5prv, migr_emi3nxt e demo_pjan) e FtM",
                              series=[dict(nome="Imigração", cor=AZUL, tipo="barra", valores=True,
                                           dados=[[str(i), round(im_ext[g], 2)] for i, g in enumerate(geos)]),
@@ -209,14 +215,34 @@ def main():
                                           dados=[[str(i), round(em_ext[g], 2)] for i, g in enumerate(geos)]),
                                      dict(nome="Saldo", cor=VERDE, tipo="barra", valores=True,
                                           dados=[[str(i), round(im_ext[g] - em_ext[g], 2)] for i, g in enumerate(geos)])]),
+                        dict(rot="Total (mil)", unidade="mil",
+                             fonte="Eurostat (migr_imm8 e migr_emi2) e FtM",
+                             series=[dict(nome="Imigração", cor=AZUL, tipo="barra", valores=True,
+                                          dados=[[str(i), round(im_q[g], 1)] for i, g in enumerate(geos)]),
+                                     dict(nome="Emigração", cor=VERMELHO, tipo="barra", valores=True,
+                                          dados=[[str(i), round(em_q[g], 1)] for i, g in enumerate(geos)]),
+                                     dict(nome="Saldo", cor=VERDE, tipo="barra", valores=True,
+                                          dados=[[str(i), round(im_q[g] - em_q[g], 1)] for i, g in enumerate(geos)])]),
+                        dict(rot="Fora da UE-27 (mil)", unidade="mil",
+                             fonte="Eurostat (migr_imm5prv e migr_emi3nxt) e FtM",
+                             series=[dict(nome="Imigração", cor=AZUL, tipo="barra", valores=True,
+                                          dados=[[str(i), round(im_ext_q[g], 1)] for i, g in enumerate(geos)]),
+                                     dict(nome="Emigração", cor=VERMELHO, tipo="barra", valores=True,
+                                          dados=[[str(i), round(em_ext_q[g], 1)] for i, g in enumerate(geos)]),
+                                     dict(nome="Saldo", cor=VERDE, tipo="barra", valores=True,
+                                          dados=[[str(i), round(im_ext_q[g] - em_ext_q[g], 1)] for i, g in enumerate(geos)])]),
                     ])
 
     var_fluxos_tempo = []
+    var_fluxos_tempo_qtd = []
     var_fluxos_fora = []
+    var_fluxos_fora_qtd = []
     for g, n in TERR:
         ys = anos_por_geo[g]
         im_s = {y: 100 * imi_t[(g, y)] / pop_t[(g, y)] for y in ys}
         em_s = {y: 100 * emi_t[(g, y)] / pop_t[(g, y)] for y in ys}
+        im_sq = {y: imi_t[(g, y)] / 1000.0 for y in ys}
+        em_sq = {y: emi_t[(g, y)] / 1000.0 for y in ys}
         conferir(abs(im_s["2024"] - im[g]) < 1e-9 and abs(em_s["2024"] - em[g]) < 1e-9,
                  "%s 2024 histórico diverge do resumo" % g)
         var_fluxos_tempo.append(dict(rot=n, series=[
@@ -226,9 +252,18 @@ def main():
                  dados=[["%s-01" % y, round(em_s[y], 2)] for y in ys]),
             dict(nome="Saldo", cor=VERDE, largura=5.5, rotulo=True,
                  dados=[["%s-01" % y, round(im_s[y] - em_s[y], 2)] for y in ys])]))
+        var_fluxos_tempo_qtd.append(dict(rot=n, series=[
+            dict(nome="Imigração", cor=AZUL, largura=4.5, rotulo=True,
+                 dados=[["%s-01" % y, round(im_sq[y], 1)] for y in ys]),
+            dict(nome="Emigração", cor=VERMELHO, largura=4.5, rotulo=True,
+                 dados=[["%s-01" % y, round(em_sq[y], 1)] for y in ys]),
+            dict(nome="Saldo", cor=VERDE, largura=5.5, rotulo=True,
+                 dados=[["%s-01" % y, round(im_sq[y] - em_sq[y], 1)] for y in ys])]))
 
         im_es = {y: 100 * imm_prv[(g, "NEU27_2020_FOR", y)] / pop_t[(g, y)] for y in ANOS_EXTRA}
         em_es = {y: 100 * emi_nxt[(g, "NEU27_2020_FOR", y)] / pop_t[(g, y)] for y in ANOS_EXTRA}
+        im_esq = {y: imm_prv[(g, "NEU27_2020_FOR", y)] / 1000.0 for y in ANOS_EXTRA}
+        em_esq = {y: emi_nxt[(g, "NEU27_2020_FOR", y)] / 1000.0 for y in ANOS_EXTRA}
         conferir(abs(im_es["2024"] - im_ext[g]) < 1e-9 and abs(em_es["2024"] - em_ext[g]) < 1e-9,
                  "%s 2024 extra-UE histórico diverge do resumo" % g)
         var_fluxos_fora.append(dict(rot=n, series=[
@@ -238,6 +273,13 @@ def main():
                  dados=[[str(i), round(em_es[y], 2)] for i, y in enumerate(ANOS_EXTRA)]),
             dict(nome="Saldo", cor=VERDE, largura=5.5, rotulo=True,
                  dados=[[str(i), round(im_es[y] - em_es[y], 2)] for i, y in enumerate(ANOS_EXTRA)])]))
+        var_fluxos_fora_qtd.append(dict(rot=n, series=[
+            dict(nome="Imigração de fora da UE-27", cor=AZUL, largura=4.5, rotulo=True,
+                 dados=[[str(i), round(im_esq[y], 1)] for i, y in enumerate(ANOS_EXTRA)]),
+            dict(nome="Emigração para fora da UE-27", cor=VERMELHO, largura=4.5, rotulo=True,
+                 dados=[[str(i), round(em_esq[y], 1)] for i, y in enumerate(ANOS_EXTRA)]),
+            dict(nome="Saldo", cor=VERDE, largura=5.5, rotulo=True,
+                 dados=[[str(i), round(im_esq[y] - em_esq[y], 1)] for i, y in enumerate(ANOS_EXTRA)])]))
     g_fluxos_tempo = dict(id="migracao-fluxos-tempo",
                           titulo="Imigração e emigração em % da população ao longo do tempo",
                           subtitulo="Entradas e saídas anuais (inclui intra-UE), sobre a população em 1º de janeiro; "
@@ -245,6 +287,12 @@ def main():
                           unidade="%", buracoMax=12,
                           fonte="Eurostat (migr_imm8, migr_emi2 e demo_pjan) e FtM",
                           variantes=var_fluxos_tempo)
+    g_fluxos_tempo_qtd = dict(id="migracao-fluxos-tempo-qtd",
+                              titulo="Imigração e emigração em milhares de pessoas ao longo do tempo",
+                              subtitulo="Entradas e saídas anuais (inclui intra-UE); saldo = imigração menos emigração",
+                              unidade="mil", buracoMax=12,
+                              fonte="Eurostat (migr_imm8 e migr_emi2) e FtM",
+                              variantes=var_fluxos_tempo_qtd)
     g_fluxos_fora = dict(id="migracao-fluxos-fora-ue-tempo",
                          titulo="Imigração e emigração de fora da UE-27 em % da população, 2020–2024",
                          subtitulo="Entradas vindas de fora da UE-27 e saídas para fora da UE-27 no ano, sobre a "
@@ -252,29 +300,51 @@ def main():
                          unidade="%", categorias=ANOS_EXTRA,
                          fonte="Eurostat (migr_imm5prv, migr_emi3nxt e demo_pjan) e FtM",
                          variantes=var_fluxos_fora)
+    g_fluxos_fora_qtd = dict(id="migracao-fluxos-fora-ue-tempo-qtd",
+                             titulo="Imigração e emigração de fora da UE-27 em milhares de pessoas, 2020–2024",
+                             subtitulo="Entradas vindas de fora da UE-27 e saídas para fora da UE-27 no ano; "
+                                       "saldo = entradas menos saídas",
+                             unidade="mil", categorias=ANOS_EXTRA,
+                             fonte="Eurostat (migr_imm5prv e migr_emi3nxt) e FtM",
+                             variantes=var_fluxos_fora_qtd)
 
-    # 2. estoque de nascidos no exterior em % da população de 2025
+    # 2. estoque de nascidos no exterior (em % da população e em milhares de pessoas, 2025)
     pct = {b: {g: 100 * est[(g, b, "TOTAL")] / est[(g, "TOTAL", "TOTAL")] for g in geos}
            for b in ("FOR", "EU27_2020_FOR", "NEU27_2020_FOR")}
-    tot = "; ".join("%s %s%%" % (n, br(pct["FOR"][g])) for g, n in TERR)
-    g_estoque = dict(id="migracao-estoque", titulo="Nascidos no exterior em % da população, 1º de janeiro de 2025",
+    est_q = {b: {g: est[(g, b, "TOTAL")] / 1000.0 for g in geos}
+             for b in ("FOR", "EU27_2020_FOR", "NEU27_2020_FOR")}
+    tot = "; ".join("%s %s%% (%s mi)" % (n, br(pct["FOR"][g]), br(est_q["FOR"][g] / 1000.0)) for g, n in TERR)
+    g_estoque = dict(id="migracao-estoque", titulo="Nascidos no exterior, 1º de janeiro de 2025",
                      subtitulo="Residentes nascidos em outro país, por bloco de nascimento; total: %s" % tot,
                      unidade="%", categorias=cats, barra=0.6,
                      fonte="Eurostat (migr_pop3ctb) e FtM",
-                     series=[dict(nome="Nascidos em outro país da UE", cor=AZUL_CLARO, tipo="barra",
-                                  dados=[[str(i), round(pct["EU27_2020_FOR"][g], 2)] for i, g in enumerate(geos)]),
-                             dict(nome="Nascidos fora da UE", cor=AZUL, tipo="barra",
-                                  dados=[[str(i), round(pct["NEU27_2020_FOR"][g], 2)] for i, g in enumerate(geos)])])
+                     variantes=[
+                         dict(rot="% da população", unidade="%",
+                              series=[dict(nome="Nascidos em outro país da UE", cor=AZUL_CLARO, tipo="barra",
+                                           dados=[[str(i), round(pct["EU27_2020_FOR"][g], 2)] for i, g in enumerate(geos)]),
+                                      dict(nome="Nascidos fora da UE", cor=AZUL, tipo="barra",
+                                           dados=[[str(i), round(pct["NEU27_2020_FOR"][g], 2)] for i, g in enumerate(geos)])]),
+                         dict(rot="Milhares de pessoas", unidade="mil",
+                              series=[dict(nome="Nascidos em outro país da UE", cor=AZUL_CLARO, tipo="barra",
+                                           dados=[[str(i), round(est_q["EU27_2020_FOR"][g], 1)] for i, g in enumerate(geos)]),
+                                      dict(nome="Nascidos fora da UE", cor=AZUL, tipo="barra",
+                                           dados=[[str(i), round(est_q["NEU27_2020_FOR"][g], 1)] for i, g in enumerate(geos)])]),
+                     ])
 
-    # 3. de onde vêm os novos imigrantes nascidos no exterior (2024)
-    variantes, fora = [], {}
+    # 3. de onde vêm os novos imigrantes nascidos no exterior (2024: % e milhares)
+    variantes, variantes_qtd, fora, fora_qtd = [], [], {}, {}
     for g, n in TERR:
         total = flu[(g, "FOR")]
-        fora[n] = 100 * flu.get((g, "NEU27_2020_FOR"), 0) / total
+        n_fora = flu.get((g, "NEU27_2020_FOR"), 0)
+        fora[n] = 100 * n_fora / total
+        fora_qtd[n] = n_fora / 1000.0
         if g == "EU27_2020":    # a UE-27 não abre país nenhum: só UE contra fora da UE
             variantes.append(dict(rot=n + " (só UE x fora da UE)", itens=[
                 ["Nascidos fora da UE", round(fora[n], 1), AZUL],
                 ["Nascidos em outro país da UE", round(100 - fora[n], 1), AZUL_CLARO]]))
+            variantes_qtd.append(dict(rot=n + " (só UE x fora da UE)", itens=[
+                ["Nascidos fora da UE", round(n_fora / 1000.0, 1), AZUL],
+                ["Nascidos em outro país da UE", round((total - n_fora) / 1000.0, 1), AZUL_CLARO]]))
             continue
         # só países (código de duas letras); os agregados regionais têm código maior
         paises = {c: v for (gg, c), v in flu.items()
@@ -284,26 +354,38 @@ def main():
         top = sorted(paises.items(), key=lambda kv: -kv[1])[:5]
         itens = [[NOMES.get(c, nomes_pais.get(c, c)), round(100 * v / total, 1), AZUL if c not in UE else AZUL_CLARO]
                  for c, v in top]
+        itens_qtd = [[NOMES.get(c, nomes_pais.get(c, c)), round(v / 1000.0, 1), AZUL if c not in UE else AZUL_CLARO]
+                     for c, v in top]
         rot_v = n + (" (só países da UE)" if g == "FR" else "")
         variantes.append(dict(rot=rot_v, itens=itens))
+        variantes_qtd.append(dict(rot=rot_v, itens=itens_qtd))
         print("  %s: %s" % (n, ", ".join("%s %.1f%%" % (a, b) for a, b, _ in itens)))
     g_origens = dict(id="migracao-origens", tipo="ranking", unidade="%",
                      titulo="Os cinco principais países de nascimento dos novos imigrantes, 2024",
                      subtitulo="%% dos imigrantes nascidos no exterior que chegaram no ano; azul claro = país da UE; "
                                "nascidos fora da UE: %s" % "; ".join("%s %s%%" % (n, br(v)) for n, v in fora.items()),
                      fonte="Eurostat (migr_imm3ctb) e FtM", itens=variantes[0]["itens"], variantes=variantes)
+    g_origens_qtd = dict(id="migracao-origens-qtd", tipo="ranking", unidade="mil",
+                         titulo="Os cinco principais países de nascimento dos novos imigrantes, 2024 (em milhares)",
+                         subtitulo="Milhares de imigrantes nascidos no exterior que chegaram no ano; azul claro = país "
+                                   "da UE; nascidos fora da UE: %s"
+                                   % "; ".join("%s %s mil" % (n, br(v, 0)) for n, v in fora_qtd.items()),
+                         fonte="Eurostat (migr_imm3ctb) e FtM", itens=variantes_qtd[0]["itens"],
+                         variantes=variantes_qtd)
 
-    # 4. idade: residentes e estoque de 2025, novos imigrantes de 2024
+    # 4. idade: residentes e estoque de 2025, novos imigrantes de 2024 (distribuição % e milhares)
     def dist(contagem):
         s = sum(contagem)
         return [100 * x / s for x in contagem]
 
     def media(d):
         return sum(m * p for m, p in zip(MEIOS, d)) / 100
-    var_idade, medias = [], {}
+    var_idade, var_idade_qtd, medias = [], [], {}
     for g, n in TERR:
-        resid = dist([est[(g, "TOTAL", f)] for f in FAIXAS])
-        estoq = dist([est[(g, "FOR", f)] for f in FAIXAS])
+        resid_n = [est[(g, "TOTAL", f)] for f in FAIXAS]
+        estoq_n = [est[(g, "FOR", f)] for f in FAIXAS]
+        resid = dist(resid_n)
+        estoq = dist(estoq_n)
         if all((g, f) in flu_idade for f in FAIXAS):
             novos_n, base = [flu_idade[(g, f)] for f in FAIXAS], None
         else:              # a UE-27 não publica: soma dos países que publicam todas as faixas
@@ -325,11 +407,24 @@ def main():
                  dados=[[str(i), round(v, 2)] for i, v in enumerate(estoq)]),
             dict(nome="Novos imigrantes nascidos no exterior, 2024", cor=BRANCO, largura=5,
                  dados=[[str(i), round(v, 2)] for i, v in enumerate(novos)])]))
+        var_idade_qtd.append(dict(rot=n, series=[
+            dict(nome="População residente, 2025", cor=AZUL_CLARO, tipo="barra",
+                 dados=[[str(i), round(v / 1000.0, 1)] for i, v in enumerate(resid_n)]),
+            dict(nome="Nascidos no exterior, estoque de 2025", cor=LARANJA, largura=6, traco="pontilhado",
+                 dados=[[str(i), round(v / 1000.0, 1)] for i, v in enumerate(estoq_n)]),
+            dict(nome="Novos imigrantes nascidos no exterior, 2024", cor=BRANCO, largura=5,
+                 dados=[[str(i), round(v / 1000.0, 1)] for i, v in enumerate(novos_n)])]))
     g_idade = dict(id="migracao-idade", titulo="Distribuição por idade: residentes, imigrantes e novos imigrantes",
                    subtitulo="% de cada grupo em cada faixa de 5 anos; a UE-27 dos novos imigrantes soma os países "
                              "que publicam a idade",
                    unidade="%", categorias=ROT_FAIXAS, barra=0.8, eixo=dict(min=0, max=20),
                    fonte="Eurostat (migr_pop3ctb e migr_imm3ctb) e FtM", variantes=var_idade)
+    g_idade_qtd = dict(id="migracao-idade-qtd",
+                       titulo="População por idade: residentes, imigrantes e novos imigrantes (em milhares)",
+                       subtitulo="Milhares de pessoas em cada faixa de 5 anos; a UE-27 dos novos imigrantes soma os "
+                                 "países que publicam a idade",
+                       unidade="mil", categorias=ROT_FAIXAS, barra=0.8,
+                       fonte="Eurostat (migr_pop3ctb e migr_imm3ctb) e FtM", variantes=var_idade_qtd)
     g_media = dict(id="migracao-idade-media", titulo="Idade média: residentes, imigrantes e novos imigrantes",
                    subtitulo="Anos, pelo ponto médio das faixas de 5 anos; residentes e estoque em 1º/jan/2025, "
                              "novos imigrantes em 2024",
@@ -346,11 +441,11 @@ def main():
     doc = dict(assunto="Migração na Europa", grupo="Análises Variadas", fonte="Eurostat e FtM",
                referencia="2025-01", atualizado=hoje, formato="artigo",
                secoes=[dict(titulo="Quem chega e quem sai", texto="", fontes=[], figuras=[],
-                            graficos=[g_fluxos, g_fluxos_tempo, g_fluxos_fora]),
+                            graficos=[g_fluxos, g_fluxos_tempo, g_fluxos_tempo_qtd, g_fluxos_fora, g_fluxos_fora_qtd]),
                        dict(titulo="Quantos nasceram fora", texto="", fontes=[], figuras=[], graficos=[g_estoque]),
-                       dict(titulo="De onde vêm", texto="", fontes=[], figuras=[], graficos=[g_origens]),
+                       dict(titulo="De onde vêm", texto="", fontes=[], figuras=[], graficos=[g_origens, g_origens_qtd]),
                        dict(titulo="A idade de quem chega", texto="", fontes=[], figuras=[],
-                            graficos=[g_idade, g_media])])
+                            graficos=[g_idade, g_idade_qtd, g_media])])
     with open(SAIDA, "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
         f.write("\n")
