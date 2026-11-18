@@ -25,8 +25,13 @@ DE ONDE VEM CADA COISA (API de disseminação do Eurostat, JSON-stat)
     que publicam a abertura por idade.
   - Idade média: ponto médio de cada faixa (2,5; 7,5; ...; 82,5) e 88,5 para
     85+, como no md.
+  - Our World in Data (UN DESA, International Migrant Stock 2024):
+    migrant-stock-share e migrant-stock-total (1990–2024), para Europa e
+    América do Norte em % da população e em milhares de pessoas.
 """
+import csv
 import datetime
+import io
 import json
 import os
 import sys
@@ -36,6 +41,7 @@ import urllib.request
 RAIZ = os.path.join(os.path.dirname(__file__), "..")
 SAIDA = os.path.join(RAIZ, "dados", "migracao-europa.json")
 API = "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/"
+OWID = "https://ourworldindata.org/grapher/"
 UA = {"User-Agent": "ftm-analises"}
 
 AZUL, VERMELHO, VERDE = "#4F81BD", "#C0504D", "#9BBB59"
@@ -113,6 +119,18 @@ def br(v, casas=1):
 def conferir(condicao, msg):
     if not condicao:
         raise RuntimeError("conferência falhou: " + msg)
+
+
+def owid(slug, coluna):
+    """Baixa CSV do Our World in Data e retorna {(entity, year): float}."""
+    url = OWID + slug + ".csv?v=1&csvType=full&useColumnShortNames=true"
+    txt = baixar(url, headers=UA).decode("utf-8")
+    out = {}
+    for row in csv.DictReader(io.StringIO(txt)):
+        v = row.get(coluna, "").strip()
+        if v:
+            out[(row["entity"], row["year"])] = float(v)
+    return out
 
 
 ANOS_EXTRA = ["2020", "2021", "2022", "2023", "2024"]
@@ -331,6 +349,46 @@ def main():
                                            dados=[[str(i), round(est_q["NEU27_2020_FOR"][g], 1)] for i, g in enumerate(geos)])]),
                      ])
 
+    # 2b. Europa x América do Norte, 1990–2024 (UN DESA 2024 via Our World in Data)
+    anos_owid = ["1990", "1995", "2000", "2005", "2010", "2015", "2020", "2024"]
+    owid_pct = owid("migrant-stock-share", "immigrant_share_of_dest_population_all")
+    owid_tot = owid("migrant-stock-total", "immigrants_all")
+    for ent in ("Europe", "North America", "European Union (27)"):
+        for y in anos_owid:
+            conferir((ent, y) in owid_pct and (ent, y) in owid_tot, "OWID sem dado para %s em %s" % (ent, y))
+            conferir(0.0 < owid_pct[(ent, y)] < 50.0 and owid_tot[(ent, y)] > 0,
+                     "OWID valor inválido para %s em %s" % (ent, y))
+    for y in anos_owid:
+        conferir(owid_tot[("Europe", y)] > owid_tot[("European Union (27)", y)],
+                 "OWID Europe <= EU27 em %s" % y)
+    conferir(abs(owid_tot[("Europe", "2024")] / (owid_pct[("Europe", "2024")] / 100.0) - 744.6e6) < 20e6,
+             "OWID população implícita da Europa em 2024 fora da faixa esperada")
+    print("  OWID 2024: Europa %.2f%% (%.0f mil); América do Norte %.2f%% (%.0f mil)"
+          % (owid_pct[("Europe", "2024")], owid_tot[("Europe", "2024")] / 1000.0,
+             owid_pct[("North America", "2024")], owid_tot[("North America", "2024")] / 1000.0))
+    g_europa_an = dict(id="migracao-europa-america-norte",
+                       titulo="População nascida no exterior: Europa e América do Norte, 1990–2024",
+                       subtitulo="Imigrantes residentes nascidos em outro país (definição continental do Our World "
+                                 "in Data: América do Norte inclui América Central e Caribe)",
+                       unidade="%", categorias=anos_owid,
+                       fonte="UN DESA (International Migrant Stock 2024, via Our World in Data)",
+                       variantes=[
+                           dict(rot="% da população", unidade="%",
+                                series=[dict(nome="Europa", cor=AZUL, largura=5, rotulo=True,
+                                             dados=[[str(i), round(owid_pct[("Europe", y)], 2)]
+                                                    for i, y in enumerate(anos_owid)]),
+                                        dict(nome="América do Norte", cor=VERMELHO, largura=5, rotulo=True,
+                                             dados=[[str(i), round(owid_pct[("North America", y)], 2)]
+                                                    for i, y in enumerate(anos_owid)])]),
+                           dict(rot="Milhares de pessoas", unidade="mil",
+                                series=[dict(nome="Europa", cor=AZUL, largura=5, rotulo=True,
+                                             dados=[[str(i), round(owid_tot[("Europe", y)] / 1000.0, 1)]
+                                                    for i, y in enumerate(anos_owid)]),
+                                        dict(nome="América do Norte", cor=VERMELHO, largura=5, rotulo=True,
+                                             dados=[[str(i), round(owid_tot[("North America", y)] / 1000.0, 1)]
+                                                    for i, y in enumerate(anos_owid)])]),
+                       ])
+
     # 3. de onde vêm os novos imigrantes nascidos no exterior (2024: % e milhares)
     variantes, variantes_qtd, fora, fora_qtd = [], [], {}, {}
     for g, n in TERR:
@@ -442,7 +500,8 @@ def main():
                referencia="2025-01", atualizado=hoje, formato="artigo",
                secoes=[dict(titulo="Quem chega e quem sai", texto="", fontes=[], figuras=[],
                             graficos=[g_fluxos, g_fluxos_tempo, g_fluxos_tempo_qtd, g_fluxos_fora, g_fluxos_fora_qtd]),
-                       dict(titulo="Quantos nasceram fora", texto="", fontes=[], figuras=[], graficos=[g_estoque]),
+                       dict(titulo="Quantos nasceram fora", texto="", fontes=[], figuras=[],
+                            graficos=[g_estoque, g_europa_an]),
                        dict(titulo="De onde vêm", texto="", fontes=[], figuras=[], graficos=[g_origens, g_origens_qtd]),
                        dict(titulo="A idade de quem chega", texto="", fontes=[], figuras=[],
                             graficos=[g_idade, g_idade_qtd, g_media])])
