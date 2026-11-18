@@ -9,8 +9,8 @@ Pedido dele em 18/11/2026, a partir do md "ftm-analises-migracao-europa-graficos
 
 DE ONDE VEM CADA COISA (API de disseminação do Eurostat, JSON-stat)
 
-  - demo_pjan: população em 1º de janeiro (2024 para as taxas de fluxo de 2024).
-  - migr_imm8 e migr_emi2: imigração e emigração de 2024, totais (idade
+  - demo_pjan: população em 1º de janeiro (série histórica e 2024 para as taxas de fluxo).
+  - migr_imm8 e migr_emi2: imigração e emigração anuais, totais (idade
     completa). Incluem o retorno de nativos e, na UE-27, a mudança entre países
     da UE.
   - migr_pop3ctb: população em 1º/jan/2025 por país de nascimento (total,
@@ -114,9 +114,9 @@ def conferir(condicao, msg):
 
 def main():
     geos = [g for g, _ in TERR]
-    pop24, _ = eurostat("demo_pjan", ["geo"], geo=geos, time="2024", age="TOTAL", sex="T")
-    imi, _ = eurostat("migr_imm8", ["geo"], geo=geos, time="2024", age="TOTAL", sex="T", agedef="COMPLET")
-    emi, _ = eurostat("migr_emi2", ["geo"], geo=geos, time="2024", age="TOTAL", sex="T", agedef="COMPLET")
+    pop_t, _ = eurostat("demo_pjan", ["geo", "time"], geo=geos, age="TOTAL", sex="T")
+    imi_t, _ = eurostat("migr_imm8", ["geo", "time"], geo=geos, age="TOTAL", sex="T", agedef="COMPLET")
+    emi_t, _ = eurostat("migr_emi2", ["geo", "time"], geo=geos, age="TOTAL", sex="T", agedef="COMPLET")
     # estoque em 1º/jan/2025 por bloco de nascimento e idade (inclui o total da população)
     est, _ = eurostat("migr_pop3ctb", ["geo", "c_birth", "age"], geo=geos, time="2025", sex="T", age=["TOTAL"] + FAIXAS,
                       c_birth=["TOTAL", "FOR", "EU27_2020_FOR", "NEU27_2020_FOR"])
@@ -127,9 +127,19 @@ def main():
                             sex="T", agedef="REACH", c_birth="FOR", age=FAIXAS)
     nomes_pais = rot.get("c_birth", {})
 
+    anos_por_geo = {}
     for g in geos:
-        conferir(pop24.get(g, 0) > 0 and imi.get(g, 0) > 0 and emi.get(g, 0) > 0,
-                 "%s sem população ou fluxos em 2024" % g)
+        ys = sorted({t for gg, t in pop_t if gg == g}
+                    & {t for gg, t in imi_t if gg == g}
+                    & {t for gg, t in emi_t if gg == g}, key=int)
+        conferir(len(ys) >= 10 and ys[-1] == "2024", "%s série histórica insuficiente ou sem 2024" % g)
+        conferir(len(ys) == int(ys[-1]) - int(ys[0]) + 1, "%s buraco inesperado na série histórica" % g)
+        for y in ys:
+            conferir(pop_t.get((g, y), 0) > 0 and imi_t.get((g, y), 0) > 0 and emi_t.get((g, y), 0) > 0,
+                     "%s sem população ou fluxos em %s" % (g, y))
+        conferir(abs(imi_t[(g, "2024")] - flu[(g, "TOTAL")]) <= 1,
+                 "%s migr_imm8 2024 (%s) != migr_imm3ctb TOTAL (%s)" % (g, imi_t[(g, "2024")], flu[(g, "TOTAL")]))
+        anos_por_geo[g] = ys
         conferir(est[(g, "EU27_2020_FOR", "TOTAL")] + est[(g, "NEU27_2020_FOR", "TOTAL")] == est[(g, "FOR", "TOTAL")],
                  "%s estoque UE + fora UE != FOR" % g)
         conferir(sum(est[(g, "TOTAL", f)] for f in FAIXAS) == est[(g, "TOTAL", "TOTAL")],
@@ -139,12 +149,14 @@ def main():
         conferir(flu.get((g, "EU27_2020_FOR"), 0) + flu.get((g, "NEU27_2020_FOR"), 0) == flu[(g, "FOR")],
                  "%s fluxo UE + fora UE != FOR" % g)
 
-    # 1. fluxos em % da população de 2024
+    # 1. fluxos em % da população de 2024 e série histórica
     cats = [n for _, n in TERR]
-    im = {g: 100 * imi[g] / pop24[g] for g in geos}
-    em = {g: 100 * emi[g] / pop24[g] for g in geos}
+    im = {g: 100 * imi_t[(g, "2024")] / pop_t[(g, "2024")] for g in geos}
+    em = {g: 100 * emi_t[(g, "2024")] / pop_t[(g, "2024")] for g in geos}
     for g, n in TERR:
-        print("  %s: imigração %.2f%%, emigração %.2f%%, saldo %+.2f p.p." % (n, im[g], em[g], im[g] - em[g]))
+        ys = anos_por_geo[g]
+        print("  %s (%s–%s): imigração %.2f%%, emigração %.2f%%, saldo %+.2f p.p."
+              % (n, ys[0], ys[-1], im[g], em[g], im[g] - em[g]))
     g_fluxos = dict(id="migracao-fluxos", titulo="Imigração e emigração em % da população, 2024",
                     subtitulo="Entradas e saídas no ano, sobre a população em 1º de janeiro de 2024; saldo = "
                               "imigração menos emigração, em pontos percentuais",
@@ -156,6 +168,28 @@ def main():
                                  dados=[[str(i), round(em[g], 2)] for i, g in enumerate(geos)]),
                             dict(nome="Saldo", cor=VERDE, tipo="barra", valores=True,
                                  dados=[[str(i), round(im[g] - em[g], 2)] for i, g in enumerate(geos)])])
+
+    var_fluxos_tempo = []
+    for g, n in TERR:
+        ys = anos_por_geo[g]
+        im_s = {y: 100 * imi_t[(g, y)] / pop_t[(g, y)] for y in ys}
+        em_s = {y: 100 * emi_t[(g, y)] / pop_t[(g, y)] for y in ys}
+        conferir(abs(im_s["2024"] - im[g]) < 1e-9 and abs(em_s["2024"] - em[g]) < 1e-9,
+                 "%s 2024 histórico diverge do resumo" % g)
+        var_fluxos_tempo.append(dict(rot=n, series=[
+            dict(nome="Imigração", cor=AZUL, largura=4.5, rotulo=True,
+                 dados=[["%s-01" % y, round(im_s[y], 2)] for y in ys]),
+            dict(nome="Emigração", cor=VERMELHO, largura=4.5, rotulo=True,
+                 dados=[["%s-01" % y, round(em_s[y], 2)] for y in ys]),
+            dict(nome="Saldo", cor=VERDE, largura=5.5, rotulo=True,
+                 dados=[["%s-01" % y, round(im_s[y] - em_s[y], 2)] for y in ys])]))
+    g_fluxos_tempo = dict(id="migracao-fluxos-tempo",
+                          titulo="Imigração e emigração em % da população ao longo do tempo",
+                          subtitulo="Entradas e saídas anuais, sobre a população em 1º de janeiro; saldo = "
+                                    "imigração menos emigração, em pontos percentuais",
+                          unidade="%", buracoMax=12,
+                          fonte="Eurostat (migr_imm8, migr_emi2 e demo_pjan) e FtM",
+                          variantes=var_fluxos_tempo)
 
     # 2. estoque de nascidos no exterior em % da população de 2025
     pct = {b: {g: 100 * est[(g, b, "TOTAL")] / est[(g, "TOTAL", "TOTAL")] for g in geos}
@@ -249,7 +283,8 @@ def main():
     hoje = datetime.date.today().isoformat()
     doc = dict(assunto="Migração na Europa", grupo="Análises Variadas", fonte="Eurostat e FtM",
                referencia="2025-01", atualizado=hoje, formato="artigo",
-               secoes=[dict(titulo="Quem chega e quem sai", texto="", fontes=[], figuras=[], graficos=[g_fluxos]),
+               secoes=[dict(titulo="Quem chega e quem sai", texto="", fontes=[], figuras=[],
+                            graficos=[g_fluxos, g_fluxos_tempo]),
                        dict(titulo="Quantos nasceram fora", texto="", fontes=[], figuras=[], graficos=[g_estoque]),
                        dict(titulo="De onde vêm", texto="", fontes=[], figuras=[], graficos=[g_origens]),
                        dict(titulo="A idade de quem chega", texto="", fontes=[], figuras=[],
