@@ -15,6 +15,7 @@ No ar: <https://guivaraschinalves.github.io/ftm-analises/>
 | **Análise de Cenário: 28/10/26 - Decisão do FOMC** | `dados/cenario-2026-10-28-fomc.json` | FRED, BLS, Fed de San Francisco, ISM (investing.com), Tesouro (MTS e TIC), Census e BIS; `scripts/cenario_fomc.py`, rodado à mão |
 | **A defasagem dos combustíveis** | `dados/defasagem-combustiveis.json` | Montados a partir das planilhas de [`planilhas/`](planilhas/); `scripts/defasagem_combustiveis.py`, rodado à mão |
 | **Migração na Europa** | `dados/migracao-europa.json` | API JSON-stat do Eurostat (`demo_pjan`, `migr_imm8`, `migr_emi2`, `migr_pop3ctb`, `migr_imm3ctb`); `scripts/migracao_europa.py`, rodado à mão |
+| **Europa: trabalho, investimento e saída de capital** | `dados/europa-competitividade.json` | Penn World Table / Huberman e Minns via Our World in Data (`annual-working-hours-per-worker`), Banco Mundial (`NE.GDI.FTOT.ZS` cruzado com Eurostat `nama_10_gdp`), Henley & Partners (2025) e HMRC (`NONDOMTABLES.ods`); `scripts/europa_competitividade.py`, rodado à mão |
 
 O assunto **Petróleo, derivados e comércio exterior** junta, ainda sem texto,
 os gráficos de petróleo, derivados, contas externas e pauta do comércio exterior: `dados/petroleo.json`, montado por

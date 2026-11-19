@@ -77,7 +77,7 @@
   var FONTES = ["dados/gave.json", "dados/cenario-2026-11-08.json", "dados/cenario-2026-10-28-fomc.json",
                 "dados/defasagem-combustiveis.json", "dados/eleicoes.json", "dados/midterms-2026.json",
                 "dados/petroleo.json", "dados/ueno-bank.json", "dados/migracao-europa.json",
-                "dados/missao-global-miami.json"];
+                "dados/europa-competitividade.json", "dados/missao-global-miami.json"];
   // Uma página pode pedir outros arquivos: <body data-fontes="dados/x.json">.
   if (document.body && document.body.getAttribute("data-fontes")) {
     FONTES = document.body.getAttribute("data-fontes").split(/\s*,\s*/);
@@ -371,6 +371,10 @@
            valor: function (v) { return nf(0).format(v) + " mil"; } },
     h: { eixo: function (v, passo) { return nf(Math.max(1, casasDoPasso(passo))).format(v); },
          valor: function (v) { return nf(1).format(v) + " h"; } },
+    h0: { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
+          valor: function (v) { return nf(0).format(v) + " h"; } },
+    "int": { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
+             valor: function (v) { return nf(0).format(v); } },
     pp: { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
           valor: function (v) { return nf(2).format(v) + " p.p."; } },
     votos: { eixo: function (v, passo) { return nf(0).format(Math.abs(v)); },
