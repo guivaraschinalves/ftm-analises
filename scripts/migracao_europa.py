@@ -59,6 +59,7 @@ HMRC_ODS = "https://assets.publishing.service.gov.uk/media/6a5a3d5b5ca06bf11ccb4
 OCDE_PDB = "https://sdmx.oecd.org/public/rest/data/OECD.SDD.TPS,DSD_PDB@DF_PDB,2.0/"
 OCDE_MIG_EMP = "https://sdmx.oecd.org/public/rest/data/OECD.ELS.IMD,DSD_MIG@DF_MIG_NUP_SEX,1.0/"
 STATBANK_DK = "https://api.statbank.dk/v1/data"
+PWT_11 = "https://dataverse.nl/api/access/datafile/554105"
 UA = {"User-Agent": "ftm-analises"}
 UA_OCDE = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
            "Accept": "application/vnd.sdmx.data+csv;version=1.0.0"}
@@ -316,6 +317,78 @@ def carregar_ocde_blanchard():
             hp = 100.0 * (h / p) / (us_h / us_p)
             conferir(abs((gp / 100.0) - (gh / 100.0) * (hp / 100.0)) < 1e-6,
                      "identidade PIB/pessoa != PIB/hora * Horas/pessoa em %s %s" % (chave, yr))
+            out[chave][yr] = (gp, gh, hp)
+    return out
+
+
+def carregar_pwt11_blanchard():
+    """Puxa PWT 11.0 (cgdpo, pop, emp, avh) de 1970 a 2023 para EUA, EU-15 e França (EUA = 100)."""
+    eu15 = ["AUT", "BEL", "DNK", "FIN", "FRA", "DEU", "GRC", "IRL", "ITA", "LUX", "NLD", "PRT", "ESP", "SWE", "GBR"]
+    alvos = set(eu15) | {"USA"}
+    xlsx = baixar(PWT_11, headers={"User-Agent": "Mozilla/5.0"})
+    ns_m = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+    ns_r = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
+
+    def _col_idx(ref):
+        v = 0
+        for ch in ref:
+            if ch.isalpha():
+                v = v * 26 + (ord(ch) - 64)
+        return v - 1
+
+    raw = {}
+    with zipfile.ZipFile(io.BytesIO(xlsx)) as z:
+        ss = [
+            "".join(t.text or "" for t in si.iter(ns_m + "t"))
+            for si in ET.fromstring(z.read("xl/sharedStrings.xml"))
+        ]
+        wb_root = ET.fromstring(z.read("xl/workbook.xml"))
+        rels = ET.fromstring(z.read("xl/_rels/workbook.xml.rels"))
+        rmap = {r.attrib["Id"]: r.attrib["Target"] for r in rels}
+        target = next(
+            "xl/" + rmap[sh.attrib[ns_r + "id"]].lstrip("/")
+            for sh in wb_root.iter(ns_m + "sheet")
+            if sh.attrib["name"] == "Data"
+        )
+        hdr = {}
+        with z.open(target) as f:
+            for _, elem in ET.iterparse(f, events=("end",)):
+                if elem.tag == ns_m + "row":
+                    rv = {}
+                    for c in elem:
+                        v_el = c.find(ns_m + "v")
+                        if v_el is not None and v_el.text is not None:
+                            rv[_col_idx(c.attrib["r"])] = ss[int(v_el.text)] if c.attrib.get("t") == "s" else v_el.text
+                    if elem.attrib.get("r") == "1":
+                        hdr = {v: k for k, v in rv.items()}
+                    else:
+                        cc = rv.get(hdr["countrycode"])
+                        yr_s = rv.get(hdr["year"])
+                        if cc in alvos and yr_s and yr_s.isdigit() and 1970 <= int(yr_s) <= 2023:
+                            raw[(cc, yr_s)] = {
+                                k: float(rv[hdr[k]])
+                                for k in ("cgdpo", "pop", "emp", "avh")
+                                if k in hdr and hdr[k] in rv
+                            }
+                    elem.clear()
+
+    out = {"EU15": {}, "FRA": {}}
+    for y in range(1970, 2024):
+        yr = str(y)
+        for c in alvos:
+            conferir(all(k in raw.get((c, yr), {}) for k in ("cgdpo", "pop", "emp", "avh")),
+                     "PWT 11.0 incompleto para %s em %s" % (c, yr))
+        us = raw[("USA", yr)]
+        us_h = us["emp"] * us["avh"]
+        for chave, paises in [("EU15", eu15), ("FRA", ["FRA"])]:
+            g = sum(raw[(c, yr)]["cgdpo"] for c in paises)
+            p = sum(raw[(c, yr)]["pop"] for c in paises)
+            h = sum(raw[(c, yr)]["emp"] * raw[(c, yr)]["avh"] for c in paises)
+            gp = 100.0 * (g / p) / (us["cgdpo"] / us["pop"])
+            gh = 100.0 * (g / h) / (us["cgdpo"] / us_h)
+            hp = 100.0 * (h / p) / (us_h / us["pop"])
+            conferir(abs((gp / 100.0) - (gh / 100.0) * (hp / 100.0)) < 1e-6,
+                     "identidade PWT falhou em %s %s" % (chave, yr))
             out[chave][yr] = (gp, gh, hp)
     return out
 
@@ -1079,12 +1152,17 @@ def main():
     )
 
     hoje = datetime.date.today().isoformat()
-    # 6b. Produtividade e horas: Tabela de Blanchard estendida (OCDE, 2000 a 2025)
+    # 6b. Produtividade e horas: Tabela de Blanchard estendida (PWT 1970 a 2023 + OCDE 2000 a 2025)
     ocde_b = carregar_ocde_blanchard()
+    pwt_b = carregar_pwt11_blanchard()
+    print("  Blanchard PWT 1970 (EUA=100): EU-15 PIB/p=%.1f, PIB/h=%.1f, h/p=%.1f | FRA PIB/p=%.1f, PIB/h=%.1f, h/p=%.1f"
+          % (*pwt_b["EU15"]["1970"], *pwt_b["FRA"]["1970"]))
     print("  Blanchard OCDE 2025 (EUA=100): EU-15 PIB/p=%.1f, PIB/h=%.1f, h/p=%.1f | FRA PIB/p=%.1f, PIB/h=%.1f, h/p=%.1f"
           % (*ocde_b["EU15"]["2025"], *ocde_b["FRA"]["2025"]))
 
     def _linha_tab_blanchard(idx_m):
+        eu15_70_pwt = round(pwt_b["EU15"]["1970"][idx_m])
+        fra_70_pwt = round(pwt_b["FRA"]["1970"][idx_m])
         eu15_00 = round(ocde_b["EU15"]["2000"][idx_m])
         eu15_10 = round(ocde_b["EU15"]["2010"][idx_m])
         eu15_25 = round(ocde_b["EU15"]["2025"][idx_m])
@@ -1095,17 +1173,18 @@ def main():
         eu27_10 = round(ocde_b["EU27"]["2010"][idx_m])
         eu27_25 = round(ocde_b["EU27"]["2025"][idx_m])
         return [
-            [dict(t="EUA", forte=True), 100, 100, 100, 100, 100],
-            ["EU-15 (15 originais)", BLANCHARD_2004["EU15"]["1970"][idx_m],
+            [dict(t="EUA", forte=True), 100, 100, 100, 100, 100, 100],
+            ["EU-15 (15 originais)", BLANCHARD_2004["EU15"]["1970"][idx_m], eu15_70_pwt,
              BLANCHARD_2004["EU15"]["2000"][idx_m], eu15_00, eu15_10, dict(t=eu15_25, forte=True)],
-            ["França", BLANCHARD_2004["FRA"]["1970"][idx_m],
+            ["França", BLANCHARD_2004["FRA"]["1970"][idx_m], fra_70_pwt,
              BLANCHARD_2004["FRA"]["2000"][idx_m], fra_00, fra_10, dict(t=fra_25, forte=True)],
-            ["UE-27 (bloco atual)", None, None, eu27_00, eu27_10, eu27_25],
+            ["UE-27 (bloco atual)", None, None, None, eu27_00, eu27_10, eu27_25],
         ]
 
     cols_blanchard = [
         dict(rot="Região / País"),
         dict(rot="1970*", num=True),
+        dict(rot="1970 (PWT)", num=True),
         dict(rot="2000*", num=True),
         dict(rot="2000 (OCDE)", num=True),
         dict(rot="2010", num=True),
@@ -1115,8 +1194,8 @@ def main():
         id="migracao-blanchard-tabela",
         tipo="tabela",
         titulo="Tabela de Blanchard estendida: PIB por pessoa, por hora e horas por pessoa",
-        subtitulo="Índices em PPP corrente (EUA = 100); 1970* e 2000* de Blanchard (2004), 2000 a 2025 da OCDE",
-        fonte="Blanchard (2004, JEP), OCDE (Productivity database, DSD_PDB@DF_PDB) e FtM",
+        subtitulo="Índices em PPP corrente (EUA = 100); 1970* e 2000* de Blanchard (2004), 1970 (PWT 11.0) e 2000 a 2025 (OCDE)",
+        fonte="Blanchard (2004, JEP), Penn World Table 11.0, OCDE (DSD_PDB@DF_PDB) e FtM",
         variantes=[
             dict(rot="PIB por hora (produtividade)", colunas=cols_blanchard, linhas=_linha_tab_blanchard(1)),
             dict(rot="PIB por pessoa (per capita)", colunas=cols_blanchard, linhas=_linha_tab_blanchard(0)),
@@ -1124,32 +1203,56 @@ def main():
         ],
     )
     anos_b = [str(y) for y in range(2000, 2026)]
+    anos_pwt = [str(y) for y in range(1970, 2024)]
 
     def _serie_b(chave, idx_m, nome, cor, largura=4.5):
         return dict(nome=nome, cor=cor, largura=largura, rotulo=True,
                     dados=[["%s-01" % y, round(ocde_b[chave][y][idx_m], 1)] for y in anos_b])
 
+    def _serie_pwt(chave, idx_m, nome, cor, largura=4.5):
+        return dict(nome=nome, cor=cor, largura=largura, rotulo=True,
+                    dados=[["%s-01" % y, round(pwt_b[chave][y][idx_m], 1)] for y in anos_pwt])
+
     serie_eua_100 = dict(nome="EUA (base 100)", cor=BRANCO, largura=2.5, tracejada=True, rotulo=True,
                          dados=[["%s-01" % y, 100.0] for y in anos_b])
+    serie_eua_pwt = dict(nome="EUA (base 100)", cor=BRANCO, largura=2.5, tracejada=True, rotulo=True,
+                         dados=[["%s-01" % y, 100.0] for y in anos_pwt])
     g_blanchard_lin = dict(
         id="migracao-produtividade-blanchard",
-        titulo="Produtividade por hora, PIB por pessoa e horas: Europa vs EUA, 2000 a 2025",
-        subtitulo="Índice em PPP corrente (EUA = 100 em cada ano); horas europeias de 2024 e 2025 são estimativas da OCDE",
+        titulo="Produtividade por hora, PIB por pessoa e horas: Europa vs EUA, 1970 a 2025",
+        subtitulo="Índice em PPP corrente (EUA = 100 em cada ano); 1970 a 2023 pela PWT 11.0 e 2000 a 2025 pela OCDE",
         unidade="ind", buracoMax=15,
-        fonte="OCDE (Productivity database, DSD_PDB@DF_PDB) e FtM",
-        eventos=[dict(em="2008-01", rot="Crise 2008"), dict(em="2020-01", rot="Covid-19")],
+        fonte="Penn World Table 11.0, OCDE (DSD_PDB@DF_PDB) e FtM",
+        eventos=[
+            dict(em="1973-01", rot="Choque petróleo"),
+            dict(em="2000-01", rot="Blanchard 2000"),
+            dict(em="2008-01", rot="Crise 2008"),
+            dict(em="2020-01", rot="Covid-19"),
+        ],
         variantes=[
-            dict(rot="PIB por hora (EUA = 100)", eixo=dict(zero=False),
+            dict(rot="PIB por hora (1970 a 2023, PWT)", eixo=dict(zero=False),
+                 series=[serie_eua_pwt,
+                         _serie_pwt("FRA", 1, "França", AZUL),
+                         _serie_pwt("EU15", 1, "EU-15", VERMELHO)]),
+            dict(rot="PIB por pessoa (1970 a 2023, PWT)", eixo=dict(zero=False),
+                 series=[serie_eua_pwt,
+                         _serie_pwt("EU15", 0, "EU-15", VERMELHO),
+                         _serie_pwt("FRA", 0, "França", AZUL)]),
+            dict(rot="Horas por pessoa (1970 a 2023, PWT)", eixo=dict(zero=False),
+                 series=[serie_eua_pwt,
+                         _serie_pwt("EU15", 2, "EU-15", VERMELHO),
+                         _serie_pwt("FRA", 2, "França", AZUL)]),
+            dict(rot="PIB por hora (2000 a 2025, OCDE)", eixo=dict(zero=False),
                  series=[serie_eua_100,
                          _serie_b("FRA", 1, "França", AZUL),
                          _serie_b("EU15", 1, "EU-15", VERMELHO),
                          _serie_b("EU27", 1, "UE-27", VERDE, 3.5)]),
-            dict(rot="PIB por pessoa (EUA = 100)", eixo=dict(zero=False),
+            dict(rot="PIB por pessoa (2000 a 2025, OCDE)", eixo=dict(zero=False),
                  series=[serie_eua_100,
                          _serie_b("EU15", 0, "EU-15", VERMELHO),
                          _serie_b("EU27", 0, "UE-27", VERDE, 3.5),
                          _serie_b("FRA", 0, "França", AZUL)]),
-            dict(rot="Horas por pessoa (EUA = 100)", eixo=dict(zero=False),
+            dict(rot="Horas por pessoa (2000 a 2025, OCDE)", eixo=dict(zero=False),
                  series=[serie_eua_100,
                          _serie_b("EU27", 2, "UE-27", VERDE, 3.5),
                          _serie_b("EU15", 2, "EU-15", VERMELHO),
