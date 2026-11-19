@@ -60,6 +60,7 @@ OCDE_PDB = "https://sdmx.oecd.org/public/rest/data/OECD.SDD.TPS,DSD_PDB@DF_PDB,2
 OCDE_MIG_EMP = "https://sdmx.oecd.org/public/rest/data/OECD.ELS.IMD,DSD_MIG@DF_MIG_NUP_SEX,1.0/"
 STATBANK_DK = "https://api.statbank.dk/v1/data"
 PWT_11 = "https://dataverse.nl/api/access/datafile/554105"
+QOG_STD = "https://www.qogdata.pol.gu.se/data/qog_std_cs_jan24.csv"
 UA = {"User-Agent": "ftm-analises"}
 UA_OCDE = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
            "Accept": "application/vnd.sdmx.data+csv;version=1.0.0"}
@@ -463,6 +464,45 @@ def carregar_dinamarca_van66():
     conferir(out["2001"]["asilo"] + out["2001"]["familia"] > out["2004"]["asilo"] + out["2004"]["familia"] * 2,
              "queda pós-Starthjælp não confirmada em VAN66")
     return out
+
+
+def carregar_diversidade_tributos():
+    """Diversidade étnica (Alesina/QoG), nascidos no exterior (ONU 2024) e carga tributária/PIB na OCDE."""
+    oecd = {
+        "AUS": "Austrália", "AUT": "Áustria", "BEL": "Bélgica", "CAN": "Canadá", "CHL": "Chile",
+        "COL": "Colômbia", "CRI": "Costa Rica", "CZE": "Tchéquia", "DNK": "Dinamarca", "EST": "Estônia",
+        "FIN": "Finlândia", "FRA": "França", "DEU": "Alemanha", "GRC": "Grécia", "HUN": "Hungria",
+        "ISL": "Islândia", "IRL": "Irlanda", "ISR": "Israel", "ITA": "Itália", "JPN": "Japão",
+        "KOR": "Coreia do Sul", "LVA": "Letônia", "LTU": "Lituânia", "LUX": "Luxemburgo", "MEX": "México",
+        "NLD": "Países Baixos", "NZL": "Nova Zelândia", "NOR": "Noruega", "POL": "Polônia", "PRT": "Portugal",
+        "SVK": "Eslováquia", "SVN": "Eslovênia", "ESP": "Espanha", "SWE": "Suécia", "CHE": "Suíça",
+        "TUR": "Turquia", "GBR": "Reino Unido", "USA": "EUA",
+    }
+    qog_txt = baixar(QOG_STD, headers={"User-Agent": "Mozilla/5.0"}).decode("utf-8", errors="ignore")
+    eth = {
+        r["ccodealp"]: float(r["al_ethnic2000"])
+        for r in csv.DictReader(io.StringIO(qog_txt))
+        if r.get("ccodealp") in oecd and r.get("al_ethnic2000", "").strip()
+    }
+    tax_txt = baixar(OWID + "total-tax-revenues-gdp.csv?v=1&csvType=full&useColumnShortNames=true", headers=UA).decode("utf-8")
+    tax = {}
+    for r in csv.DictReader(io.StringIO(tax_txt)):
+        c, v, y = r.get("code", ""), r.get("tax_inc_sc", "").strip(), r.get("year", "").strip()
+        if c in oecd and v and y.isdigit():
+            yi = int(y)
+            if yi >= 2020 and (c not in tax or yi > tax[c][0]):
+                tax[c] = (yi, float(v))
+
+    mig_txt = baixar(OWID + "migrant-stock-share.csv?v=1&csvType=full&useColumnShortNames=true", headers=UA).decode("utf-8")
+    mig = {}
+    for r in csv.DictReader(io.StringIO(mig_txt)):
+        c, v, y = r.get("code", ""), r.get("immigrant_share_of_dest_population_all", "").strip(), r.get("year", "").strip()
+        if c in oecd and v and y == "2024":
+            mig[c] = float(v)
+
+    conferir(len(eth) == 38 and len(tax) == 38 and len(mig) == 38,
+             "OCDE incompleta em diversidade/tributos: eth=%d tax=%d mig=%d" % (len(eth), len(tax), len(mig)))
+    return [(c, oecd[c], eth[c], mig[c], tax[c][1], tax[c][0]) for c in sorted(oecd)]
 
 
 ANOS_EXTRA = ["2020", "2021", "2022", "2023", "2024"]
@@ -1399,8 +1439,58 @@ def main():
         ],
     )
 
+    div_rows = carregar_diversidade_tributos()
+    dest_div = {"USA", "FRA", "DEU", "ITA", "ESP", "GBR", "DNK", "SWE", "CHE", "JPN", "KOR", "CAN"}
+    pts_eth = [
+        dict(
+            x=round(eth, 3), y=round(tax_v, 1), rot=c,
+            cor=VERMELHO if c in dest_div else AZUL,
+            destaque=(c in dest_div),
+            dica="%s: fracionalização étnica %.3f; carga tributária %.1f%% do PIB (%d)" % (nome, eth, tax_v, tax_y),
+        )
+        for c, nome, eth, _, tax_v, tax_y in div_rows
+    ]
+    pts_mig = [
+        dict(
+            x=round(mig_v, 1), y=round(tax_v, 1), rot=c,
+            cor=VERMELHO if c in dest_div else AZUL,
+            destaque=(c in dest_div),
+            dica="%s: nascidos no exterior %.1f%% (2024); carga tributária %.1f%% do PIB (%d)" % (nome, mig_v, tax_v, tax_y),
+        )
+        for c, nome, _, mig_v, tax_v, tax_y in div_rows
+    ]
+    a_et, b_et, r_et, x0_et, x1_et = _ols(pts_eth)
+    a_mg, b_mg, r_mg, x0_mg, x1_mg = _ols(pts_mig)
+    conferir(r_et < -0.20 and r_mg > 0.15, "correlações diversidade x tributos inesperadas: r_eth=%.2f r_mig=%.2f" % (r_et, r_mg))
+    print("  Diversidade x Tributos (OCDE n=38): r_étnica=%.2f | r_imigração=%.2f" % (r_et, r_mg))
+
+    g_diversidade_tax = dict(
+        id="migracao-diversidade-carga-tributaria",
+        tipo="dispersao",
+        titulo="Diversidade e carga tributária em % do PIB na OCDE (38 países)",
+        subtitulo="Índice de fracionalização étnica de Alesina (0 a 1) e fatia de nascidos no exterior (2024) vs carga tributária total (% do PIB, 2022 a 2023)",
+        fonte="QoG (Alesina et al., 2003), ONU DESA (2024) e UNU-WIDER GRD (via OWID) e FtM",
+        legenda=[
+            dict(rot="Demais países da OCDE", cor=AZUL),
+            dict(rot="Principais destacados", cor=VERMELHO),
+            dict(rot="Tendência linear", cor="linha:" + BRANCO),
+        ],
+        variantes=[
+            dict(rot="Diversidade étnica histórica (Alesina, r=%s)" % ("%+.2f" % r_et).replace(".", ","),
+                 eixoX=dict(unidade="n2", rot="Índice de fracionalização étnica (0 = homogêneo, 1 = diverso)"),
+                 eixoY=dict(unidade="pct1", rot="Carga tributária + contribuições (% do PIB)"),
+                 pontos=pts_eth,
+                 reta=dict(a=round(a_et, 4), b=round(b_et, 4), de=round(x0_et, 3), ate=round(x1_et, 3), cor=BRANCO)),
+            dict(rot="Nascidos no exterior (ONU 2024, r=%s)" % ("%+.2f" % r_mg).replace(".", ","),
+                 eixoX=dict(unidade="pct1", rot="População nascida no exterior (%, 2024)"),
+                 eixoY=dict(unidade="pct1", rot="Carga tributária + contribuições (% do PIB)"),
+                 pontos=pts_mig,
+                 reta=dict(a=round(a_mg, 4), b=round(b_mg, 4), de=round(x0_mg, 1), ate=round(x1_mg, 1), cor=BRANCO)),
+        ],
+    )
+
     doc = dict(assunto="Migração na Europa", grupo="Análises Variadas",
-               fonte="Eurostat, OCDE, Statistics Denmark, ONU (via OWID), Penn World Table, Banco Mundial, Henley & Partners, HMRC e FtM",
+               fonte="Eurostat, OCDE, Statistics Denmark, ONU (via OWID), UNU-WIDER, QoG (Alesina), Penn World Table 11.0, Banco Mundial, Henley & Partners, HMRC e FtM",
                referencia="2025-12", atualizado=hoje, formato="artigo",
                secoes=[dict(titulo="Quem chega e quem sai", texto="", fontes=[], figuras=[],
                             graficos=[g_fluxos, g_fluxos_tempo, g_fluxos_tempo_qtd, g_fluxos_fora, g_fluxos_fora_qtd]),
@@ -1417,7 +1507,7 @@ def main():
                        dict(titulo="Saídas fiscais e de milionários", texto="", fontes=[], figuras=[],
                             graficos=[g_milionarios, g_nondom]),
                        dict(titulo="O ímã do bem-estar: seleção e Dinamarca", texto="", fontes=[], figuras=[],
-                            graficos=[g_ima_disp, g_ima_emp_ocde, g_dinamarca])])
+                            graficos=[g_ima_disp, g_ima_emp_ocde, g_dinamarca, g_diversidade_tax])])
     with open(SAIDA, "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
         f.write("\n")
