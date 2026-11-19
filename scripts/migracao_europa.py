@@ -40,6 +40,7 @@ import csv
 import datetime
 import io
 import json
+import math
 import os
 import re
 import sys
@@ -55,7 +56,19 @@ OWID = "https://ourworldindata.org/grapher/"
 WB_GFCF = "https://api.worldbank.org/v2/en/indicator/NE.GDI.FTOT.ZS?downloadformat=csv"
 HENLEY_2025 = "https://www.henleyglobal.com/newsroom/press-releases/henley-private-wealth-migration-report-2025"
 HMRC_ODS = "https://assets.publishing.service.gov.uk/media/6a5a3d5b5ca06bf11ccb43fe/NONDOMTABLES.ods"
+OCDE_PDB = "https://sdmx.oecd.org/public/rest/data/OECD.SDD.TPS,DSD_PDB@DF_PDB,2.0/"
+OCDE_MIG_EMP = "https://sdmx.oecd.org/public/rest/data/OECD.ELS.IMD,DSD_MIG@DF_MIG_NUP_SEX,1.0/"
+STATBANK_DK = "https://api.statbank.dk/v1/data"
 UA = {"User-Agent": "ftm-analises"}
+UA_OCDE = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
+           "Accept": "application/vnd.sdmx.data+csv;version=1.0.0"}
+
+# Tabela 1 de Olivier Blanchard, "The Economic Future of Europe" (JEP, 2004), EUA = 100.
+# Valores históricos publicados (fixos, 19/11/2026).
+BLANCHARD_2004 = {
+    "EU15": {"1970": (69, 65, 101), "2000": (70, 91, 77)},
+    "FRA": {"1970": (73, 73, 99), "2000": (71, 105, 67)},
+}
 
 AZUL, VERMELHO, VERDE = "#4F81BD", "#C0504D", "#9BBB59"
 AZUL_CLARO, LARANJA, AMARELO, BRANCO = "#8EB4E3", "#F79646", "#FFFF00", "#FFFFFF"
@@ -266,6 +279,117 @@ def carregar_hmrc_nondom():
         if len(r) >= 3 and r[0] == "1" and re.fullmatch(r"\d{4}", r[1]):
             chegadas[r[1]] = int(r[2].replace(",", ""))
     return todos, resid, chegadas
+
+
+def carregar_ocde_blanchard():
+    """Puxa GDP (PPP corrente), POP e HRSTO de 2000 a 2025 na OCDE (EUA = 100)."""
+    eu15 = ["AUT", "BEL", "DNK", "FIN", "FRA", "DEU", "GRC", "IRL", "ITA", "LUX", "NLD", "PRT", "ESP", "SWE", "GBR"]
+    areas = "+".join(["USA", "EU27_2020"] + eu15)
+    url = (OCDE_PDB + areas
+           + ".A.GDP+POP+HRSTO._T..V+_Z.N._Z.?startPeriod=2000&endPeriod=2025")
+    txt = baixar(url, headers=UA_OCDE).decode("utf-8")
+    raw = {}
+    for row in csv.DictReader(io.StringIO(txt)):
+        m = row["MEASURE"]
+        if m == "GDP" and not (row["UNIT_MEASURE"] == "USD_PPP" and row["PRICE_BASE"] == "V"
+                               and row["CONVERSION_TYPE"] == "PPP"):
+            continue
+        if m == "POP" and row["UNIT_MEASURE"] != "PS":
+            continue
+        if m == "HRSTO" and row["UNIT_MEASURE"] != "H":
+            continue
+        if row.get("OBS_VALUE", "").strip():
+            raw[(row["REF_AREA"], row["TIME_PERIOD"], m)] = float(row["OBS_VALUE"])
+
+    out = {"EU15": {}, "FRA": {}, "EU27": {}}
+    for y in range(2000, 2026):
+        yr = str(y)
+        us_g = raw[("USA", yr, "GDP")]
+        us_p = raw[("USA", yr, "POP")]
+        us_h = raw[("USA", yr, "HRSTO")]
+        for chave, paises in [("EU15", eu15), ("FRA", ["FRA"]), ("EU27", ["EU27_2020"])]:
+            g = sum(raw[(c, yr, "GDP")] for c in paises)
+            p = sum(raw[(c, yr, "POP")] for c in paises)
+            h = sum(raw[(c, yr, "HRSTO")] for c in paises)
+            gp = 100.0 * (g / p) / (us_g / us_p)
+            gh = 100.0 * (g / h) / (us_g / us_h)
+            hp = 100.0 * (h / p) / (us_h / us_p)
+            conferir(abs((gp / 100.0) - (gh / 100.0) * (hp / 100.0)) < 1e-6,
+                     "identidade PIB/pessoa != PIB/hora * Horas/pessoa em %s %s" % (chave, yr))
+            out[chave][yr] = (gp, gh, hp)
+    return out
+
+
+def carregar_ocde_emprego_mig():
+    """Taxa de emprego (15 a 64 anos) de nativos vs nascidos no exterior na OCDE (2025)."""
+    paises = [
+        ("IRL", "Irlanda"), ("PRT", "Portugal"), ("USA", "EUA"), ("ITA", "Itália"),
+        ("GBR", "Reino Unido"), ("AUS", "Austrália"), ("CAN", "Canadá"), ("ESP", "Espanha"),
+        ("DNK", "Dinamarca"), ("BEL", "Bélgica"), ("FRA", "França"), ("SWE", "Suécia"),
+        ("DEU", "Alemanha"), ("FIN", "Finlândia"), ("NLD", "Países Baixos"),
+    ]
+    areas = "+".join(c for c, _ in paises)
+    url = OCDE_MIG_EMP + areas + "._Z.A.EMP_WAP._T.NB+FB._Z.PT_WAP_SUB?startPeriod=2025&endPeriod=2025"
+    txt = baixar(url, headers=UA_OCDE).decode("utf-8")
+    vals = {}
+    for row in csv.DictReader(io.StringIO(txt)):
+        if row.get("OBS_VALUE", "").strip():
+            vals[(row["REF_AREA"], row["BIRTH_PLACE"])] = float(row["OBS_VALUE"])
+    out = []
+    for c, nome in paises:
+        conferir((c, "NB") in vals and (c, "FB") in vals, "OCDE emprego 2025 ausente para %s" % c)
+        nb, fb = vals[(c, "NB")], vals[(c, "FB")]
+        conferir(30.0 < nb < 95.0 and 30.0 < fb < 95.0, "OCDE emprego suspeito para %s" % c)
+        out.append((c, nome, nb, fb, fb - nb))
+    out.sort(key=lambda item: -item[4])
+    return out
+
+
+def carregar_dinamarca_van66():
+    """Autorizações de residência anuais por motivo na Dinamarca (StatBank VAN66, 1997 a 2025)."""
+    payload = json.dumps({
+        "table": "VAN66",
+        "format": "CSV",
+        "lang": "en",
+        "variables": [{"code": "OPHOLD", "values": ["*"]}, {"code": "Tid", "values": ["*"]}],
+    }).encode("utf-8")
+    req = urllib.request.Request(STATBANK_DK, data=payload,
+                                 headers={"Content-Type": "application/json", "User-Agent": "ftm-analises"})
+    ultimo = None
+    for i in range(4):
+        try:
+            with urllib.request.urlopen(req, timeout=60) as r:
+                txt = r.read().decode("utf-8-sig")
+            break
+        except Exception as e:
+            ultimo = e
+            time.sleep(2 * (i + 1))
+    else:
+        raise RuntimeError("não deu para baixar VAN66: %s" % ultimo)
+
+    out = {}
+    for row in csv.DictReader(io.StringIO(txt), delimiter=";"):
+        yr = row["TID"].strip()
+        oph = row["OPHOLD"].strip()
+        v = int(row["INDHOLD"]) if row["INDHOLD"].strip().isdigit() else 0
+        d = out.setdefault(yr, {"asilo": 0, "familia": 0, "trabalho": 0, "eu": 0, "ucrania": 0, "total": 0})
+        d["total"] += v
+        if "Asylum" in oph:
+            d["asilo"] += v
+        elif "Family reunification" in oph:
+            d["familia"] += v
+        elif oph == "Work" or oph.startswith("Work"):
+            d["trabalho"] += v
+        elif "EU/EEA" in oph:
+            d["eu"] += v
+        elif "Ukraine" in oph:
+            d["ucrania"] += v
+    anos = sorted(out.keys(), key=int)
+    conferir(anos[0] == "1997" and int(anos[-1]) >= 2025, "VAN66 período inesperado: %s..%s" % (anos[0], anos[-1]))
+    conferir(len(anos) == int(anos[-1]) - int(anos[0]) + 1, "buraco em VAN66")
+    conferir(out["2001"]["asilo"] + out["2001"]["familia"] > out["2004"]["asilo"] + out["2004"]["familia"] * 2,
+             "queda pós-Starthjælp não confirmada em VAN66")
+    return out
 
 
 ANOS_EXTRA = ["2020", "2021", "2022", "2023", "2024"]
@@ -955,8 +1079,225 @@ def main():
     )
 
     hoje = datetime.date.today().isoformat()
+    # 6b. Produtividade e horas: Tabela de Blanchard estendida (OCDE, 2000 a 2025)
+    ocde_b = carregar_ocde_blanchard()
+    print("  Blanchard OCDE 2025 (EUA=100): EU-15 PIB/p=%.1f, PIB/h=%.1f, h/p=%.1f | FRA PIB/p=%.1f, PIB/h=%.1f, h/p=%.1f"
+          % (*ocde_b["EU15"]["2025"], *ocde_b["FRA"]["2025"]))
+
+    def _linha_tab_blanchard(idx_m):
+        eu15_00 = round(ocde_b["EU15"]["2000"][idx_m])
+        eu15_10 = round(ocde_b["EU15"]["2010"][idx_m])
+        eu15_25 = round(ocde_b["EU15"]["2025"][idx_m])
+        fra_00 = round(ocde_b["FRA"]["2000"][idx_m])
+        fra_10 = round(ocde_b["FRA"]["2010"][idx_m])
+        fra_25 = round(ocde_b["FRA"]["2025"][idx_m])
+        eu27_00 = round(ocde_b["EU27"]["2000"][idx_m])
+        eu27_10 = round(ocde_b["EU27"]["2010"][idx_m])
+        eu27_25 = round(ocde_b["EU27"]["2025"][idx_m])
+        return [
+            [dict(t="EUA", forte=True), 100, 100, 100, 100, 100],
+            ["EU-15 (15 originais)", BLANCHARD_2004["EU15"]["1970"][idx_m],
+             BLANCHARD_2004["EU15"]["2000"][idx_m], eu15_00, eu15_10, dict(t=eu15_25, forte=True)],
+            ["França", BLANCHARD_2004["FRA"]["1970"][idx_m],
+             BLANCHARD_2004["FRA"]["2000"][idx_m], fra_00, fra_10, dict(t=fra_25, forte=True)],
+            ["UE-27 (bloco atual)", None, None, eu27_00, eu27_10, eu27_25],
+        ]
+
+    cols_blanchard = [
+        dict(rot="Região / País"),
+        dict(rot="1970*", num=True),
+        dict(rot="2000*", num=True),
+        dict(rot="2000 (OCDE)", num=True),
+        dict(rot="2010", num=True),
+        dict(rot="2025", num=True),
+    ]
+    g_blanchard_tab = dict(
+        id="migracao-blanchard-tabela",
+        tipo="tabela",
+        titulo="Tabela de Blanchard estendida: PIB por pessoa, por hora e horas por pessoa",
+        subtitulo="Índices em PPP corrente (EUA = 100); 1970* e 2000* de Blanchard (2004), 2000 a 2025 da OCDE",
+        fonte="Blanchard (2004, JEP), OCDE (Productivity database, DSD_PDB@DF_PDB) e FtM",
+        variantes=[
+            dict(rot="PIB por hora (produtividade)", colunas=cols_blanchard, linhas=_linha_tab_blanchard(1)),
+            dict(rot="PIB por pessoa (per capita)", colunas=cols_blanchard, linhas=_linha_tab_blanchard(0)),
+            dict(rot="Horas por pessoa", colunas=cols_blanchard, linhas=_linha_tab_blanchard(2)),
+        ],
+    )
+    anos_b = [str(y) for y in range(2000, 2026)]
+
+    def _serie_b(chave, idx_m, nome, cor, largura=4.5):
+        return dict(nome=nome, cor=cor, largura=largura, rotulo=True,
+                    dados=[["%s-01" % y, round(ocde_b[chave][y][idx_m], 1)] for y in anos_b])
+
+    serie_eua_100 = dict(nome="EUA (base 100)", cor=BRANCO, largura=2.5, tracejada=True, rotulo=True,
+                         dados=[["%s-01" % y, 100.0] for y in anos_b])
+    g_blanchard_lin = dict(
+        id="migracao-produtividade-blanchard",
+        titulo="Produtividade por hora, PIB por pessoa e horas: Europa vs EUA, 2000 a 2025",
+        subtitulo="Índice em PPP corrente (EUA = 100 em cada ano); horas europeias de 2024 e 2025 são estimativas da OCDE",
+        unidade="ind", buracoMax=15,
+        fonte="OCDE (Productivity database, DSD_PDB@DF_PDB) e FtM",
+        eventos=[dict(em="2008-01", rot="Crise 2008"), dict(em="2020-01", rot="Covid-19")],
+        variantes=[
+            dict(rot="PIB por hora (EUA = 100)", eixo=dict(zero=False),
+                 series=[serie_eua_100,
+                         _serie_b("FRA", 1, "França", AZUL),
+                         _serie_b("EU15", 1, "EU-15", VERMELHO),
+                         _serie_b("EU27", 1, "UE-27", VERDE, 3.5)]),
+            dict(rot="PIB por pessoa (EUA = 100)", eixo=dict(zero=False),
+                 series=[serie_eua_100,
+                         _serie_b("EU15", 0, "EU-15", VERMELHO),
+                         _serie_b("EU27", 0, "UE-27", VERDE, 3.5),
+                         _serie_b("FRA", 0, "França", AZUL)]),
+            dict(rot="Horas por pessoa (EUA = 100)", eixo=dict(zero=False),
+                 series=[serie_eua_100,
+                         _serie_b("EU27", 2, "UE-27", VERDE, 3.5),
+                         _serie_b("EU15", 2, "EU-15", VERMELHO),
+                         _serie_b("FRA", 2, "França", AZUL)]),
+        ],
+    )
+
+    # 9. O ímã do bem-estar: seleção na Europa/OCDE e experimento da Dinamarca
+    spr24, lbl_spr = eurostat("tps00098", ["geo"], unit="PC_GDP", spdeps="TOTAL", time="2024")
+    edu25, _ = eurostat("edat_lfs_9912", ["geo", "c_birth"], sex="T", age="Y25-64", unit="PC",
+                        isced11="ED0-2", c_birth=["NAT", "NEU27_2020_FOR"], time="2025")
+    emp25, _ = eurostat("lfsa_ergacob", ["geo", "c_birth"], sex="T", age="Y20-64", unit="PC",
+                        c_birth=["NAT", "NEU27_2020_FOR"], time="2025")
+    destaques = {"DE", "FR", "ES", "IT", "DK", "SE", "PT"}
+    nomes_geo_pt = {
+        "AT": "Áustria", "BE": "Bélgica", "BG": "Bulgária", "CH": "Suíça", "CY": "Chipre",
+        "CZ": "Tchéquia", "DE": "Alemanha", "DK": "Dinamarca", "EE": "Estônia", "EL": "Grécia",
+        "ES": "Espanha", "FI": "Finlândia", "FR": "França", "HR": "Croácia", "HU": "Hungria",
+        "IE": "Irlanda", "IS": "Islândia", "IT": "Itália", "LT": "Lituânia", "LU": "Luxemburgo",
+        "LV": "Letônia", "MT": "Malta", "NL": "Países Baixos", "NO": "Noruega", "PL": "Polônia",
+        "PT": "Portugal", "RO": "Romênia", "SE": "Suécia", "SI": "Eslovênia", "SK": "Eslováquia",
+        "RS": "Sérvia", "ME": "Montenegro",
+    }
+
+    def _ols(pts):
+        xs = [p["x"] for p in pts]
+        ys = [p["y"] for p in pts]
+        mx, my = sum(xs) / len(xs), sum(ys) / len(ys)
+        b = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / sum((x - mx) ** 2 for x in xs)
+        a = my - b * mx
+        r = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / math.sqrt(
+            sum((x - mx) ** 2 for x in xs) * sum((y - my) ** 2 for y in ys))
+        return a, b, r, min(xs), max(xs)
+
+    pts_edu, pts_emp = [], []
+    for g in sorted(spr24):
+        if len(g) != 2 or g in ("EA", "EU"):
+            continue
+        x = spr24[g]
+        nome_g = nomes_geo_pt.get(g, lbl_spr.get("geo", {}).get(g, g))
+        cor_g = VERMELHO if g in destaques else AZUL
+        if (g, "NAT") in edu25 and (g, "NEU27_2020_FOR") in edu25:
+            diff_edu = edu25[(g, "NEU27_2020_FOR")] - edu25[(g, "NAT")]
+            pts_edu.append(dict(
+                x=round(x, 1), y=round(diff_edu, 1), rot=g, cor=cor_g,
+                destaque=(g in destaques),
+                dica="%s: proteção social %.1f%% do PIB; baixa escolaridade fora da UE %.1f%% vs nativos %.1f%% (%+.1f p.p.)"
+                     % (nome_g, x, edu25[(g, "NEU27_2020_FOR")], edu25[(g, "NAT")], diff_edu),
+            ))
+        if (g, "NAT") in emp25 and (g, "NEU27_2020_FOR") in emp25:
+            diff_emp = emp25[(g, "NEU27_2020_FOR")] - emp25[(g, "NAT")]
+            pts_emp.append(dict(
+                x=round(x, 1), y=round(diff_emp, 1), rot=g, cor=cor_g,
+                destaque=(g in destaques),
+                dica="%s: proteção social %.1f%% do PIB; emprego fora da UE %.1f%% vs nativos %.1f%% (%+.1f p.p.)"
+                     % (nome_g, x, emp25[(g, "NEU27_2020_FOR")], emp25[(g, "NAT")], diff_emp),
+            ))
+
+    conferir(len(pts_edu) >= 25 and len(pts_emp) >= 28, "amostra europeia pequena em dispersão")
+    a_ed, b_ed, r_ed, x0_ed, x1_ed = _ols(pts_edu)
+    a_em, b_em, r_em, x0_em, x1_em = _ols(pts_emp)
+    conferir(r_ed > 0.5 and r_em < -0.25, "correlações fora do esperado (r_edu=%.2f, r_emp=%.2f)" % (r_ed, r_em))
+    print("  Dispersão Eurostat: n_edu=%d r=%.2f | n_emp=%d r=%.2f" % (len(pts_edu), r_ed, len(pts_emp), r_em))
+
+    g_ima_disp = dict(
+        id="migracao-ima-selecao-europa",
+        tipo="dispersao",
+        titulo="Proteção social vs escolaridade e emprego de nascidos fora da UE, 2024 e 2025",
+        subtitulo="Gasto em proteção social (% do PIB, 2024) vs diferença fora da UE menos nativos (p.p., 2025)",
+        fonte="Eurostat (tps00098, edat_lfs_9912 e lfsa_ergacob) e FtM",
+        legenda=[
+            dict(rot="Países europeus", cor=AZUL),
+            dict(rot="Principais acompanhados", cor=VERMELHO),
+            dict(rot="Tendência linear", cor="linha:" + BRANCO),
+        ],
+        variantes=[
+            dict(rot="Baixa escolaridade: fora da UE menos nativos (2025, r=+0,72)",
+                 eixoX=dict(unidade="pct1", rot="Gasto em proteção social (% do PIB, 2024)"),
+                 eixoY=dict(unidade="pp", rot="Diferença na baixa escolaridade (p.p.)"),
+                 pontos=pts_edu,
+                 reta=dict(a=round(a_ed, 4), b=round(b_ed, 4), de=round(x0_ed, 1), ate=round(x1_ed, 1), cor=BRANCO)),
+            dict(rot="Taxa de emprego: fora da UE menos nativos (2025, r=-0,41)",
+                 eixoX=dict(unidade="pct1", rot="Gasto em proteção social (% do PIB, 2024)"),
+                 eixoY=dict(unidade="pp", rot="Diferença na taxa de emprego (p.p.)"),
+                 pontos=pts_emp,
+                 reta=dict(a=round(a_em, 4), b=round(b_em, 4), de=round(x0_em, 1), ate=round(x1_em, 1), cor=BRANCO)),
+        ],
+    )
+
+    emp_ocde = carregar_ocde_emprego_mig()
+    print("  OCDE emprego 2025:", ", ".join("%s %+.1f p.p." % (n, g) for _, n, _, _, g in emp_ocde[:4] + emp_ocde[-3:]))
+    g_ima_emp_ocde = dict(
+        id="migracao-emprego-nativos-imigrantes",
+        titulo="Taxa de emprego de nativos e nascidos no exterior (OCDE, 2025)",
+        subtitulo="População de 15 a 64 anos empregada (%); ordenado pela diferença entre imigrantes e nativos",
+        unidade="pct1",
+        categorias=[nome for _, nome, _, _, _ in emp_ocde],
+        agrupadas=True,
+        barra=0.78,
+        fonte="OCDE (International Migration Database, DSD_MIG@DF_MIG_NUP_SEX)",
+        series=[
+            dict(nome="Nativos", cor=AZUL, tipo="barra", valores=True,
+                 dados=[[str(i), round(nb, 1)] for i, (_, _, nb, _, _) in enumerate(emp_ocde)]),
+            dict(nome="Nascidos no exterior", cor=VERMELHO, tipo="barra", valores=True,
+                 dados=[[str(i), round(fb, 1)] for i, (_, _, _, fb, _) in enumerate(emp_ocde)]),
+        ],
+    )
+
+    dk = carregar_dinamarca_van66()
+    anos_dk = sorted(dk.keys(), key=int)
+    print("  Dinamarca VAN66 (%s): asilo=%d, família=%d, trabalho=%d, UE=%d, Ucrânia=%d"
+          % (anos_dk[-1], dk[anos_dk[-1]]["asilo"], dk[anos_dk[-1]]["familia"],
+             dk[anos_dk[-1]]["trabalho"], dk[anos_dk[-1]]["eu"], dk[anos_dk[-1]]["ucrania"]))
+    g_dinamarca = dict(
+        id="migracao-dinamarca-experimento",
+        titulo="Dinamarca: autorizações de residência por motivo, 1997 a 2025",
+        subtitulo="Registros anuais; marcos das reformas do benefício assistencial a não europeus (Agersnap, Jensen e Kleven, 2020)",
+        unidade="int", buracoMax=15,
+        fonte="Statistics Denmark (StatBank VAN66) e Agersnap, Jensen e Kleven (2020)",
+        eventos=[
+            dict(em="2002-01", rot="Corte 50%"),
+            dict(em="2012-01", rot="Revogação"),
+            dict(em="2015-01", rot="Reintrodução"),
+        ],
+        variantes=[
+            dict(rot="Asilo e família vs trabalho e UE (1997 a 2025)",
+                 series=[
+                     dict(nome="Asilo e reagrupamento familiar", cor=VERMELHO, largura=4.5, rotulo=True,
+                          dados=[["%s-01" % y, dk[y]["asilo"] + dk[y]["familia"]] for y in anos_dk]),
+                     dict(nome="Trabalho (fora da UE/EEE)", cor=AZUL, largura=4.5, rotulo=True,
+                          dados=[["%s-01" % y, dk[y]["trabalho"]] for y in anos_dk]),
+                     dict(nome="UE e EEE", cor=VERDE, largura=3.5, rotulo=True,
+                          dados=[["%s-01" % y, dk[y]["eu"]] for y in anos_dk]),
+                 ]),
+            dict(rot="Abertura humanitária e Ucrânia (1997 a 2025)",
+                 series=[
+                     dict(nome="Asilo", cor=VERMELHO, largura=4.5, rotulo=True,
+                          dados=[["%s-01" % y, dk[y]["asilo"]] for y in anos_dk]),
+                     dict(nome="Reagrupamento familiar", cor=AZUL, largura=4.5, rotulo=True,
+                          dados=[["%s-01" % y, dk[y]["familia"]] for y in anos_dk]),
+                     dict(nome="Ucrânia (Lei Especial, 2022 a 2025)", cor=AMARELO, largura=3.5, rotulo=True,
+                          dados=[["%s-01" % y, dk[y]["ucrania"]] for y in anos_dk if dk[y]["ucrania"] > 0]),
+                 ]),
+        ],
+    )
+
     doc = dict(assunto="Migração na Europa", grupo="Análises Variadas",
-               fonte="Eurostat, ONU (via OWID), Penn World Table, Banco Mundial, Henley & Partners, HMRC e FtM",
+               fonte="Eurostat, OCDE, Statistics Denmark, ONU (via OWID), Penn World Table, Banco Mundial, Henley & Partners, HMRC e FtM",
                referencia="2025-12", atualizado=hoje, formato="artigo",
                secoes=[dict(titulo="Quem chega e quem sai", texto="", fontes=[], figuras=[],
                             graficos=[g_fluxos, g_fluxos_tempo, g_fluxos_tempo_qtd, g_fluxos_fora, g_fluxos_fora_qtd]),
@@ -967,10 +1308,13 @@ def main():
                             graficos=[g_idade, g_idade_qtd, g_media, g_piramide, g_piramide_qtd]),
                        dict(titulo="Crescimento com e sem migração", texto="", fontes=[], figuras=[],
                             graficos=[g_cresc_hist, g_cresc_extra, g_cresc_extra_qtd]),
-                       dict(titulo="Horas trabalhadas", texto="", fontes=[], figuras=[], graficos=[g_horas]),
+                       dict(titulo="Horas trabalhadas", texto="", fontes=[], figuras=[],
+                            graficos=[g_horas, g_blanchard_tab, g_blanchard_lin]),
                        dict(titulo="Investimento (FBCF / PIB)", texto="", fontes=[], figuras=[], graficos=[g_fbcf]),
                        dict(titulo="Saídas fiscais e de milionários", texto="", fontes=[], figuras=[],
-                            graficos=[g_milionarios, g_nondom])])
+                            graficos=[g_milionarios, g_nondom]),
+                       dict(titulo="O ímã do bem-estar: seleção e Dinamarca", texto="", fontes=[], figuras=[],
+                            graficos=[g_ima_disp, g_ima_emp_ocde, g_dinamarca])])
     with open(SAIDA, "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
         f.write("\n")
