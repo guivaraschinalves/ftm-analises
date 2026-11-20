@@ -14,6 +14,8 @@
 
 ## Investimento (FBCF / PIB)
 
+## Participação no PIB mundial e renda per capita relativa
+
 ## Saídas fiscais e de milionários
 
 ## O ímã do bem-estar: seleção e Dinamarca
