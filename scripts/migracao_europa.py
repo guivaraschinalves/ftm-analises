@@ -57,10 +57,14 @@ WB_GFCF = "https://api.worldbank.org/v2/en/indicator/NE.GDI.FTOT.ZS?downloadform
 WB_GDP_PPP = "https://api.worldbank.org/v2/en/indicator/NY.GDP.MKTP.PP.CD?downloadformat=csv"
 WB_GDPCAP_PPP = "https://api.worldbank.org/v2/en/indicator/NY.GDP.PCAP.PP.CD?downloadformat=csv"
 WB_GDPCAP_USD = "https://api.worldbank.org/v2/en/indicator/NY.GDP.PCAP.CD?downloadformat=csv"
+WB_GDP_USD = "https://api.worldbank.org/v2/en/indicator/NY.GDP.MKTP.CD?downloadformat=csv"
+WB_POP = "https://api.worldbank.org/v2/en/indicator/SP.POP.TOTL?downloadformat=csv"
 UE15 = ["AUT", "BEL", "DNK", "FIN", "FRA", "DEU", "GRC", "IRL", "ITA", "LUX", "NLD", "PRT", "ESP", "SWE", "GBR"]
 UE27_ISO3 = ["AUT", "BEL", "BGR", "HRV", "CYP", "CZE", "DNK", "EST", "FIN", "FRA", "DEU", "GRC",
              "HUN", "IRL", "ITA", "LVA", "LTU", "LUX", "MLT", "NLD", "POL", "PRT", "ROU", "SVK",
              "SVN", "ESP", "SWE"]
+NORDICOS = ["SWE", "DNK", "NOR", "FIN"]
+CONT_OCID = ["DEU", "FRA", "ITA", "NLD", "BEL", "AUT"]
 HENLEY_2025 = "https://www.henleyglobal.com/newsroom/press-releases/henley-private-wealth-migration-report-2025"
 HMRC_ODS = "https://assets.publishing.service.gov.uk/media/6a5a3d5b5ca06bf11ccb43fe/NONDOMTABLES.ods"
 OCDE_PDB = "https://sdmx.oecd.org/public/rest/data/OECD.SDD.TPS,DSD_PDB@DF_PDB,2.0/"
@@ -109,13 +113,13 @@ NOMES = {"UA": "Ucrânia", "SY": "Síria", "TR": "Turquia", "RO": "Romênia", "I
          "CH": "Suíça", "SI": "Eslovênia", "CY": "Chipre", "MT": "Malta", "EE": "Estônia"}
 
 
-def baixar(url, headers=None, tentativas=4):
+def baixar(url, headers=None, tentativas=4, timeout=120):
     """Baixa uma URL usando apenas biblioteca padrão, com retentativas."""
     ultimo = None
     for i in range(tentativas):
         try:
             req = urllib.request.Request(url, headers=headers or {})
-            with urllib.request.urlopen(req, timeout=120) as r:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
                 return r.read()
         except Exception as e:                               # noqa: BLE001
             ultimo = e
@@ -219,10 +223,11 @@ def carregar_wb_pib_ppp():
     """Retorna participação no PIB mundial em PPP (1990-2025) e PIB per capita relativo aos EUA."""
     anos_ppp = [str(y) for y in range(1990, 2026)]
     anos_usd = [str(y) for y in range(1960, 2026)]
-    cods_world = sorted(set(["WLD", "EUU", "USA", "CHN"] + UE15 + UE27_ISO3))
+    cods_world = sorted(set(["WLD", "EUU", "USA", "CHN"] + UE15 + UE27_ISO3 + NORDICOS))
     pib_ppp = _carregar_wb_zip(WB_GDP_PPP, "API_NY.GDP.MKTP.PP.CD", cods_world, 1990, 2025)
 
-    part = {"UE15": [], "UE27": [], "USA": [], "CHN": [], "GBR": []}
+    part = {"UE15": [], "UE27": [], "USA": [], "CHN": [], "GBR": [], "NORD": [],
+            "SWE": [], "DNK": [], "NOR": [], "FIN": []}
     for y in anos_ppp:
         wld = pib_ppp["WLD"][y]
         s15 = sum(pib_ppp[c][y] for c in UE15) / wld * 100.0
@@ -234,25 +239,46 @@ def carregar_wb_pib_ppp():
         part["USA"].append((y, pib_ppp["USA"][y] / wld * 100.0))
         part["CHN"].append((y, pib_ppp["CHN"][y] / wld * 100.0))
         part["GBR"].append((y, pib_ppp["GBR"][y] / wld * 100.0))
+        part["NORD"].append((y, sum(pib_ppp[c][y] for c in NORDICOS) / wld * 100.0))
+        for c in NORDICOS:
+            part[c].append((y, pib_ppp[c][y] / wld * 100.0))
 
     conferir(20.0 < part["UE15"][0][1] < 23.0 and 12.0 < part["UE15"][-1][1] < 15.0,
              "UE-15 PPP/PIB mundial fora do esperado: 1990=%.2f 2025=%.2f" % (part["UE15"][0][1], part["UE15"][-1][1]))
     conferir(13.0 < part["USA"][-1][1] < 16.0, "EUA PPP/PIB mundial 2025 inesperado: %.2f" % part["USA"][-1][1])
+    conferir(0.9 < part["NORD"][-1][1] < 1.6 and part["NORD"][0][1] > part["NORD"][-1][1],
+             "Nórdicos PPP/PIB mundial fora do esperado: 1990=%.2f 2025=%.2f" % (part["NORD"][0][1], part["NORD"][-1][1]))
 
-    paises_pc = ["USA", "GBR", "FRA", "ITA", "KOR", "CHN"]
+    paises_pc = sorted(set(["USA", "GBR", "FRA", "ITA", "KOR", "CHN"] + NORDICOS))
+    paises_agg = sorted(set(CONT_OCID))
     pc_ppp_raw = _carregar_wb_zip(WB_GDPCAP_PPP, "API_NY.GDP.PCAP.PP.CD", paises_pc, 1990, 2025)
     pc_usd_raw = _carregar_wb_zip(WB_GDPCAP_USD, "API_NY.GDP.PCAP.CD", paises_pc, 1960, 2025)
+    pib_usd = _carregar_wb_zip(WB_GDP_USD, "API_NY.GDP.MKTP.CD", paises_agg, 1960, 2025)
+    pop_raw = _carregar_wb_zip(WB_POP, "API_SP.POP.TOTL", paises_agg, 1960, 2025)
 
     rel_ppp = {c: [(y, pc_ppp_raw[c][y] / pc_ppp_raw["USA"][y] * 100.0) for y in anos_ppp]
                for c in paises_pc if c != "USA"}
     rel_usd = {c: [(y, pc_usd_raw[c][y] / pc_usd_raw["USA"][y] * 100.0) for y in anos_usd]
                for c in paises_pc if c != "USA"}
+    rel_ppp["CONT"] = [
+        (y, (sum(pib_ppp[c][y] for c in CONT_OCID) / sum(pop_raw[c][y] for c in CONT_OCID))
+         / pc_ppp_raw["USA"][y] * 100.0)
+        for y in anos_ppp
+    ]
+    rel_usd["CONT"] = [
+        (y, (sum(pib_usd[c][y] for c in CONT_OCID) / sum(pop_raw[c][y] for c in CONT_OCID))
+         / pc_usd_raw["USA"][y] * 100.0)
+        for y in anos_usd
+    ]
 
-    for c in ("GBR", "FRA", "ITA", "KOR", "CHN"):
+    for c in ("GBR", "FRA", "ITA", "KOR", "CHN", "SWE", "DNK", "NOR", "FIN", "CONT"):
         conferir(len(rel_ppp[c]) == len(anos_ppp) and len(rel_usd[c]) == len(anos_usd),
                  "série incompleta de PIB per capita para %s" % c)
     conferir(rel_ppp["KOR"][0][1] < 40.0 and rel_ppp["KOR"][-1][1] > 65.0,
              "Coreia do Sul PPP/EUA inesperado: 1990=%.1f 2025=%.1f" % (rel_ppp["KOR"][0][1], rel_ppp["KOR"][-1][1]))
+    conferir(rel_ppp["NOR"][-1][1] > 100.0 and 70.0 < rel_ppp["CONT"][-1][1] < 85.0,
+             "Escandinavos/Europa Continental PPP/EUA inesperado: NOR=%.1f CONT=%.1f"
+             % (rel_ppp["NOR"][-1][1], rel_ppp["CONT"][-1][1]))
     return part, rel_ppp, rel_usd
 
 
@@ -378,11 +404,35 @@ def carregar_ocde_blanchard():
     return out
 
 
+def _pwt_fallback_json():
+    """Reaproveita PWT 11.0 (1970-2023) já gravada em dados/migracao-europa.json se dataverse.nl estiver fora."""
+    with open(SAIDA, "r", encoding="utf-8") as f:
+        doc = json.load(f)
+    g = next(x for s in doc["secoes"] for x in s["graficos"] if x["id"] == "migracao-produtividade-blanchard")
+    vmap = {v["rot"]: {sr["nome"]: {d[0][:4]: float(d[1]) for d in sr["dados"]} for sr in v["series"]} for v in g["variantes"]}
+    out = {"EU15": {}, "FRA": {}}
+    for y in range(1970, 2024):
+        yr = str(y)
+        for ch, nome in (("EU15", "EU-15"), ("FRA", "França")):
+            out[ch][yr] = (
+                vmap["PIB por pessoa (1970 a 2023, PWT)"][nome][yr],
+                vmap["PIB por hora (1970 a 2023, PWT)"][nome][yr],
+                vmap["Horas por pessoa (1970 a 2023, PWT)"][nome][yr],
+            )
+    return out
+
+
 def carregar_pwt11_blanchard():
     """Puxa PWT 11.0 (cgdpo, pop, emp, avh) de 1970 a 2023 para EUA, EU-15 e França (EUA = 100)."""
     eu15 = ["AUT", "BEL", "DNK", "FIN", "FRA", "DEU", "GRC", "IRL", "ITA", "LUX", "NLD", "PRT", "ESP", "SWE", "GBR"]
     alvos = set(eu15) | {"USA"}
-    xlsx = baixar(PWT_11, headers={"User-Agent": "Mozilla/5.0"})
+    try:
+        xlsx = baixar(PWT_11, headers={"User-Agent": "Mozilla/5.0"}, tentativas=2, timeout=20)
+    except RuntimeError as e:
+        if os.path.exists(SAIDA):
+            print("  AVISO PWT 11.0 (%s): usando séries PWT já gravadas em %s" % (e, SAIDA))
+            return _pwt_fallback_json()
+        raise
     ns_m = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
     ns_r = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
 
@@ -1187,14 +1237,21 @@ def main():
     )
 
     part_ppp, rel_ppp, rel_usd = carregar_wb_pib_ppp()
-    print("  PIB mundial PPP (2025): UE-15 %.2f%%, UE-27 %.2f%%, EUA %.2f%%, China %.2f%%"
-          % (part_ppp["UE15"][-1][1], part_ppp["UE27"][-1][1], part_ppp["USA"][-1][1], part_ppp["CHN"][-1][1]))
+    print("  PIB mundial PPP (2025): UE-15 %.2f%%, UE-27 %.2f%%, EUA %.2f%%, China %.2f%%, Nórdicos %.2f%% (SWE %.2f%%, NOR %.2f%%, DNK %.2f%%, FIN %.2f%%)"
+          % (part_ppp["UE15"][-1][1], part_ppp["UE27"][-1][1], part_ppp["USA"][-1][1], part_ppp["CHN"][-1][1],
+             part_ppp["NORD"][-1][1], part_ppp["SWE"][-1][1], part_ppp["NOR"][-1][1], part_ppp["DNK"][-1][1], part_ppp["FIN"][-1][1]))
     print("  PIB/hab EUA=100 (2025, PPC | US$): GBR %.1f|%.1f, FRA %.1f|%.1f, ITA %.1f|%.1f, KOR %.1f|%.1f, CHN %.1f|%.1f"
           % (rel_ppp["GBR"][-1][1], rel_usd["GBR"][-1][1],
              rel_ppp["FRA"][-1][1], rel_usd["FRA"][-1][1],
              rel_ppp["ITA"][-1][1], rel_usd["ITA"][-1][1],
              rel_ppp["KOR"][-1][1], rel_usd["KOR"][-1][1],
              rel_ppp["CHN"][-1][1], rel_usd["CHN"][-1][1]))
+    print("  PIB/hab Nórdicos vs Continental (2025, PPC | US$): NOR %.1f|%.1f, DNK %.1f|%.1f, SWE %.1f|%.1f, FIN %.1f|%.1f, CONT %.1f|%.1f"
+          % (rel_ppp["NOR"][-1][1], rel_usd["NOR"][-1][1],
+             rel_ppp["DNK"][-1][1], rel_usd["DNK"][-1][1],
+             rel_ppp["SWE"][-1][1], rel_usd["SWE"][-1][1],
+             rel_ppp["FIN"][-1][1], rel_usd["FIN"][-1][1],
+             rel_ppp["CONT"][-1][1], rel_usd["CONT"][-1][1]))
 
     def _s_wb(pts, nome, cor, largura=4.5, tracejada=False):
         s = dict(nome=nome, cor=cor, largura=largura, rotulo=True,
@@ -1207,26 +1264,37 @@ def main():
         return dict(nome="EUA (base 100)", cor=BRANCO, largura=2.5, tracejada=True, rotulo=True,
                     dados=[["%s-01" % y, 100.0] for y, _ in pts_ref])
 
-    def _var_rel_eua(rot, mapa, min_ano=None):
+    grupos_rel = {
+        "principais": [
+            ("GBR", "Reino Unido", VERMELHO, 4.5),
+            ("FRA", "França", AZUL, 4.5),
+            ("KOR", "Coreia do Sul", AMARELO, 4.0),
+            ("ITA", "Itália", AZUL_CLARO, 4.5),
+            ("CHN", "China", VERDE, 3.5),
+        ],
+        "nordicos": [
+            ("NOR", "Noruega", AZUL_CLARO, 4.0),
+            ("DNK", "Dinamarca", AMARELO, 4.0),
+            ("SWE", "Suécia", AZUL, 4.5),
+            ("CONT", "Europa Ocidental Continental", VERMELHO, 5.0),
+            ("FIN", "Finlândia", VERDE, 3.5),
+        ],
+    }
+
+    def _var_rel_eua(rot, mapa, grupo="principais", min_ano=None):
         def _flt(cc):
             return [(y, v) for y, v in mapa[cc] if min_ano is None or int(y) >= min_ano]
-        ref = _flt("GBR")
+        specs = grupos_rel[grupo]
+        ref = _flt(specs[0][0])
         return dict(
             rot=rot, eixo=dict(zero=False),
-            series=[
-                _s_eua100(ref),
-                _s_wb(_flt("GBR"), "Reino Unido", VERMELHO),
-                _s_wb(_flt("FRA"), "França", AZUL),
-                _s_wb(_flt("KOR"), "Coreia do Sul", AMARELO, 4.0),
-                _s_wb(_flt("ITA"), "Itália", AZUL_CLARO),
-                _s_wb(_flt("CHN"), "China", VERDE, 3.5),
-            ],
+            series=[_s_eua100(ref)] + [_s_wb(_flt(cc), nome, cor, larg) for cc, nome, cor, larg in specs],
         )
 
     g_pib_mundial_ppp = dict(
         id="migracao-pib-mundial-ppp",
-        titulo="Participação no PIB mundial em PPC (PPP): UE-15, UE-27 e EUA, 1990 a 2025",
-        subtitulo="Fatia do PIB mundial em paridade de poder de compra corrente (%)",
+        titulo="Participação no PIB mundial em PPC (PPP): UE-15, UE-27, Nórdicos e EUA, 1990 a 2025",
+        subtitulo="Fatia do PIB mundial em paridade de poder de compra corrente (%); Nórdicos = Suécia, Dinamarca, Noruega e Finlândia",
         unidade="pct1", buracoMax=15,
         fonte="Banco Mundial (WDI, NY.GDP.MKTP.PP.CD) e FtM",
         eventos=[dict(em="2008-01", rot="Crise 2008"), dict(em="2020-01", rot="Covid-19")],
@@ -1237,28 +1305,40 @@ def main():
                      _s_wb(part_ppp["USA"], "Estados Unidos", VERMELHO),
                      _s_wb(part_ppp["UE27"], "UE-27 (bloco atual)", BRANCO, 3.5),
                  ]),
-            dict(rot="Com China e Reino Unido (1990 a 2025)", eixo=dict(zero=False),
+            dict(rot="Com China, Reino Unido e Nórdicos (1990 a 2025)", eixo=dict(zero=False),
                  series=[
                      _s_wb(part_ppp["CHN"], "China", AMARELO),
                      _s_wb(part_ppp["USA"], "Estados Unidos", VERMELHO),
                      _s_wb(part_ppp["UE27"], "UE-27 (bloco atual)", BRANCO, 3.5),
                      _s_wb(part_ppp["UE15"], "UE-15 (15 primeiros membros)", AZUL, 5.0),
                      _s_wb(part_ppp["GBR"], "Reino Unido", VERDE, 3.5),
+                     _s_wb(part_ppp["NORD"], "Nórdicos (4 países)", AZUL_CLARO, 3.5),
+                 ]),
+            dict(rot="Escandinavos / Nórdicos (1990 a 2025)", unidade="%", eixo=dict(zero=False),
+                 series=[
+                     _s_wb(part_ppp["NORD"], "Total Nórdicos (4 países)", BRANCO, 5.0),
+                     _s_wb(part_ppp["SWE"], "Suécia", AZUL, 4.5),
+                     _s_wb(part_ppp["NOR"], "Noruega", VERMELHO, 4.5),
+                     _s_wb(part_ppp["DNK"], "Dinamarca", AMARELO, 4.0),
+                     _s_wb(part_ppp["FIN"], "Finlândia", VERDE, 3.5),
                  ]),
         ],
     )
 
     g_pib_pc_eua = dict(
         id="migracao-pib-pc-relativo-eua",
-        titulo="PIB per capita relativo aos EUA (EUA = 100): Europa, Coreia do Sul e China",
-        subtitulo="Comparação em paridade de poder de compra (PPC, 1990 a 2025) e em US$ correntes (1960 a 2025)",
+        titulo="PIB per capita relativo aos EUA (EUA = 100): Europa, Nórdicos, Coreia do Sul e China",
+        subtitulo="PPC (1990 a 2025) e US$ correntes (1960 a 2025); Europa Ocidental Continental = Alemanha, França, Itália, Países Baixos, Bélgica e Áustria",
         unidade="ind", buracoMax=15,
-        fonte="Banco Mundial (WDI, NY.GDP.PCAP.PP.CD e NY.GDP.PCAP.CD) e FtM",
+        fonte="Banco Mundial (WDI, NY.GDP.PCAP.PP.CD, NY.GDP.PCAP.CD e SP.POP.TOTL) e FtM",
         eventos=[dict(em="2008-01", rot="Crise 2008"), dict(em="2020-01", rot="Covid-19")],
         variantes=[
-            _var_rel_eua("PPC / PPP corrente (1990 a 2025)", rel_ppp),
-            _var_rel_eua("US$ correntes / câmbio (1990 a 2025)", rel_usd, min_ano=1990),
-            _var_rel_eua("US$ correntes / câmbio (1960 a 2025)", rel_usd),
+            _var_rel_eua("PPC: UK, França, Itália, Coreia e China (1990 a 2025)", rel_ppp, "principais"),
+            _var_rel_eua("US$: UK, França, Itália, Coreia e China (1990 a 2025)", rel_usd, "principais", min_ano=1990),
+            _var_rel_eua("US$: UK, França, Itália, Coreia e China (1960 a 2025)", rel_usd, "principais"),
+            _var_rel_eua("PPC: Escandinavos vs Europa Continental (1990 a 2025)", rel_ppp, "nordicos"),
+            _var_rel_eua("US$: Escandinavos vs Europa Continental (1990 a 2025)", rel_usd, "nordicos", min_ano=1990),
+            _var_rel_eua("US$: Escandinavos vs Europa Continental (1960 a 2025)", rel_usd, "nordicos"),
         ],
     )
 
