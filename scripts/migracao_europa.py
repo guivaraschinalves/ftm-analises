@@ -53,7 +53,8 @@ RAIZ = os.path.join(os.path.dirname(__file__), "..")
 SAIDA = os.path.join(RAIZ, "dados", "migracao-europa.json")
 API = "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/"
 OWID = "https://ourworldindata.org/grapher/"
-WB_GFCF = "https://api.worldbank.org/v2/en/indicator/NE.GDI.FTOT.ZS?downloadformat=csv"
+OCDE_VC = "https://sdmx.oecd.org/public/rest/data/OECD.SDD.TPS,DSD_VC@DF_VC_INV,1.0/all?startPeriod=2007&endPeriod=2025"
+CB_UNICORNS = "https://www.cbinsights.com/research-unicorn-companies"
 WB_GDP_PPP = "https://api.worldbank.org/v2/en/indicator/NY.GDP.MKTP.PP.CD?downloadformat=csv"
 WB_GDPCAP_PPP = "https://api.worldbank.org/v2/en/indicator/NY.GDP.PCAP.PP.CD?downloadformat=csv"
 WB_GDPCAP_USD = "https://api.worldbank.org/v2/en/indicator/NY.GDP.PCAP.CD?downloadformat=csv"
@@ -72,6 +73,8 @@ OCDE_MIG_EMP = "https://sdmx.oecd.org/public/rest/data/OECD.ELS.IMD,DSD_MIG@DF_M
 STATBANK_DK = "https://api.statbank.dk/v1/data"
 PWT_11 = "https://dataverse.nl/api/access/datafile/554105"
 QOG_STD = "https://www.qogdata.pol.gu.se/data/qog_std_cs_jan24.csv"
+ENTA_ESA = "https://zenodo.org/api/records/24141615/files/ENTA_esa.zip/content"
+ENTA_UNITS = "https://zenodo.org/api/records/24141615/files/ENTA_units.csv/content"
 UA = {"User-Agent": "ftm-analises"}
 UA_OCDE = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
            "Accept": "application/vnd.sdmx.data+csv;version=1.0.0"}
@@ -84,7 +87,7 @@ BLANCHARD_2004 = {
 }
 
 AZUL, VERMELHO, VERDE = "#4F81BD", "#C0504D", "#9BBB59"
-AZUL_CLARO, LARANJA, AMARELO, BRANCO = "#8EB4E3", "#F79646", "#FFFF00", "#FFFFFF"
+AZUL_ESCURO, AZUL_CLARO, VINHO, LARANJA, AMARELO, BRANCO = "#1F497D", "#8EB4E3", "#632523", "#F79646", "#FFFF00", "#FFFFFF"
 
 TERR = [("EU27_2020", "UE-27"), ("DE", "Alemanha"), ("FR", "França"), ("IT", "Itália"), ("ES", "Espanha")]
 UE = ["BE", "BG", "CZ", "DK", "DE", "EE", "IE", "EL", "ES", "FR", "HR", "IT", "CY", "LV", "LT", "LU", "HU", "MT",
@@ -212,11 +215,112 @@ def _carregar_wb_zip(url, prefixo, codigos, ano_ini, ano_fim):
     return out
 
 
-def carregar_wb_fbcf():
-    """Retorna {iso3: [(year_str, float), ...]} de 1970 a 2025."""
-    cods = ["EUU", "DEU", "FRA", "ITA", "ESP", "GBR", "USA", "CAN", "JPN", "KOR"]
-    bruto = _carregar_wb_zip(WB_GFCF, "API_NE.GDI.FTOT.ZS", cods, 1970, 2025)
-    return {cc: sorted(bruto[cc].items(), key=lambda kv: int(kv[0])) for cc in cods if cc in bruto}
+def carregar_vc_ocde():
+    """Retorna VC total (% PIB e US$ bi) de 2007 a 2025 via OCDE DSD_VC@DF_VC_INV."""
+    txt = baixar(OCDE_VC, headers=UA_OCDE).decode("utf-8")
+    pct_raw, usd_raw = {}, {}
+    for row in csv.DictReader(io.StringIO(txt)):
+        if row.get("BUSINESS_DEVELOPMENT_STAGE") != "_T":
+            continue
+        val_s = (row.get("OBS_VALUE") or "").strip()
+        if not val_s:
+            continue
+        cc, yr, unit = row["REF_AREA"], row["TIME_PERIOD"], row["UNIT_MEASURE"]
+        val = float(val_s)
+        if unit == "PT_B1GQ":
+            pct_raw.setdefault(cc, {})[yr] = val
+        elif unit == "USD_EXC":
+            usd_raw.setdefault(cc, {})[yr] = val / 1000.0
+    for cc in ("USA", "GBR", "FRA", "DEU", "SWE", "KOR", "ITA", "ESP", "NLD", "DNK", "FIN"):
+        conferir(len(pct_raw.get(cc, {})) == 19 and len(usd_raw.get(cc, {})) == 19,
+                 "série incompleta de VC OCDE para %s" % cc)
+    conferir(pct_raw["USA"]["2025"] > 0.5 and usd_raw["USA"]["2025"] > 150.0,
+             "VC EUA 2025 inesperado: %.3f%% / US$ %.1f bi" % (pct_raw["USA"]["2025"], usd_raw["USA"]["2025"]))
+    return pct_raw, usd_raw
+
+
+def carregar_unicornios():
+    """Baixa tabela ao vivo da CB Insights (unicórnios ativos) e agrega por país, UE-27 e ano de entrada."""
+    html = baixar(CB_UNICORNS, headers={"User-Agent": "Mozilla/5.0"}).decode("utf-8", errors="ignore")
+    trs = re.findall(r"<tr>(.*?)</tr>", html, re.S)[1:]
+    ue27_nomes = {
+        "Austria", "Belgium", "Bulgaria", "Croatia", "Cyprus", "Czech Republic", "Czechia",
+        "Denmark", "Estonia", "Finland", "France", "Germany", "Greece", "Hungary", "Ireland",
+        "Italy", "Latvia", "Lithuania", "Luxembourg", "Malta", "Netherlands", "Poland",
+        "Portugal", "Romania", "Slovakia", "Slovenia", "Spain", "Sweden",
+    }
+    qtd_pais, val_pais, por_ano = {}, {}, {}
+    total = 0
+    for row in trs:
+        cols = [re.sub(r"<[^>]+>", "", c).strip() for c in re.findall(r"<td[^>]*>(.*?)</td>", row, re.S)]
+        if len(cols) < 4:
+            continue
+        val_s = cols[1].replace("$", "").replace(",", "").strip()
+        val = float(val_s) if val_s else 0.0
+        dt = cols[2]
+        yr = dt.split("/")[-1] if "/" in dt else ""
+        ctry = cols[3]
+        total += 1
+        qtd_pais[ctry] = qtd_pais.get(ctry, 0) + 1
+        val_pais[ctry] = val_pais.get(ctry, 0.0) + val
+        grp = "UE27" if ctry in ue27_nomes else ctry
+        if yr.isdigit():
+            por_ano[(ctry, yr)] = por_ano.get((ctry, yr), 0) + 1
+            if grp == "UE27":
+                por_ano[("UE27", yr)] = por_ano.get(("UE27", yr), 0) + 1
+    conferir(total > 1200 and qtd_pais.get("United States", 0) > 700 and qtd_pais.get("China", 0) > 120,
+             "CB Insights contagem inesperada: total=%d EUA=%d" % (total, qtd_pais.get("United States", 0)))
+    qtd_ue27 = sum(qtd_pais.get(c, 0) for c in ue27_nomes)
+    val_ue27 = sum(val_pais.get(c, 0.0) for c in ue27_nomes)
+    conferir(qtd_ue27 > 100 and qtd_pais.get("United Kingdom", 0) > 50,
+             "CB Insights Europa inesperado: UE27=%d UK=%d" % (qtd_ue27, qtd_pais.get("United Kingdom", 0)))
+    return qtd_pais, val_pais, por_ano, qtd_ue27, val_ue27, total
+
+
+def carregar_enta_etaria():
+    """Retorna perfis fiscais por faixa etária (em mil EUR constantes de 2020/ano) via ENTA 2.0.1."""
+    u_txt = baixar(ENTA_UNITS, headers=UA).decode("utf-8")
+    units = {(r["CNT2"], r["YEAR"]): r for r in csv.DictReader(io.StringIO(u_txt))}
+    zbytes = baixar(ENTA_ESA, headers=UA)
+    paises = ("FR", "DE", "IT", "ES")
+    anos_alvo = ("2008", "2023")
+    inds = {"POP", "T", "TYEM", "TB", "TYA", "TCON", "TX", "BSPEN", "BSFAM", "BSU", "BSX", "CGH"}
+    bruto = {}
+    with zipfile.ZipFile(io.BytesIO(zbytes)) as z:
+        fn = [n for n in z.namelist() if n.endswith(".csv")][0]
+        with z.open(fn) as f:
+            for r in csv.DictReader(io.TextIOWrapper(f, encoding="utf-8")):
+                if r["CNT2"] in paises and r["YEAR"] in anos_alvo and r["SEX"] == "Total" and r["IND"] in inds:
+                    bruto[(r["CNT2"], r["YEAR"], r["IND"], int(r["AGE"]))] = float(r["VALUE"])
+
+    faixas = [("25-34", 25, 34), ("35-44", 35, 44), ("45-54", 45, 54), ("55-64", 55, 64),
+              ("65-74", 65, 74), ("75-79", 75, 79), ("80+", 80, 80)]
+    out = {}
+    for c in paises:
+        for yr in anos_alvo:
+            u = units[(c, yr)]
+            fac = float(u["EXR_NAC_EUR"]) / (float(u["HICP"]) / 100.0) / float(u["EXR_2020"]) / 1000.0
+            res = []
+            for rot, a0, a1 in faixas:
+                pop = sum(bruto.get((c, yr, "POP", a), 0.0) for a in range(a0, a1 + 1))
+                conferir(pop > 0, "ENTA POP zero para %s %s %s" % (c, yr, rot))
+                def _med(ind):
+                    return sum(bruto.get((c, yr, ind, a), 0.0) * bruto.get((c, yr, "POP", a), 0.0)
+                               for a in range(a0, a1 + 1)) / pop * fac
+                t_dir = _med("TYEM") + _med("TB") + _med("TYA")
+                t_con = _med("TCON") + _med("TX")
+                t_tot = _med("T")
+                conferir(abs((t_dir + t_con) - t_tot) < 0.05,
+                         "ENTA T não fecha para %s %s %s: %.2f vs %.2f" % (c, yr, rot, t_dir + t_con, t_tot))
+                pen = _med("BSPEN")
+                oth = _med("BSFAM") + _med("BSU") + _med("BSX")
+                hlt = _med("CGH")
+                net = (t_dir + t_con) - (pen + oth + hlt)
+                res.append(dict(rot=rot, dir=t_dir, con=t_con, pen=-pen, oth=-oth, hlt=-hlt, net=net))
+            conferir(res[2]["net"] > 5.0 and res[4]["net"] < -5.0 and res[6]["net"] < -10.0,
+                     "ENTA padrão etário inesperado em %s %s" % (c, yr))
+            out[(c, yr)] = res
+    return out, [f[0] for f in faixas]
 
 
 def carregar_wb_pib_ppp():
@@ -1230,66 +1334,120 @@ def main():
         ],
     )
 
-    # 7. FBCF / PIB (Europa vs outros desenvolvidos, 1970–2025)
-    fbcf = carregar_wb_fbcf()
-    eur_24, _ = eurostat("nama_10_gdp", ["geo"], geo=geos, na_item="P51G", unit="PC_GDP", time="2024")
-    for wb_c, eu_c in [("EUU", "EU27_2020"), ("DEU", "DE"), ("FRA", "FR"), ("ITA", "IT"), ("ESP", "ES")]:
-        wb_24 = dict(fbcf[wb_c])["2024"]
-        conferir(abs(wb_24 - eur_24[eu_c]) <= 0.25,
-                 "FBCF/PIB 2024 %s WB (%.2f) != Eurostat (%.2f)" % (wb_c, wb_24, eur_24[eu_c]))
-    paises_f = [
-        ("KOR", "Coreia do Sul", False),
-        ("JPN", "Japão", False),
-        ("CAN", "Canadá", False),
-        ("FRA", "França", True),
-        ("ITA", "Itália", True),
-        ("USA", "Estados Unidos", False),
-        ("EUU", "UE-27", True),
-        ("ESP", "Espanha", True),
-        ("DEU", "Alemanha", True),
-        ("GBR", "Reino Unido", True),
-    ]
-    for cc, _, _ in paises_f:
-        pts = fbcf[cc]
-        conferir(pts[0][0] == "1970" and pts[-1][0] in ("2024", "2025"),
-                 "FBCF %s período inesperado (%s..%s)" % (cc, pts[0][0], pts[-1][0]))
-        conferir(len(pts) == int(pts[-1][0]) - int(pts[0][0]) + 1, "buraco em FBCF para %s" % cc)
-    f_ult = {cc: (fbcf[cc][-1][0], fbcf[cc][-1][1]) for cc, _, _ in paises_f}
-    print("  FBCF/PIB último ano:", ", ".join("%s (%s) %.1f%%" % (pt, f_ult[cc][0], f_ult[cc][1]) for cc, pt, _ in paises_f))
+    # 7. Venture Capital (OCDE 2007-2025) e Unicórnios (CB Insights)
+    vc_pct, vc_usd = carregar_vc_ocde()
+    anos_vc = [str(y) for y in range(2007, 2026)]
+    print("  VC 2025 (%% PIB | US$ bi): EUA %.2f%% (%.1f bi), Suécia %.2f%% (%.1f bi), Reino Unido %.2f%% (%.1f bi), Coreia %.2f%% (%.1f bi), França %.2f%% (%.1f bi), Alemanha %.2f%% (%.1f bi)"
+          % (vc_pct["USA"]["2025"], vc_usd["USA"]["2025"],
+             vc_pct["SWE"]["2025"], vc_usd["SWE"]["2025"],
+             vc_pct["GBR"]["2025"], vc_usd["GBR"]["2025"],
+             vc_pct["KOR"]["2025"], vc_usd["KOR"]["2025"],
+             vc_pct["FRA"]["2025"], vc_usd["FRA"]["2025"],
+             vc_pct["DEU"]["2025"], vc_usd["DEU"]["2025"]))
 
-    def s_fbcf(cc, nome, cor, largura=4.5):
+    def _s_vc(mapa, cc, nome, cor, largura=4.5, casas=3):
         return dict(nome=nome, cor=cor, largura=largura, rotulo=True,
-                    dados=[["%s-01" % y, round(v, 2)] for y, v in fbcf[cc]])
+                    dados=[["%s-01" % y, round(mapa[cc][y], casas)] for y in anos_vc])
 
-    rank_f = sorted(paises_f, key=lambda item: -f_ult[item[0]][1])
-    itens_f = [[pt + (" (2024)" if f_ult[cc][0] == "2024" else ""), round(f_ult[cc][1], 1), AZUL if eur else VERMELHO]
-               for cc, pt, eur in rank_f]
-    g_fbcf = dict(
-        id="migracao-fbcf-pib",
-        titulo="Formação Bruta de Capital Fixo (FBCF) em % do PIB: Europa vs outros desenvolvidos",
-        subtitulo="Investimento fixo em % do PIB (1970–2025; EUA e Japão até 2024); no ranking, azul = europeus",
-        unidade="%", buracoMax=12,
-        fonte="Banco Mundial (WDI, NE.GDI.FTOT.ZS; conferido contra Eurostat nama_10_gdp)",
+    rank_vc_cfg = [
+        ("USA", "Estados Unidos", False), ("EST", "Estônia", True), ("SWE", "Suécia", True),
+        ("CAN", "Canadá", False), ("CHE", "Suíça", True), ("GBR", "Reino Unido", True),
+        ("NZL", "Nova Zelândia", False), ("KOR", "Coreia do Sul", False), ("DNK", "Dinamarca", True),
+        ("FIN", "Finlândia", True), ("NLD", "Países Baixos", True), ("ESP", "Espanha", True),
+        ("FRA", "França", True), ("IRL", "Irlanda", True), ("DEU", "Alemanha", True),
+        ("ITA", "Itália", True), ("PRT", "Portugal", True),
+    ]
+    itens_vc = sorted(
+        [[pt, round(vc_pct[cc]["2025"], 2), AZUL if eur else VERMELHO]
+         for cc, pt, eur in rank_vc_cfg if "2025" in vc_pct.get(cc, {})],
+        key=lambda x: -x[1],
+    )
+    g_vc = dict(
+        id="migracao-vc-pib",
+        titulo="Investimento em Venture Capital: EUA vs Europa e outros desenvolvidos",
+        subtitulo="Capital de risco total por país de mercado (2007 a 2025); no ranking, azul = europeus",
+        unidade="%", buracoMax=15,
+        fonte="OCDE (Entrepreneurship Financing Database, DSD_VC@DF_VC_INV) e FtM",
+        eventos=[dict(em="2021-01", rot="Pico 2021")],
         variantes=[
-            dict(rot="Principais desenvolvidos (1970–2025)", eixo=dict(zero=False),
+            dict(rot="Em % do PIB (2007 a 2025)", unidade="%",
                  series=[
-                     s_fbcf("EUU", "UE-27", BRANCO, 5.0),
-                     s_fbcf("KOR", "Coreia do Sul", AMARELO),
-                     s_fbcf("JPN", "Japão", VERDE),
-                     s_fbcf("CAN", "Canadá", AZUL_CLARO),
-                     s_fbcf("USA", "Estados Unidos", VERMELHO),
-                     s_fbcf("DEU", "Alemanha", AZUL),
+                     _s_vc(vc_pct, "USA", "Estados Unidos", VERMELHO, 5.0, 3),
+                     _s_vc(vc_pct, "SWE", "Suécia", AMARELO, 4.0, 3),
+                     _s_vc(vc_pct, "GBR", "Reino Unido", AZUL_CLARO, 4.0, 3),
+                     _s_vc(vc_pct, "KOR", "Coreia do Sul", VERDE, 3.5, 3),
+                     _s_vc(vc_pct, "FRA", "França", AZUL, 4.0, 3),
+                     _s_vc(vc_pct, "DEU", "Alemanha", BRANCO, 3.5, 3),
                  ]),
-            dict(rot="Europeus x EUA (1970–2025)", eixo=dict(zero=False),
+            dict(rot="Em US$ bilhões (2007 a 2025)", unidade="usd-bi",
                  series=[
-                     s_fbcf("USA", "Estados Unidos", BRANCO, 5.0),
-                     s_fbcf("FRA", "França", VERDE),
-                     s_fbcf("ITA", "Itália", AMARELO),
-                     s_fbcf("ESP", "Espanha", AZUL_CLARO),
-                     s_fbcf("DEU", "Alemanha", AZUL),
-                     s_fbcf("GBR", "Reino Unido", VERMELHO),
+                     _s_vc(vc_usd, "USA", "Estados Unidos", VERMELHO, 5.0, 2),
+                     _s_vc(vc_usd, "GBR", "Reino Unido", AZUL_CLARO, 4.0, 2),
+                     _s_vc(vc_usd, "DEU", "Alemanha", BRANCO, 3.5, 2),
+                     _s_vc(vc_usd, "FRA", "França", AZUL, 4.0, 2),
+                     _s_vc(vc_usd, "KOR", "Coreia do Sul", VERDE, 3.5, 2),
+                     _s_vc(vc_usd, "SWE", "Suécia", AMARELO, 3.5, 2),
                  ]),
-            dict(rot="Ranking último ano (2024–2025)", tipo="ranking", unidade="pct1", itens=itens_f),
+            dict(rot="Ranking em 2025 (% do PIB)", tipo="ranking", unidade="%", itens=itens_vc),
+        ],
+    )
+
+    qtd_u, val_u, por_ano_u, qtd_ue27, val_ue27, total_u = carregar_unicornios()
+    print("  Unicórnios CB Insights (total=%d): EUA=%d (%.0f bi), China=%d (%.0f bi), UE-27=%d (%.0f bi), UK=%d (%.0f bi), Alemanha=%d, França=%d"
+          % (total_u, qtd_u["United States"], val_u["United States"], qtd_u["China"], val_u["China"],
+             qtd_ue27, val_ue27, qtd_u["United Kingdom"], val_u["United Kingdom"],
+             qtd_u["Germany"], qtd_u["France"]))
+    anos_u = [str(y) for y in range(2015, 2027)]
+
+    def _s_uni(chave, nome, cor, largura=4.5):
+        return dict(nome=nome, cor=cor, largura=largura, rotulo=True,
+                    dados=[["%s-01" % y, por_ano_u.get((chave, y), 0)] for y in anos_u])
+
+    rank_u_cfg = [
+        ("United States", "Estados Unidos", VERMELHO),
+        ("China", "China", VERMELHO),
+        ("UE27", "UE-27 (soma dos 27)", BRANCO),
+        ("United Kingdom", "Reino Unido", AZUL),
+        ("India", "Índia", VERMELHO),
+        ("Germany", "Alemanha", AZUL),
+        ("France", "França", AZUL),
+        ("Israel", "Israel", VERMELHO),
+        ("Canada", "Canadá", VERMELHO),
+        ("Brazil", "Brasil", VERMELHO),
+        ("Singapore", "Singapura", VERMELHO),
+        ("South Korea", "Coreia do Sul", VERMELHO),
+        ("Netherlands", "Países Baixos", AZUL),
+        ("Sweden", "Suécia", AZUL),
+        ("Spain", "Espanha", AZUL),
+        ("Italy", "Itália", AZUL),
+    ]
+    itens_u_qtd = sorted(
+        [[pt, qtd_ue27 if en == "UE27" else qtd_u.get(en, 0), cor] for en, pt, cor in rank_u_cfg],
+        key=lambda x: -x[1],
+    )
+    itens_u_val = sorted(
+        [[pt, round(val_ue27 if en == "UE27" else val_u.get(en, 0.0), 1), cor] for en, pt, cor in rank_u_cfg],
+        key=lambda x: -x[1],
+    )
+    g_unicornios = dict(
+        id="migracao-unicornios",
+        titulo="Unicórnios ativos e novos por ano: EUA, Europa e China",
+        subtitulo="Empresas privadas avaliadas em US$ 1 bi+ (CB Insights); azul = europeus, branco = bloco UE-27",
+        unidade="int", buracoMax=15,
+        fonte="CB Insights (The Complete List Of Unicorn Companies, consulta ao vivo) e FtM",
+        eventos=[dict(em="2021-01", rot="Pico 2021")],
+        variantes=[
+            dict(rot="Novos unicórnios por ano (ativos hoje, 2015 a 2026)",
+                 series=[
+                     _s_uni("United States", "Estados Unidos", VERMELHO, 5.0),
+                     _s_uni("UE27", "UE-27 (bloco atual)", BRANCO, 4.0),
+                     _s_uni("China", "China", AMARELO, 4.0),
+                     _s_uni("United Kingdom", "Reino Unido", AZUL_CLARO, 3.5),
+                     _s_uni("Germany", "Alemanha", AZUL, 3.5),
+                     _s_uni("France", "França", VERDE, 3.5),
+                 ]),
+            dict(rot="Total de unicórnios ativos (2026)", tipo="ranking", unidade="int", itens=itens_u_qtd),
+            dict(rot="Valor agregado dos unicórnios (2026, US$)", tipo="ranking", unidade="usd-bi-tri", itens=itens_u_val),
         ],
     )
 
@@ -1795,6 +1953,61 @@ def main():
         ],
     )
 
+    # 9b. Transferência fiscal por idade (ENTA 2.0.1, 2008 e 2023)
+    enta, faixas_enta = carregar_enta_etaria()
+    print("  ENTA 2023 (€ mil 2020, 45-54 vs 80+): FR %+.1f/%+.1f, DE %+.1f/%+.1f, IT %+.1f/%+.1f, ES %+.1f/%+.1f"
+          % (enta[("FR", "2023")][2]["net"], enta[("FR", "2023")][6]["net"],
+             enta[("DE", "2023")][2]["net"], enta[("DE", "2023")][6]["net"],
+             enta[("IT", "2023")][2]["net"], enta[("IT", "2023")][6]["net"],
+             enta[("ES", "2023")][2]["net"], enta[("ES", "2023")][6]["net"]))
+
+    def _var_enta(rot, cc, yr):
+        rows = enta[(cc, yr)]
+        return dict(
+            rot=rot,
+            series=[
+                dict(nome="Impostos diretos e contribuições", cor=AZUL_ESCURO, tipo="barra",
+                     dados=[[str(i), round(r["dir"], 1)] for i, r in enumerate(rows)]),
+                dict(nome="Impostos sobre consumo e outros", cor=AZUL_CLARO, tipo="barra",
+                     dados=[[str(i), round(r["con"], 1)] for i, r in enumerate(rows)]),
+                dict(nome="Aposentadorias e pensões", cor=VINHO, tipo="barra",
+                     dados=[[str(i), round(r["pen"], 1)] for i, r in enumerate(rows)]),
+                dict(nome="Outros benefícios em dinheiro", cor=VERMELHO, tipo="barra",
+                     dados=[[str(i), round(r["oth"], 1)] for i, r in enumerate(rows)]),
+                dict(nome="Saúde pública", cor=AMARELO, tipo="barra",
+                     dados=[[str(i), round(r["hlt"], 1)] for i, r in enumerate(rows)]),
+                dict(nome="Saldo líquido", cor=BRANCO, largura=3.5, rotulo=True,
+                     dados=[[str(i), round(r["net"], 1)] for i, r in enumerate(rows)]),
+            ],
+        )
+
+    g_transferencia_etaria = dict(
+        id="migracao-transferencia-etaria",
+        titulo="Transferência fiscal por idade: impostos pagos vs benefícios recebidos",
+        subtitulo="Em € mil por pessoa ao ano (preços constantes de 2020); positivo = pago ao Estado, negativo = recebido",
+        unidade="pts", categorias=faixas_enta, barra=0.68,
+        fonte="European National Transfer Accounts (ENTA 2.0.1, Hammer et al., Zenodo 2026) e FtM",
+        variantes=[
+            _var_enta("França (2023)", "FR", "2023"),
+            _var_enta("Alemanha (2023)", "DE", "2023"),
+            _var_enta("Itália (2023)", "IT", "2023"),
+            _var_enta("Espanha (2023)", "ES", "2023"),
+            _var_enta("França (2008)", "FR", "2008"),
+            _var_enta("Alemanha (2008)", "DE", "2008"),
+            dict(rot="Saldo líquido comparado (2023, 4 países)",
+                 series=[
+                     dict(nome="França", cor=AZUL, largura=4.5, rotulo=True,
+                          dados=[[str(i), round(r["net"], 1)] for i, r in enumerate(enta[("FR", "2023")])]),
+                     dict(nome="Alemanha", cor=VERMELHO, largura=4.5, rotulo=True,
+                          dados=[[str(i), round(r["net"], 1)] for i, r in enumerate(enta[("DE", "2023")])]),
+                     dict(nome="Itália", cor=AMARELO, largura=4.0, rotulo=True,
+                          dados=[[str(i), round(r["net"], 1)] for i, r in enumerate(enta[("IT", "2023")])]),
+                     dict(nome="Espanha", cor=VERDE, largura=4.0, rotulo=True,
+                          dados=[[str(i), round(r["net"], 1)] for i, r in enumerate(enta[("ES", "2023")])]),
+                 ]),
+        ],
+    )
+
     doc = dict(assunto="Migração na Europa", grupo="Análises Variadas",
                fonte="Eurostat, OCDE, Statistics Denmark, ONU (via OWID), UNU-WIDER, QoG (Alesina), Penn World Table 11.0, Banco Mundial, Henley & Partners, HMRC e FtM",
                referencia="2025-12", atualizado=hoje, formato="artigo",
@@ -1802,7 +2015,8 @@ def main():
                             graficos=[g_satisfacao]),
                        dict(titulo="", texto="", fontes=[], figuras=[], graficos=[g_pib_mundial_ppp]),
                        dict(titulo="", texto="", fontes=[], figuras=[], graficos=[g_pib_pc_eua]),
-                       dict(titulo="", texto="", fontes=[], figuras=[], graficos=[g_fbcf]),
+                       dict(titulo="", texto="", fontes=[], figuras=[], graficos=[g_vc]),
+                       dict(titulo="", texto="", fontes=[], figuras=[], graficos=[g_unicornios]),
                        dict(titulo="Horas trabalhadas: escolha ou freio tributário?", texto="", fontes=[], figuras=[],
                             graficos=[g_horas]),
                        dict(titulo="", texto="", fontes=[], figuras=[], graficos=[g_blanchard_tab]),
@@ -1824,6 +2038,8 @@ def main():
                             graficos=[g_idade, g_idade_qtd]),
                        dict(titulo="", texto="", fontes=[], figuras=[], graficos=[g_media]),
                        dict(titulo="", texto="", fontes=[], figuras=[], graficos=[g_piramide, g_piramide_qtd]),
+                       dict(titulo="Quanto cada faixa etária paga e recebe do Estado", texto="", fontes=[], figuras=[],
+                            graficos=[g_transferencia_etaria]),
                        dict(titulo="O teto tributário e quem sai no topo", texto="", fontes=[], figuras=[],
                             graficos=[g_milionarios]),
                        dict(titulo="", texto="", fontes=[], figuras=[], graficos=[g_nondom]),

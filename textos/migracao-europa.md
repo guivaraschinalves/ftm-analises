@@ -23,9 +23,15 @@ Em dólares correntes, a distância após 2010 abriu ainda mais: em 2025, a Fran
 
 ##
 
-Parte desse distanciamento vem de investir menos e financiar pior o risco. Em % do PIB, **Reino Unido (18,9%)**, **Alemanha (20,3%)**, **Espanha (20,6%)** e **UE-27 (21,3%)** ficam bem abaixo de economias asiáticas como **Coreia do Sul (28,3%)** e **Japão (27,8%)**.
+Esse distanciamento aparece direto no mercado de capitais e no capital de risco (VC). O retrato virou até manchete da CNBC: "Esqueça a Anthropic: na Europa, o hype de IPO é uma lagoa azul". Enquanto Wall Street acompanha estreias bilionárias de inteligência artificial nos EUA, o destaque europeu de abertura de capital foi a **Blue Lagoon**, um spa geotérmico na Islândia que captou **US$ 110 milhões** com avaliação de cerca de **US$ 787 milhões**.
 
-O retrato desse abismo no mercado de capitais e no capital de risco (VC) virou até manchete da CNBC: "Esqueça a Anthropic: na Europa, o hype de IPO é uma lagoa azul". Enquanto Wall Street acompanha estreias bilionárias de inteligência artificial nos EUA, o destaque europeu de abertura de capital foi a **Blue Lagoon**, um spa geotérmico na Islândia que captou **US$ 110 milhões** com avaliação de cerca de **US$ 787 milhões**. Quando um unicórnio europeu precisa de capital em escala, ele atravessa o Atlântico.
+Nos dados da OCDE até 2025, os **Estados Unidos** investiram **0,62% do PIB** em Venture Capital (**US$ 192,1 bilhões** no ano), mais do triplo da **Suécia (0,21%)**, quase o quádruplo do **Reino Unido (0,16% / US$ 6,5 bilhões)**, oito vezes a **França (0,08% / US$ 2,6 bilhões)** e cerca de dez vezes a **Alemanha (0,06% / US$ 2,8 bilhões)**. Quando uma startup europeia precisa de capital em escala, ela busca nos EUA.
+
+##
+
+O reflexo dessa diferença de capital de risco aparece na criação de unicórnios (empresas privadas avaliadas em US$ 1 bilhão ou mais). No levantamento ao vivo da CB Insights (1.447 unicórnios ativos), os **Estados Unidos** concentram **830 unicórnios** (**US$ 5,1 trilhões** em valor agregado) e a **China** soma **170**, enquanto toda a **UE-27** reúne **133** (**Alemanha 39**, **França 31**, **Países Baixos 13**, **Suécia 7**) e o **Reino Unido** tem **72**.
+
+Olhando o ritmo anual de novos unicórnios entre os que seguem ativos, o pico de 2021 gerou **256** novos unicórnios nos EUA contra **42** na UE-27; em 2025 foram **89** nos EUA contra **12** na UE-27 e **5** no Reino Unido.
 
 ## Horas trabalhadas: escolha ou freio tributário?
 parte: Trabalho, horas e o fim do empate em produtividade
@@ -86,6 +92,12 @@ Em idade média, a diferença na **UE-27** passa de **12 anos**: **31,6 anos** e
 ##
 
 Na pirâmide etária, os nascidos no exterior preenchem justamente a faixa em idade ativa no meio da distribuição. Na teoria, mais jovens trabalhando ajudariam a pagar a previdência e os serviços públicos de uma Europa que envelhece. É aqui, porém, que começa o paradoxo.
+
+## Quanto cada faixa etária paga e recebe do Estado
+
+Para enxergar o tamanho da conta demográfica por idade na Europa, a base harmonizada **European National Transfer Accounts (ENTA)** mede exatamente quanto cada pessoa paga em impostos e contribuições versus quanto recebe em aposentadorias, saúde pública e outros benefícios (em **mil euros ao ano a preços constantes de 2020**).
+
+Em **França, Alemanha, Itália e Espanha**, o desenho é nítido: adultos entre **25 e 54 anos** financiam o sistema com saldo líquido positivo entre **+€10,1 mil e +€18,6 mil por pessoa/ano** em 2023 (na faixa de 45 a 54 anos: **+€18,6 mil** na França, **+€17,1 mil** na Alemanha, **+€14,0 mil** na Itália e **+€10,1 mil** na Espanha). A partir dos **65 anos**, a balança vira com força para o negativo por causa das aposentadorias e da saúde pública: aos **80+ anos**, a transferência líquida recebida chega a **-€21,7 mil** na Alemanha (era -€16,3 mil em 2008), **-€21,1 mil** na França, **-€16,2 mil** na Itália e **-€14,6 mil** na Espanha. (O Reino Unido não integra a série pós-Brexit da ENTA.)
 
 ## O teto tributário e quem sai no topo
 parte: O paradoxo do Estado de bem-estar
