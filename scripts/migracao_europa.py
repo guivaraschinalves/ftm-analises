@@ -282,6 +282,63 @@ def carregar_wb_pib_ppp():
     return part, rel_ppp, rel_usd
 
 
+def carregar_satisfacao():
+    """Retorna notas Cantril (Gallup/WHR 2011-2025) e % felizes (WVS até 2022), conferidos com Eurostat ilc_pw01."""
+    cantril = owid("happiness-cantril-ladder", "cantril_ladder_score")
+    happy = owid("share-of-people-who-say-they-are-happy", "happy")
+    eu_pw25, _ = eurostat("ilc_pw01", ["geo"], sex="T", age="Y_GE16", isced11="TOTAL", life_sat="LIFE", time="2025")
+    conferir(7.0 <= eu_pw25["EU27_2020"] <= 7.5, "Eurostat ilc_pw01 UE-27 2025 inesperado: %.2f" % eu_pw25["EU27_2020"])
+
+    paises_c = [
+        ("Finland", "Finlândia", AZUL),
+        ("Denmark", "Dinamarca", AZUL),
+        ("Sweden", "Suécia", AZUL),
+        ("Norway", "Noruega", AZUL),
+        ("Netherlands", "Países Baixos", AZUL),
+        ("Switzerland", "Suíça", AZUL),
+        ("Germany", "Alemanha", AZUL),
+        ("United States", "Estados Unidos", VERMELHO),
+        ("United Kingdom", "Reino Unido", AZUL),
+        ("France", "França", AZUL),
+        ("Italy", "Itália", AZUL),
+        ("Spain", "Espanha", AZUL),
+        ("Argentina", "Argentina", AMARELO),
+        ("World", "Média mundial", BRANCO),
+    ]
+    anos_c = [str(y) for y in range(2011, 2026) if y != 2013]
+    series_c = {
+        en: [(y, cantril[(en, y)]) for y in anos_c]
+        for en, _, _ in paises_c
+    }
+    rank_c25 = sorted(
+        [(pt, cantril[(en, "2025")], cor) for en, pt, cor in paises_c],
+        key=lambda x: -x[1],
+    )
+    conferir(cantril[("Finland", "2025")] > cantril[("Germany", "2025")] > cantril[("World", "2025")],
+             "ranking Cantril 2025 fora do esperado")
+
+    paises_h = [
+        ("Norway", "Noruega", AZUL),
+        ("Sweden", "Suécia", AZUL),
+        ("United Kingdom", "Reino Unido", AZUL),
+        ("France", "França", AZUL),
+        ("Netherlands", "Países Baixos", AZUL),
+        ("Denmark", "Dinamarca", AZUL),
+        ("Finland", "Finlândia", AZUL),
+        ("Spain", "Espanha", AZUL),
+        ("United States", "Estados Unidos", VERMELHO),
+        ("Germany", "Alemanha", AZUL),
+        ("Argentina", "Argentina", AMARELO),
+        ("Italy", "Itália", AZUL),
+    ]
+    rank_h22 = sorted(
+        [(pt, happy[(en, "2022")], cor) for en, pt, cor in paises_h],
+        key=lambda x: -x[1],
+    )
+    conferir(all(v > 80.0 for _, v, _ in rank_h22), "WVS 2022 abaixo de 80%% inesperado")
+    return rank_c25, rank_h22, series_c, eu_pw25["EU27_2020"]
+
+
 def carregar_henley_2025():
     """Baixa o press release oficial da Henley 2025 e verifica os valores por regex."""
     html = baixar(HENLEY_2025, headers=UA).decode("utf-8", errors="ignore")
@@ -1342,6 +1399,43 @@ def main():
         ],
     )
 
+    rank_c25, rank_h22, series_c, eu_sat25 = carregar_satisfacao()
+    print("  Satisfação 2025 (Cantril | Eurostat UE-27=%.1f): Finlândia %.2f, Dinamarca %.2f, Alemanha %.2f, EUA %.2f, França %.2f, Mundo %.2f | WVS 2022: %s %.1f%% .. %s %.1f%%"
+          % (eu_sat25,
+             series_c["Finland"][-1][1], series_c["Denmark"][-1][1], series_c["Germany"][-1][1],
+             series_c["United States"][-1][1], series_c["France"][-1][1], series_c["World"][-1][1],
+             rank_h22[0][0], rank_h22[0][1], rank_h22[-1][0], rank_h22[-1][1]))
+    g_satisfacao = dict(
+        id="migracao-satisfacao-europa-eua",
+        titulo="Satisfação com a vida e felicidade: Europa e EUA vs média mundial",
+        subtitulo="Nota Cantril (0 a 10, Gallup/WHR 2025) e parcela que se diz feliz (WVS 2022); azul = europeus, amarelo = Argentina",
+        tipo="ranking", unidade="n2",
+        fonte="World Happiness Report / Gallup (via OWID), World Values Survey / IVS (via OWID), Eurostat (ilc_pw01) e FtM",
+        itens=[[pt, round(v, 2), cor] for pt, v, cor in rank_c25],
+        variantes=[
+            dict(rot="Nota de satisfação (Gallup/WHR 2025, 0 a 10)", tipo="ranking", unidade="n2",
+                 itens=[[pt, round(v, 2), cor] for pt, v, cor in rank_c25]),
+            dict(rot="Parcela que se diz feliz (WVS, onda 2022)", tipo="ranking", unidade="pct1",
+                 itens=[[pt, round(v, 1), cor] for pt, v, cor in rank_h22]),
+            dict(rot="Evolução da satisfação (Gallup/WHR, 2011 a 2025)", tipo="linha", unidade="n2", buracoMax=30,
+                 eixo=dict(zero=False), eventos=[dict(em="2020-01", rot="Covid-19")],
+                 series=[
+                     dict(nome="Finlândia", cor=AZUL_CLARO, largura=4.0, rotulo=True,
+                          dados=[["%s-01" % y, round(v, 2)] for y, v in series_c["Finland"]]),
+                     dict(nome="Dinamarca", cor=AMARELO, largura=4.0, rotulo=True,
+                          dados=[["%s-01" % y, round(v, 2)] for y, v in series_c["Denmark"]]),
+                     dict(nome="Alemanha", cor=AZUL, largura=4.5, rotulo=True,
+                          dados=[["%s-01" % y, round(v, 2)] for y, v in series_c["Germany"]]),
+                     dict(nome="Estados Unidos", cor=VERMELHO, largura=4.5, rotulo=True,
+                          dados=[["%s-01" % y, round(v, 2)] for y, v in series_c["United States"]]),
+                     dict(nome="França", cor=VERDE, largura=3.5, rotulo=True,
+                          dados=[["%s-01" % y, round(v, 2)] for y, v in series_c["France"]]),
+                     dict(nome="Média mundial", cor=BRANCO, largura=3.5, tracejada=True, rotulo=True,
+                          dados=[["%s-01" % y, round(v, 2)] for y, v in series_c["World"]]),
+                 ]),
+        ],
+    )
+
     # 8. Saídas fiscais e saídas de milionários
     hen = carregar_henley_2025()
     eur_hen = [
@@ -1704,8 +1798,9 @@ def main():
     doc = dict(assunto="Migração na Europa", grupo="Análises Variadas",
                fonte="Eurostat, OCDE, Statistics Denmark, ONU (via OWID), UNU-WIDER, QoG (Alesina), Penn World Table 11.0, Banco Mundial, Henley & Partners, HMRC e FtM",
                referencia="2025-12", atualizado=hoje, formato="artigo",
-               secoes=[dict(titulo="A Europa como o sapo na água morna", texto="", fontes=[], figuras=[],
-                            graficos=[g_pib_mundial_ppp]),
+               secoes=[dict(titulo="Fronteiras abertas ou Estado de bem-estar? O dilema de Friedman", texto="", fontes=[], figuras=[],
+                            graficos=[g_satisfacao]),
+                       dict(titulo="", texto="", fontes=[], figuras=[], graficos=[g_pib_mundial_ppp]),
                        dict(titulo="", texto="", fontes=[], figuras=[], graficos=[g_pib_pc_eua]),
                        dict(titulo="", texto="", fontes=[], figuras=[], graficos=[g_fbcf]),
                        dict(titulo="Horas trabalhadas: escolha ou freio tributário?", texto="", fontes=[], figuras=[],

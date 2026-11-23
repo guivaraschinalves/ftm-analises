@@ -1,11 +1,17 @@
 # Migração na Europa
 
-## A Europa como o sapo na água morna
-parte: O sapo na água morna e a perda de peso da Europa
+## Fronteiras abertas ou Estado de bem-estar? O dilema de Friedman
+parte: O ponto de partida: Friedman e o sapo na água morna
 
-Hoje, os europeus (assim como os norte-americanos) ainda se dizem, em maioria, contentes com a sociedade em que vivem. É um contraste forte com casos de ruptura súbita, como a Argentina, onde a maioria já se afirmava descontente antes e até o dia da crise de 2001.
+**Milton Friedman disse uma frase famosa que resume o ponto de partida desta análise: você pode ter fronteiras abertas ou um Estado de bem-estar social, mas não os dois ao mesmo tempo.**
 
-Na Europa, o desgaste não explode de um dia para o outro: é um processo lento. Vale o velho ditado do sapo: se você joga um sapo na água fervente, ele salta e sobrevive; se coloca na água fria e aquece devagar, ele fica ali até morrer cozido. A Europa parece esse sapo na água aquecendo lentamente.
+A Europa hoje vive exatamente essa tensão. Sem imigração, estimativas demográficas apontam um encolhimento severo da população da União Europeia ao longo do século (de cerca de 450 milhões para algo em torno de 270 milhões). Ao mesmo tempo, em boa parte dos países europeus de proteção social mais generosa, a taxa de emprego dos imigrantes fica bem abaixo da dos nativos e a integração escolar patina (segundo dados da OCDE, cerca de metade dos estudantes de ensino médio filhos de imigrantes de segunda geração na França é analfabeta funcional em matemática).
+
+Mesmo assim, hoje os europeus (assim como os norte-americanos) ainda se dizem, em maioria, contentes com a sociedade e com a vida que levam. Na última onda do World Values Survey (até 2022), de **82,3% a 94,1%** dos entrevistados nos principais países europeus e **88,2%** nos Estados Unidos se diziam felizes. No relatório Gallup/World Happiness de 2025, os países europeus lideram o topo mundial (**Finlândia 7,76**, **Dinamarca 7,54**, **Suécia 7,25**, **Noruega 7,24**, **Alemanha 6,88**, **França 6,59**), e os **Estados Unidos marcam 6,82** frente a uma média mundial de **5,44** (enquanto na pesquisa oficial do Eurostat de 2025 a média da UE-27 fica em **7,2**).
+
+##
+
+Essa satisfação alta contrasta com crises agudas como a da Argentina, onde a maioria já se afirmava descontente antes e até o dia da crise de 2001. Na Europa, o desgaste não explode de uma vez: é lento. Vale o velho ditado do sapo: se você joga um sapo na água fervente, ele salta e sobrevive; se coloca na água fria e aquece devagar, ele fica ali até morrer cozido. A Europa parece esse sapo na água aquecendo lentamente.
 
 Nos números globais, esse cozimento aparece na perda de peso econômico. De 1990 a 2025, a fatia da **UE-15** (os 15 primeiros membros) no PIB mundial em paridade de poder de compra caiu de **21,5% para 13,6%**, e a da **UE-27** foi de **21,2% para 14,0%**. Os **Estados Unidos** passaram de **20,1% para 14,6%**, enquanto a **China** subiu de **3,8% para 19,5%**. Na aba dos **Escandinavos**, os quatro países juntos (Suécia, Dinamarca, Noruega e Finlândia) encolheram de **1,47% para 1,05%** do PIB mundial.
 
@@ -108,6 +114,6 @@ O resultado aparece na linha do tempo: as autorizações por **asilo e reagrupam
 
 ## O aperto político: diversidade e vontade de redistribuir
 
-Por fim, fecha-se o grande paradoxo do vídeo: **a imigração pode reduzir a necessidade fiscal de subir impostos na Europa, mas ao mesmo tempo reduz a capacidade política dos governos de aumentá-los**.
+Por fim, fecha-se o grande paradoxo do vídeo e voltamos à frase de Milton Friedman que abriu esta análise: **a imigração pode reduzir a necessidade fiscal de subir impostos na Europa, mas ao mesmo tempo reduz a capacidade política dos governos de aumentá-los**.
 
 Como mostraram Alberto Alesina e Edward Glaeser (e depois Alesina, Murard e Rapoport comparando regiões dentro dos mesmos países europeus), o aumento da diversidade reduz a disposição dos eleitores de financiar redistribuição com impostos altos. Nos 38 países da OCDE, a fracionalização étnica histórica correlaciona-se negativamente com a carga tributária (**r = -0,31**). O sinal positivo na segunda aba (**r = +0,27** com nascidos no exterior em 2024) reflete causalidade reversa: países ricos com Estado de bem-estar já grande atraíram mais imigrantes antes, mas o desgaste político vem na sequência. Sem destravar produtividade e investimento, a Europa segue como o sapo na água morna, perdendo espaço econômico e margem de manobra ano após ano.
