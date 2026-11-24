@@ -59,7 +59,9 @@ def main():
             s["parte"] = partes[i]
         novas.append(s)
     doc = {k: v for k, v in m.items() if k not in ("secoes", "reordenar", "assunto")}
-    doc["assunto"] = "Leituras de ciclo"
+    # no índice, junto das análises de cenário (pedido dele em 24/11/2026)
+    doc["assunto"] = "Cenário BR e EUA 16/11/26"
+    doc["grupo"] = "Análise de Cenário"
     doc["secoes"] = novas
     with open(SAIDA, "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False, separators=(",", ":"), allow_nan=False)

@@ -74,10 +74,11 @@
   // A análise vem primeiro: ela é o que se lê de ponta a ponta. Os painéis
   // antigos ficam embaixo, fechados, como acervo.
   // a ordem é a do índice; assuntos do mesmo "grupo" ficam juntos
-  var FONTES = ["dados/gave.json", "dados/cenario-2026-11-08.json", "dados/cenario-2026-10-28-fomc.json",
+  var FONTES = ["dados/gave.json", "dados/leituras-de-ciclo.json", "dados/cenario-2026-11-08.json",
+                "dados/cenario-2026-10-28-fomc.json",
                 "dados/orcamento-2027.json", "dados/defasagem-combustiveis.json", "dados/eleicoes.json", "dados/midterms-2026.json",
                 "dados/petroleo.json", "dados/ueno-bank.json", "dados/migracao-europa.json",
-                "dados/missao-global-miami.json", "dados/leituras-de-ciclo.json"];
+                "dados/missao-global-miami.json"];
   // Uma página pode pedir outros arquivos: <body data-fontes="dados/x.json">.
   if (document.body && document.body.getAttribute("data-fontes")) {
     FONTES = document.body.getAttribute("data-fontes").split(/\s*,\s*/);
