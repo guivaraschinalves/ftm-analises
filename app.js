@@ -75,7 +75,7 @@
   // antigos ficam embaixo, fechados, como acervo.
   // a ordem é a do índice; assuntos do mesmo "grupo" ficam juntos
   var FONTES = ["dados/gave.json", "dados/cenario-2026-11-08.json", "dados/cenario-2026-10-28-fomc.json",
-                "dados/defasagem-combustiveis.json", "dados/eleicoes.json", "dados/midterms-2026.json",
+                "dados/orcamento-2027.json", "dados/defasagem-combustiveis.json", "dados/eleicoes.json", "dados/midterms-2026.json",
                 "dados/petroleo.json", "dados/ueno-bank.json", "dados/migracao-europa.json",
                 "dados/missao-global-miami.json", "dados/leituras-de-ciclo.json"];
   // Uma página pode pedir outros arquivos: <body data-fontes="dados/x.json">.
