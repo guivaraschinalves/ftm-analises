@@ -2571,6 +2571,9 @@ def main():
     if ids != esperado:
         raise RuntimeError("textos/%s.md fora do lugar: o JSON saiu com %s; tinha de ser %s"
                            % (NOME, ids, esperado))
+    # as leituras de ciclo (Brasil e EUA) para o ftm.app.br saem desta página
+    import leituras_ciclo
+    leituras_ciclo.main()
 
 
 if __name__ == "__main__":
