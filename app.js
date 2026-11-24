@@ -3208,7 +3208,24 @@
   function escalarLamina() {
     if (!apres) return;
     var l = apres.palco.querySelector(".apres-lamina");
-    if (l) l.style.transform = "scale(" + (apres.palco.clientWidth / 1920) + ")";
+    if (!l) return;
+    // zoom, e não transform: com transform o navegador desenha a lâmina numa
+    // camada e estica a imagem, e o texto (tabela, comparador) sai borrado;
+    // com zoom ele redesenha a letra no tamanho final
+    var f = apres.palco.clientWidth / 1920;
+    if (window.CSS && CSS.supports && CSS.supports("zoom", "1")) { l.style.transform = ""; l.style.zoom = f; }
+    else l.style.transform = "scale(" + f + ")";
+  }
+  // tabela comprida: diminui a letra até caber na lâmina, em vez de cortar
+  function caberTabela(corpo) {
+    var tab = corpo.querySelector(".tabela");
+    if (!tab) return;
+    var z = 2.1;
+    tab.style.zoom = z;
+    while (z > 1.05 && corpo.scrollHeight > corpo.clientHeight + 1) {
+      z -= 0.05;
+      tab.style.zoom = z;
+    }
   }
   function cabecalhoLamina(l, g) {
     l.appendChild(html("h2", { "class": "apres-l-titulo", texto: g.titulo }));
@@ -3253,6 +3270,7 @@
       var corpo = html("div", { "class": "apres-quadro-corpo" + (g.tipo === "comunicados" ? " apres-comunicados" : "") });
       corpo.appendChild(g.tipo === "tabela" ? montarTabela(g) : montarComparador(g));
       lt.appendChild(corpo);
+      if (g.tipo === "tabela") caberTabela(corpo);
       if (g.fonte && g.tipo === "tabela") lt.appendChild(html("p", { "class": "apres-l-fonte", texto: "Fonte: " + g.fonte }));
       return;
     }
