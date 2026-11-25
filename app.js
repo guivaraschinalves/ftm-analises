@@ -20,6 +20,9 @@
   var MESES_LONGOS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto",
     "Setembro", "Outubro", "Novembro", "Dezembro"];
 
+  var NOTAS_MOODYS = ["Aaa", "Aa1", "Aa2", "Aa3", "A1", "A2", "A3", "Baa1", "Baa2", "Baa3", "Ba1", "Ba2", "Ba3",
+                      "B1", "B2", "B3", "Caa1", "Caa2", "Caa3", "Ca", "C"];
+
   var PALETAS = {
     dark: {
       texto: "#ffffff", eixo: "#ffffff", suave: "rgba(255,255,255,.78)", grade: "rgba(255,255,255,.09)",
@@ -345,6 +348,12 @@
     // bilhões de dólares sem casa decimal, para o número em cima de cada coluna caber
     "usd-bi0": { eixo: function (v, passo) { return "US$ " + nf(casasDoPasso(passo)).format(v); },
                  valor: function (v) { return "US$ " + nf(0).format(v); } },
+    // nota de crédito da Moody's: o valor é 21 − posição na escala (Aaa = 21,
+    // Baa3 = 12, C = 1), para a nota melhor ficar em cima; eixo e caixa do
+    // mouse mostram o nome da nota (arredondado: o desvio que separa linhas
+    // na mesma nota não aparece)
+    "moodys": { eixo: function (v) { return NOTAS_MOODYS[21 - Math.round(v)] || ""; },
+                valor: function (v) { return NOTAS_MOODYS[21 - Math.round(v)] || ""; } },
     "usd-bi": { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
                 valor: function (v) { return "US$ " + nf(1).format(v) + " bi"; } },
     // do ftm-dados (SpaceX e Anthropic): duas casas para o passo pequeno da
@@ -519,7 +528,8 @@
     if (eixo.min !== undefined) baixo = eixo.min;
     if (eixo.max !== undefined) alto = eixo.max;
     if (alto - baixo <= 0) alto = baixo + 1;
-    var passo = passoBonito(alto - baixo, 8);
+    // "passo" fixa o intervalo das marcas (a escala de notas pede um degrau por linha)
+    var passo = eixo.passo || passoBonito(alto - baixo, 8);
     var min = eixo.min !== undefined ? eixo.min : Math.floor(baixo / passo + 1e-9) * passo;
     var max = eixo.max !== undefined ? eixo.max : Math.ceil(alto / passo - 1e-9) * passo;
     var ticks = [];
