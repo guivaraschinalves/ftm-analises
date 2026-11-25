@@ -223,19 +223,39 @@ def historico(gasto):
                          "OWID e WEO divergem em %s %s (%.2f x %.2f)" % (nome, y, owid[c][y], gasto[c][y]))
     print("  OWID, último ano:", ", ".join("%s %s %.1f%%" % (n, max(owid[c], key=int), owid[c][max(owid[c], key=int)])
                                          for c, n in HIST))
+    # continuação pelo WEO atual: do último ano do OWID até ANO, pontilhada. Começa no
+    # valor do próprio WEO no último ano do OWID (não no do OWID), para não criar um
+    # degrau artificial entre as duas edições do FMI.
+    fim_owid = max(max(owid[c], key=int) for c, _ in HIST)
+    anos_weo = [str(y) for y in range(int(fim_owid), int(ANO) + 1)]
+    dif = {}
+    for c, nome in HIST:
+        conferir(all(y in gasto.get(c, {}) for y in anos_weo), "WEO sem %s em %s" % (nome, anos_weo))
+        dif[c] = owid[c][fim_owid] - gasto[c][fim_owid]
+        conferir(abs(dif[c]) <= 2.5, "OWID e WEO divergem demais em %s %s (%.2f)" % (nome, fim_owid, dif[c]))
+    print("  WEO %s a %s:" % (fim_owid, ANO), ", ".join("%s %.1f%% (OWID - WEO em %s: %+.2f)"
+          % (n, gasto[c][ANO], fim_owid, dif[c]) for c, n in HIST))
+    pior = max(HIST, key=lambda cn: abs(dif[cn[0]]))
     g_total = dict(
         id="gasto-publico-historico",
-        titulo="Gasto do governo em %% do PIB, %s a %s" % (min(min(owid[c], key=int) for c, _ in HIST),
-                                                         max(max(owid[c], key=int) for c, _ in HIST)),
-        subtitulo="Despesa total do governo em % do PIB, inclusive juros da dívida",
+        titulo="Gasto do governo em %% do PIB, %s a %s" % (min(min(owid[c], key=int) for c, _ in HIST), ANO),
+        subtitulo="Despesa total do governo em % do PIB, inclusive juros da dívida; pontilhado: FMI atual",
         unidade="%", buracoMax=12,
-        fonte="FMI (Public Finances in Modern History e World Economic Outlook) via Our World in Data",
+        fonte="FMI (Public Finances in Modern History e World Economic Outlook) via Our World in Data e FMI "
+              "(World Economic Outlook)",
         nota=("Governo geral (central, estados, municípios e previdência) quando disponível; nos anos mais antigos, "
-              "só o governo central. É a série do Our World in Data, que usa uma edição anterior do FMI: nos anos "
-              "recentes difere do World Economic Outlook atual em até 1,5 ponto do PIB."),
-        series=[dict(nome=n, cor=COR_HIST[c], largura=5.0 if c == "BRA" else 4.0, rotulo=True,
+              "só o governo central. Linha cheia: série do Our World in Data, que usa uma edição anterior do FMI. "
+              "Linha pontilhada: World Economic Outlook atual (set/2026), de %s a %s; %s é estimativa do FMI e %s "
+              "também pode ser, conforme o país. Em %s as duas edições diferem em até %s pontos do PIB (%s), por "
+              "isso a linha pontilhada não começa exatamente no fim da cheia."
+              % (fim_owid, ANO, ANO, int(ANO) - 1, fim_owid, br(abs(dif[pior[0]])), pior[1])),
+        series=[dict(nome=n, cor=COR_HIST[c], largura=5.0 if c == "BRA" else 4.0,
                      dados=[["%s-01" % y, round(owid[c][y], 2)] for y in sorted(owid[c], key=int)])
-                for c, n in HIST],
+                for c, n in HIST]
+               + [dict(nome="%s (WEO, %s a %s)" % (n, fim_owid, ANO), cor=COR_HIST[c], legenda=False, rotulo=True,
+                       traco="pontilhado", largura=5.0 if c == "BRA" else 4.0,
+                       dados=[["%s-01" % y, round(gasto[c][y], 2)] for y in anos_weo])
+                  for c, n in HIST],
     )
 
     # 2) consumo e investimento em % do PIB (OCDE / PIB do Banco Mundial)
