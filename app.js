@@ -1343,10 +1343,31 @@
     return box;
   }
 
+  // "quadros": {ano: {pontos, reta, legenda}} faz uma dispersão por ano; o ano
+  // vem da barra abaixo do gráfico (cartao.ano) e o título troca o anoPadrao
+  // pelo ano escolhido. "pontoPadrao" completa cada ponto (cor, opacidade) e
+  // "dicaModelo" monta a caixa do mouse: linhas com {campo} ou {campo:casas}.
+  function quadroDispersao(cartao) {
+    var g0 = graficoDe(cartao);
+    if (!g0.quadros) return g0;
+    var ano = cartao.ano && g0.quadros[cartao.ano] ? cartao.ano : g0.anoPadrao;
+    return Object.assign({}, g0, g0.quadros[ano], { anoAtual: ano,
+      titulo: ano === g0.anoPadrao ? g0.titulo : String(g0.titulo).replace(new RegExp(g0.anoPadrao + "(?!.*" + g0.anoPadrao + ")"), ano) });
+  }
+  function linhasDica(g, p) {
+    if (!g.dicaModelo) return p.dica ? [p.dica] : [];
+    return g.dicaModelo.map(function (m) {
+      return m.replace(/\{(\w+)(?::(\d))?\}/g, function (_, k, c) {
+        var v = p[k];
+        return typeof v === "number" ? nf(c === undefined ? 0 : +c).format(v) : (v === undefined ? "" : v);
+      });
+    });
+  }
+
   function construirDispersao(cartao, L0, nomeTema) {
-    var g = graficoDe(cartao), pal = PALETAS[nomeTema], L = Object.assign({}, L0);
+    var g = quadroDispersao(cartao), pal = PALETAS[nomeTema], L = Object.assign({}, L0);
     var Fx = UNIDADES[(g.eixoX || {}).unidade] || UNIDADES.n, Fy = UNIDADES[(g.eixoY || {}).unidade] || UNIDADES.n;
-    var svg = svgNovo(g, L), pts = g.pontos || [];
+    var svg = svgNovo(g, L), pts = (g.pontos || []).map(function (p) { return Object.assign({}, g.pontoPadrao || {}, p); });
     var logX = !!(g.eixoX || {}).log, tx = function (v) { return logX ? Math.log(v) / Math.LN10 : v; };
     var yReta = function (r, x) { return r.a + r.b * tx(x); };
     var itensLeg = (g.legenda || []).map(function (it) {
@@ -1358,7 +1379,8 @@
     if (g.reta) { ys.push(yReta(g.reta, g.reta.de), yReta(g.reta, g.reta.ate)); }
     var ex;
     if (logX) {
-      var lo = Math.min.apply(null, xs) / 1.15, hi = Math.max.apply(null, xs) * 1.15, tk = [];
+      var lo = g.eixoX.min !== undefined ? g.eixoX.min : Math.min.apply(null, xs) / 1.15;
+      var hi = g.eixoX.max !== undefined ? g.eixoX.max : Math.max.apply(null, xs) * 1.15, tk = [];
       for (var e10 = Math.floor(tx(lo)); e10 <= Math.ceil(tx(hi)); e10++) {
         [1, 2, 5].forEach(function (d) { var t = d * Math.pow(10, e10); if (t >= lo && t <= hi) tk.push(t); });
       }
@@ -1445,7 +1467,12 @@
       }
       gp.appendChild(el("circle", { cx: cx, cy: cy, r: rr, fill: cor, "fill-opacity": p.opacidade || null,
                                     stroke: pal.bg, "stroke-width": p.raio ? 1 : 2 }));
-      if (p.dica) { var t = el("title", {}); t.textContent = p.dica; gp.appendChild(t); }
+      if (p.dica && !g.dicaModelo) { var t = el("title", {}); t.textContent = p.dica; gp.appendChild(t); }
+      if (g.dicaModelo) {
+        gp.addEventListener("mouseenter", function () { mostrarDica(p, cx, cy, rr); });
+        gp.addEventListener("mouseleave", esconderDica);
+        gp.addEventListener("touchstart", function () { mostrarDica(p, cx, cy, rr); }, { passive: true });
+      }
       svg.appendChild(gp);
       var lado = posRot[k];
       if (lado) {
@@ -1461,7 +1488,64 @@
         svg.appendChild(texto(p.nota, Object.assign({}, an, { fill: cor })));
       }
     });
+    // a caixa do mouse fica numa camada por cima de tudo e não captura o mouse
+    var camadaDica = el("g", { "pointer-events": "none" });
+    svg.appendChild(camadaDica);
+    function esconderDica() { while (camadaDica.firstChild) camadaDica.removeChild(camadaDica.firstChild); }
+    function mostrarDica(p, cx, cy, rr) {
+      esconderDica();
+      var linhas = linhasDica(g, p), f = Math.round(fs * 0.8), pad = f * 0.7, lh = f * 1.4;
+      var w = Math.max.apply(null, linhas.map(function (t, k) { return largura(t, f, k ? "normal" : "bold"); })) + pad * 2;
+      var h = linhas.length * lh + pad * 0.9;
+      var bx = cx + rr + 10 + w > x1 ? cx - rr - 10 - w : cx + rr + 10;
+      var by = Math.max(y0, Math.min(y1 - h, cy - h / 2));
+      camadaDica.appendChild(el("circle", { cx: cx, cy: cy, r: rr + 3, fill: "none", stroke: pal.texto, "stroke-width": 2 }));
+      camadaDica.appendChild(el("rect", { x: bx, y: by, width: w, height: h, rx: 6, fill: pal.bg, "fill-opacity": 0.95,
+                                          stroke: pal.grade, "stroke-width": 1.5 }));
+      linhas.forEach(function (t, k) {
+        camadaDica.appendChild(texto(t, { x: bx + pad, y: by + pad * 0.45 + lh * (k + 0.75), "font-size": f, fill: pal.texto,
+                                          "font-weight": k ? null : "bold" }));
+      });
+    }
     return { svg: svg, L: L, pal: pal, ranking: true };
+  }
+
+  // A barra de anos da dispersão com "quadros": arrastar escolhe o ano, e o
+  // botão anima de um ano para o outro até o último.
+  function controlesAno(cartao) {
+    var anos = Object.keys(graficoDe(cartao).quadros).sort();
+    if (!cartao.ano) cartao.ano = graficoDe(cartao).anoPadrao;
+    var box = html("div", { "class": "ano-controles" });
+    var play = html("button", { type: "button", "class": "btn", texto: "▶ Animar" });
+    var r = html("input", { type: "range", min: 0, max: anos.length - 1, step: 1, value: Math.max(0, anos.indexOf(cartao.ano)),
+                            "aria-label": "Ano" });
+    var rot = html("span", { "class": "ano-rotulo", texto: cartao.ano });
+    var timer = null;
+    function ir(k) {
+      cartao.ano = anos[k]; r.value = k; rot.textContent = anos[k];
+      desenhar(cartao, true);
+      if (visor && visor.cartao === cartao && !visor.box.hidden) pintarVisor();
+    }
+    function parar() { if (timer) { clearInterval(timer); timer = null; } play.textContent = "▶ Animar"; }
+    r.addEventListener("input", function () { parar(); ir(+r.value); });
+    play.addEventListener("click", function () {
+      if (timer) { parar(); return; }
+      var k = +r.value;
+      if (k >= anos.length - 1) { k = 0; ir(0); }
+      play.textContent = "❚❚ Pausar";
+      timer = setInterval(function () {
+        k++;
+        if (k >= anos.length) { parar(); return; }
+        ir(k);
+        if (k === anos.length - 1) parar();
+      }, 700);
+    });
+    box.appendChild(play);
+    box.appendChild(html("span", { "class": "ano-ponta", texto: anos[0] }));
+    box.appendChild(r);
+    box.appendChild(html("span", { "class": "ano-ponta", texto: anos[anos.length - 1] }));
+    box.appendChild(rot);
+    return box;
   }
 
   // ---------- painéis (portados do ftm-dados) ----------
@@ -3768,6 +3852,7 @@
       raiz.appendChild(cartao.frame);
     }
     if (g.tipo === "simulador") raiz.appendChild(controlesSimulador(cartao));
+    if (g.tipo === "dispersao" && graficoDe(cartao).quadros) raiz.appendChild(controlesAno(cartao));
     paragrafos(g.nota, "nota").forEach(function (p) { raiz.appendChild(p); });
     // o gráfico leva o rótulo curto do acontecimento; a explicação inteira fica
     // aqui embaixo, em lista, na ordem em que aconteceu
@@ -4203,7 +4288,8 @@
     // cartão (ou seção) fechado mede zero: redesenha quando voltar a aparecer
     if (!cartao.frame.clientWidth) { cartao.chave = null; return; }
     var nomeLayout = cartao.frame.clientWidth < 700 || window.innerWidth < 700 ? "narrow" : "wide";
-    var chave = nomeLayout + "|" + tema() + "|" + cartao.periodo + "|" + cartao.inicioIdx + "|" + cartao.fimIdx + "|" + cartao.variante;
+    var chave = nomeLayout + "|" + tema() + "|" + cartao.periodo + "|" + cartao.inicioIdx + "|" + cartao.fimIdx + "|" + cartao.variante +
+                "|" + (cartao.ano || "");
     if (!forcar && cartao.chave === chave) return;
     cartao.chave = chave;
     if (graficoDe(cartao).tipo === "comunicados") {

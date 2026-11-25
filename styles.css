@@ -1010,3 +1010,9 @@ body.apres-aberta { overflow: hidden; }
 }
 .apres-texto[hidden] { display: none; }
 .apres-texto .artigo-texto { color: #e8edf3; font-size: 19px; line-height: 1.6; margin: 0 0 14px; }
+
+/* barra de anos da dispersão com "quadros" */
+.ano-controles { display: flex; align-items: center; gap: 12px; padding: 10px 16px 4px; }
+.ano-controles input[type="range"] { flex: 1; accent-color: var(--accent); min-width: 120px; }
+.ano-controles .ano-ponta { font-size: 13px; color: var(--ink-2); }
+.ano-controles .ano-rotulo { font-weight: 600; min-width: 3.2em; text-align: right; font-variant-numeric: tabular-nums; }

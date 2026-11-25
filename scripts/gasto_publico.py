@@ -21,10 +21,8 @@ de dados do FMI, dataflow IMF.RES/WEO; a edição vem no atributo de cada série
   - 2026 é estimativa do FMI na edição corrente do WEO, não dado fechado.
 
 CONFERÊNCIAS QUE ABORTAM
-  - GGX_NGDP = GGX / NGDP × 100 em cada país (≤ 0,05 p.p.). Exceção: os
-    países de ANO_FISCAL, em que o FMI divide pelo PIB do ano fiscal e a conta
-    com o PIB do ano civil difere em até 1,4 p.p. (WEO de set/2026); para eles
-    a tolerância é 2 p.p.
+  - GGX_NGDP = GGX / NGDP × 100 em cada país e ano (≤ 0,05 p.p.); exceções
+    em TOL_GGX (países de ano fiscal, Venezuela e Polônia).
   - PPPPC = PPPGDP / LP em cada país (≤ 0,5%).
   - Amostra de pelo menos 150 países e Brasil presente.
 
@@ -71,9 +69,9 @@ API = "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.RES/WEO/+/"
 UA = {"User-Agent": "ftm-analises"}
 ANO = "2026"
 DESTAQUE = "BRA"
+ANO_INI = "2001"   # o primeiro ano com Brasil e EUA no WEO (GGX_NGDP)
 # países com o nome escrito ao lado da bolha (os demais só na dica)
 ROTULADOS = ["USA", "CHN", "IND", "FRA", "DEU", "ARG", "CHL", "MEX", "JPN", "NGA", "SGP", "NOR", "RUS", "ZAF"]
-# conta de despesa no ano fiscal (a razão do FMI não bate com GGX / NGDP do ano civil)
 OWID = "https://ourworldindata.org/grapher/historical-gov-spending-gdp.csv?v=1&csvType=full&useColumnShortNames=true"
 OCDE = "https://sdmx.oecd.org/public/rest/data/OECD.SDD.NAD,DSD_NASEC10@DF_TABLE12,/"
 WB = "https://api.worldbank.org/v2/country/%s/indicator/%s?format=json&per_page=5000&date=1950:2030"
@@ -87,10 +85,16 @@ COR_HIST = {"BRA": "#FFFFFF", "DEU": "#4F81BD", "GBR": "#8EB4E3", "JPN": "#9BBB5
 # 17,9% para 22,1% do PIB em 2008): consumo e investimento das contas nacionais passam
 # do total e o resto sairia negativo. A decomposição da China começa em 2008.
 INICIO_COMP = {"CHN": "2008"}
-ANO_FISCAL = {"BHS", "BRB", "BWA", "DMA", "FJI", "HKG", "JAM", "LCA", "MUS", "SGP", "SWZ", "THA", "TTO"}
+# GGX_NGDP x GGX / NGDP: tolerância por país (p.p.), de 2001 a 2026 no WEO de set/2026.
+# Ano fiscal: o FMI divide pelo PIB do ano fiscal (diferença de até 4,2 p.p., Dominica).
+# Venezuela: na hiperinflação o FMI usa outra base de PIB (até 7,9 p.p.). Polônia: 0,17 p.p.
+ANO_FISCAL = {"BHS", "BRB", "BWA", "DMA", "FJI", "HKG", "JAM", "LBR", "LCA", "MUS", "SGP", "SWZ", "THA", "TTO"}
+TOL_GGX = dict({c: 5.0 for c in ANO_FISCAL}, VEN=10.0, POL=0.25)
 VERMELHO, BRANCO, CINZA = "#C0504D", "#FFFFFF", "#8a8a86"
 
 NOMES = {
+    "AFG": "Afeganistão", "ECU": "Equador", "ERI": "Eritreia", "LBN": "Líbano", "SEN": "Senegal", "SYR": "Síria",
+    "VEN": "Venezuela", "WBG": "Cisjordânia e Gaza",
     "ABW": "Aruba", "AGO": "Angola", "ALB": "Albânia", "AND": "Andorra", "ARE": "Emirados Árabes Unidos",
     "ARG": "Argentina", "ARM": "Armênia", "ATG": "Antígua e Barbuda", "AUS": "Austrália", "AUT": "Áustria",
     "AZE": "Azerbaijão", "BDI": "Burundi", "BEL": "Bélgica", "BEN": "Benin", "BFA": "Burquina Faso",
@@ -340,24 +344,31 @@ def main():
     pppgdp, _ = weo("PPPGDP")
     print("  WEO, datas das séries:", ", ".join(sorted(ed)))
 
-    paises = sorted(c for c in gasto if ANO in gasto[c] and ANO in ppc.get(c, {}) and ANO in pop.get(c, {}))
-    for c in paises:
-        g = gasto[c][ANO]
-        if ANO in ggx.get(c, {}) and ANO in ngdp.get(c, {}) and ngdp[c][ANO]:
-            calc = ggx[c][ANO] / ngdp[c][ANO] * 100
-            tol = 2.0 if c in ANO_FISCAL else 0.05
-            conferir(abs(calc - g) <= tol, "GGX/NGDP de %s (%.3f) != GGX_NGDP (%.3f)" % (c, calc, g))
-        conferir(ANO in pppgdp.get(c, {}), "sem PIB em PPC: %s" % c)
-        if pop[c][ANO]:
-            calc = pppgdp[c][ANO] / pop[c][ANO]
-            conferir(abs(calc / ppc[c][ANO] - 1) <= 0.005, "PPPGDP/LP de %s (%.0f) != PPPPC (%.0f)" % (c, calc, ppc[c][ANO]))
-        conferir(c in NOMES, "país sem nome em português: %s" % c)
-        conferir(0 < g < 150 and ppc[c][ANO] > 100, "valor suspeito em %s" % c)
-    conferir(len(paises) >= 150 and DESTAQUE in paises, "amostra pequena (%d países)" % len(paises))
+    def paises_de(ano):
+        return sorted(c for c in gasto if ano in gasto[c] and ano in ppc.get(c, {}) and ano in pop.get(c, {})
+                      and ano in pppgdp.get(c, {}))
 
-    def ols(lista):
-        xs = [math.log10(ppc[c][ANO]) for c in lista]
-        ys = [gasto[c][ANO] for c in lista]
+    anos = [str(y) for y in range(int(ANO_INI), int(ANO) + 1)]
+    for ano in anos:
+        lista = paises_de(ano)
+        for c in lista:
+            g = gasto[c][ano]
+            if ano in ggx.get(c, {}) and ano in ngdp.get(c, {}) and ngdp[c][ano]:
+                calc = ggx[c][ano] / ngdp[c][ano] * 100
+                tol = TOL_GGX.get(c, 0.05)
+                conferir(abs(calc - g) <= tol, "GGX/NGDP de %s %s (%.3f) != GGX_NGDP (%.3f)" % (c, ano, calc, g))
+            if pop[c][ano]:
+                calc = pppgdp[c][ano] / pop[c][ano]
+                conferir(abs(calc / ppc[c][ano] - 1) <= 0.005,
+                         "PPPGDP/LP de %s %s (%.0f) != PPPPC (%.0f)" % (c, ano, calc, ppc[c][ano]))
+            conferir(c in NOMES, "país sem nome em português: %s" % c)
+            conferir(0 < g < 150 and ppc[c][ano] > 100, "valor suspeito em %s %s" % (c, ano))
+        conferir(len(lista) >= 150 and DESTAQUE in lista and "USA" in lista,
+                 "amostra pequena em %s (%d países)" % (ano, len(lista)))
+
+    def ols(lista, ano):
+        xs = [math.log10(ppc[c][ano]) for c in lista]
+        ys = [gasto[c][ano] for c in lista]
         n = len(xs)
         mx, my = sum(xs) / n, sum(ys) / n
         sxx = sum((x - mx) ** 2 for x in xs)
@@ -368,50 +379,51 @@ def main():
         ep_b = math.sqrt(sum((y - a - b * x) ** 2 for x, y in zip(xs, ys)) / (n - 2) / sxx)
         return a, b, sxy / math.sqrt(sxx * syy), ep_b
 
-    ref = max(pppgdp[c][ANO] for c in paises)   # o maior PIB (China) tem o maior raio
+    # o raio é fixo entre os anos: o maior PIB em PPC de ANO (China) tem o maior raio
+    ref = max(pppgdp[c][ANO] for c in paises_de(ANO))
 
-    def variante(rot, lista):
-        a, b, r, ep_b = ols(lista)
+    def quadro(lista, ano, imprime=False):
+        a, b, r, ep_b = ols(lista, ano)
         n = len(lista)
-        bx, by = ppc[DESTAQUE][ANO], gasto[DESTAQUE][ANO]
-        print("  %s: %d países; gasto = %.2f + %.2f·log10(PIB pc) (ep %.2f), r = %+.2f; Brasil %.2f%% contra %.2f%% da reta"
-              % (rot, n, a, b, ep_b, r, by, a + b * math.log10(bx)))
+        if imprime:
+            bx, by = ppc[DESTAQUE][ano], gasto[DESTAQUE][ano]
+            print("  %s, %d países: gasto = %.2f + %.2f·log10(PIB pc) (ep %.2f), r = %+.2f; Brasil %.2f%% contra %.2f%% "
+                  "da reta" % (ano, n, a, b, ep_b, r, by, a + b * math.log10(bx)))
         pontos = []
-        for c in sorted(lista, key=lambda k: -pppgdp[k][ANO]):
-            g, x, p, y = gasto[c][ANO], ppc[c][ANO], pop[c][ANO], pppgdp[c][ANO]
-            ponto = dict(
-                x=round(x, 0), y=round(g, 2),
-                raio=round(0.7 + 3.3 * math.sqrt(y / ref), 3),
-                cor=VERMELHO if c == DESTAQUE else CINZA,
-                dica="%s: gasto de %s%% do PIB; PIB per capita de US$ %s e PIB de US$ %s bilhões (PPC); população de %s milhões"
-                     % (NOMES[c], br(g), br(x, 0), br(y / 1e9, 0), br(p / 1e6, 1)),
-            )
+        for c in sorted(lista, key=lambda k: -pppgdp[k][ano]):
+            g, x, p, y = gasto[c][ano], ppc[c][ano], pop[c][ano], pppgdp[c][ano]
+            ponto = dict(x=round(x, 0), y=round(g, 2), raio=round(0.7 + 3.3 * math.sqrt(y / ref), 3),
+                         n=NOMES[c], pib=round(y / 1e9, 0), pop=round(p / 1e6, 1))
             if c == DESTAQUE:
-                ponto.update(destaque=True, rot=NOMES[c], nota="%s%% do PIB" % br(g))
-            else:
-                ponto["opacidade"] = 0.55
-                if c in ROTULADOS:
-                    ponto["rot"] = NOMES[c]
+                ponto.update(destaque=True, rot=NOMES[c], nota="%s%% do PIB" % br(g), cor=VERMELHO, opacidade=1)
+            elif c in ROTULADOS:
+                ponto["rot"] = NOMES[c]
             pontos.append(ponto)
         pontos.sort(key=lambda q: 1 if q.get("destaque") else 0)   # o Brasil por cima
         return dict(
-            rot=rot,
-            legenda=[
-                dict(rot="Brasil", cor=VERMELHO),
-                dict(rot="Demais países (%d)" % (n - 1), cor=CINZA),
-                dict(rot="Tendência linear (r = %s)" % br(r, 2).replace("-", "−"), cor="linha:" + BRANCO),
-            ],
-            eixoX=dict(unidade="usd", log=True, rot="PIB per capita (US$ internacionais em PPC, escala logarítmica)"),
-            eixoY=dict(unidade="pct0", rot="Gasto do governo geral (% do PIB)", zero=True),
+            legenda=[dict(rot="Brasil", cor=VERMELHO), dict(rot="Demais países (%d)" % (n - 1), cor=CINZA),
+                     dict(rot="Tendência linear (r = %s)" % br(r, 2).replace("-", "−"), cor="linha:" + BRANCO)],
             pontos=pontos,
-            reta=dict(a=round(a, 4), b=round(b, 4), de=round(min(ppc[c][ANO] for c in lista), 0),
-                      ate=round(max(ppc[c][ANO] for c in lista), 0), cor=BRANCO),
+            reta=dict(a=round(a, 4), b=round(b, 4), de=round(min(ppc[c][ano] for c in lista), 0),
+                      ate=round(max(ppc[c][ano] for c in lista), 0), cor=BRANCO),
         )
 
-    grandes = [c for c in paises if pop[c][ANO] >= 1e6]
-    conferir(DESTAQUE in grandes and len(grandes) >= 140, "amostra de países com 1 milhão+ pequena (%d)" % len(grandes))
-    v1 = variante("Países com 1 milhão de habitantes ou mais", grandes)
-    v2 = variante("Todos os países (inclui microestados)", paises)
+    def variante(rot, filtro):
+        listas = {ano: [c for c in paises_de(ano) if filtro(c, ano)] for ano in anos}
+        quadros = {ano: quadro(listas[ano], ano, imprime=ano in (ANO_INI, ANO)) for ano in anos}
+        todos = [(ppc[c][ano], gasto[c][ano]) for ano in anos for c in listas[ano]]
+        x_min, x_max = min(v[0] for v in todos), max(v[0] for v in todos)
+        y_max = max(v[1] for v in todos)
+        v = dict(rot=rot, anoPadrao=ANO, quadros=quadros,
+                 eixoX=dict(unidade="usd", log=True, min=round(x_min / 1.15, 0), max=round(x_max * 1.15, 0),
+                            rot="PIB per capita (US$ internacionais em PPC, escala logarítmica)"),
+                 eixoY=dict(unidade="pct0", rot="Gasto do governo geral (% do PIB)", zero=True,
+                            max=10 * math.ceil(y_max / 10)))
+        v.update(quadros[ANO])
+        return v
+
+    v1 = variante("Países com 1 milhão de habitantes ou mais", lambda c, ano: pop[c][ano] >= 1e6)
+    v2 = variante("Todos os países (inclui microestados)", lambda c, ano: True)
     g_disp = dict(
         id="gasto-publico-pib-per-capita-2026",
         tipo="dispersao",
@@ -419,13 +431,18 @@ def main():
         subtitulo="Despesa do governo geral (% do PIB) e PIB per capita em PPC; tamanho da bolha pelo PIB",
         nota=("Despesa total do governo geral, inclusive juros da dívida (GGX_NGDP do FMI). PIB per capita em "
               "paridade de poder de compra, em dólares internacionais correntes (PPPPC), no eixo em escala "
-              "logarítmica. Tamanho da bolha proporcional ao PIB em PPC (PPPGDP). Valores de %s são estimativas "
-              "do FMI no World Economic Outlook. Reta de tendência por mínimos quadrados do gasto sobre o "
-              "logaritmo do PIB per capita, com o mesmo peso para cada país." % ANO),
+              "logarítmica. Tamanho da bolha proporcional ao PIB em PPC (PPPGDP), na mesma escala em todos os anos. "
+              "Anos de %s a %s, no World Economic Outlook de set/2026; %s é estimativa do FMI e %s também pode ser, "
+              "conforme o país. Reta de tendência por mínimos quadrados do gasto sobre o logaritmo do PIB per capita, "
+              "com o mesmo peso para cada país." % (ANO_INI, ANO, ANO, int(ANO) - 1)),
         fonte="FMI (World Economic Outlook) e FtM",
-        legenda=v1["legenda"], eixoX=v1["eixoX"], eixoY=v1["eixoY"], pontos=v1["pontos"], reta=v1["reta"],
+        pontoPadrao=dict(cor=CINZA, opacidade=0.55),
+        dicaModelo=["{n}", "Gasto do governo: {y:1}% do PIB", "PIB per capita (PPC): US$ {x:0}",
+                    "PIB (PPC): US$ {pib:0} bilhões", "População: {pop:1} milhões"],
         variantes=[v1, v2],
     )
+    for k in ("legenda", "eixoX", "eixoY", "pontos", "reta"):
+        g_disp[k] = v1[k]
     meses = sorted((int(d.split("/")[2]), int(d.split("/")[0])) for d in ed)
     referencia = "%04d-%02d" % meses[-1]
 
