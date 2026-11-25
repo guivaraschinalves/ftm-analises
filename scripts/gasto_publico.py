@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Gasto público em % do PIB contra o PIB per capita, 2026 (um ponto por país,
-tamanho pelo PIB em PPC, com a reta de mínimos quadrados). Refaz o gráfico do
+tamanho da bolha pelo PIB em PPC, com a reta de mínimos quadrados). Refaz o gráfico do
 Our World in Data ("Government spending as share of GDP vs. GDP per capita",
 2022) com os dados de 2026. Gera dados/gasto-publico.json. Só biblioteca padrão.
 Rodado à mão. Página própria: gasto-publico.html.
@@ -16,7 +16,7 @@ de dados do FMI, dataflow IMF.RES/WEO; a edição vem no atributo de cada série
   - PPPPC: PIB per capita em paridade de poder de compra, dólares
     internacionais correntes. O OWID usava o Maddison (dólares de 2011), que
     não chega a 2026; por isso a escala do eixo X não é a mesma do original.
-  - PPPGDP: PIB em PPC, dólares internacionais correntes (tamanho da bolinha).
+  - PPPGDP: PIB em PPC, dólares internacionais correntes (tamanho da bolha).
   - LP: população (corte de 1 milhão de habitantes e dica).
   - 2026 é estimativa do FMI na edição corrente do WEO, não dado fechado.
 
@@ -27,6 +27,28 @@ CONFERÊNCIAS QUE ABORTAM
     a tolerância é 2 p.p.
   - PPPPC = PPPGDP / LP em cada país (≤ 0,5%).
   - Amostra de pelo menos 150 países e Brasil presente.
+
+O GASTO AO LONGO DO TEMPO (seção nova, 25/11/2026)
+
+  - Gasto total, 1830 em diante: Our World in Data (historical-gov-spending-gdp),
+    que junta o "Public Finances in Modern History" e o WEO do FMI. É uma
+    safra anterior do FMI: de 2011 a 2019 fica a até 1,5 p.p. do WEO atual
+    (conferência que aborta), mas nos anos 1990 e 2000 o Reino Unido chega a
+    7 p.p. de diferença. Por isso o OWID só entra na série longa; a
+    decomposição usa o WEO atual.
+  - Consumo e investimento do governo geral: contas nacionais da OCDE
+    (DSD_NASEC10@DF_TABLE12, setor S13, P3 = despesa de consumo final, P51G =
+    formação bruta de capital fixo), em moeda local, divididos pelo PIB nominal
+    do Banco Mundial (NY.GDP.MKTP.CN). Conferência: P3/PIB contra a série
+    pronta do Banco Mundial (NE.CON.GOVT.ZS), ≤ 1 p.p. (o Reino Unido difere
+    0,9 p.p. no começo dos anos 1990 por revisão).
+  - Demais despesas = gasto total do WEO menos consumo menos investimento:
+    transferências, juros, subsídios e outras. O total da OCDE (OTE) não serve
+    de teto: para o Brasil passa de 60% do PIB, contra uns 48% do FMI.
+    Conferência: o resto não pode ser negativo.
+  - China só a partir de 2008 (INICIO_COMP).
+  - Brasil só vai até 2020 (o último ano com investimento do governo na
+    OCDE); Japão começa em 2005, Alemanha em 1995, Reino Unido em 1990.
 
 A reta: gasto (% do PIB) = a + b · log10(PIB per capita), mínimos quadrados
 sem ponderação (cada país conta um). Como o eixo X é logarítmico, ela sai reta.
@@ -49,9 +71,22 @@ API = "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.RES/WEO/+/"
 UA = {"User-Agent": "ftm-analises"}
 ANO = "2026"
 DESTAQUE = "BRA"
-# países com o nome escrito ao lado da bolinha (os demais só na dica)
+# países com o nome escrito ao lado da bolha (os demais só na dica)
 ROTULADOS = ["USA", "CHN", "IND", "FRA", "DEU", "ARG", "CHL", "MEX", "JPN", "NGA", "SGP", "NOR", "RUS", "ZAF"]
 # conta de despesa no ano fiscal (a razão do FMI não bate com GGX / NGDP do ano civil)
+OWID = "https://ourworldindata.org/grapher/historical-gov-spending-gdp.csv?v=1&csvType=full&useColumnShortNames=true"
+OCDE = "https://sdmx.oecd.org/public/rest/data/OECD.SDD.NAD,DSD_NASEC10@DF_TABLE12,/"
+WB = "https://api.worldbank.org/v2/country/%s/indicator/%s?format=json&per_page=5000&date=1950:2030"
+# os seis países do gráfico do OWID, na ordem da legenda; o Brasil é a série principal
+HIST = [("BRA", "Brasil"), ("DEU", "Alemanha"), ("GBR", "Reino Unido"), ("JPN", "Japão"),
+        ("USA", "Estados Unidos"), ("CHN", "China")]
+AZUL, VERDE, AZUL_CLARO, AMARELO = "#4F81BD", "#9BBB59", "#8EB4E3", "#FFFF00"
+COR_HIST = {"BRA": "#FFFFFF", "DEU": "#4F81BD", "GBR": "#8EB4E3", "JPN": "#9BBB59", "USA": "#C0504D",
+            "CHN": "#FFFF00"}
+# Antes de 2008 o total do WEO para a China cobre só parte do governo geral (salta de
+# 17,9% para 22,1% do PIB em 2008): consumo e investimento das contas nacionais passam
+# do total e o resto sairia negativo. A decomposição da China começa em 2008.
+INICIO_COMP = {"CHN": "2008"}
 ANO_FISCAL = {"BHS", "BRB", "BWA", "DMA", "FJI", "HKG", "JAM", "LCA", "MUS", "SGP", "SWZ", "THA", "TTO"}
 VERMELHO, BRANCO, CINZA = "#C0504D", "#FFFFFF", "#8a8a86"
 
@@ -133,9 +168,147 @@ def weo(indicador):
     return out, edicoes
 
 
+def carregar_owid():
+    """{iso3: {ano: gasto % PIB}} do OWID (FMI histórico)."""
+    import csv
+    import io
+    out = {}
+    for r in csv.DictReader(io.StringIO(baixar(OWID).decode("utf-8"))):
+        if r["code"] in dict(HIST) and r["expenditure"]:
+            out.setdefault(r["code"], {})[r["year"]] = float(r["expenditure"])
+    return out
+
+
+def carregar_ocde():
+    """{(iso3, P3|P51G): {ano: valor em moeda local}} das contas do governo geral."""
+    import csv
+    import io
+    chave = ".".join(["A", "+".join(c for c, _ in HIST), "S13", "", "", "P51G+P3", "", "", "", "", "", "", ""])
+    txt = baixar(OCDE + chave + "?startPeriod=1950&format=csvfilewithlabels").decode("utf-8")
+    out = {}
+    for r in csv.DictReader(io.StringIO(txt)):
+        conferir(r["UNIT_MEASURE"] == "XDC" and r["ACCOUNTING_ENTRY"] == "D", "OCDE: unidade ou lançamento inesperado")
+        out.setdefault((r["REF_AREA"], r["TRANSACTION"]), {})[r["TIME_PERIOD"]] = \
+            float(r["OBS_VALUE"]) * 10 ** int(r["UNIT_MULT"])
+    return out
+
+
+def carregar_wb(indicador):
+    d = json.loads(baixar(WB % (";".join(c for c, _ in HIST), indicador)))[1]
+    out = {}
+    for r in d:
+        if r["value"] is not None:
+            out.setdefault(r["countryiso3code"], {})[r["date"]] = float(r["value"])
+    return out
+
+
 def br(v, casas=1):
     s = "{:,.{c}f}".format(v, c=casas)
     return s.replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def historico(gasto):
+    """Gasto total desde 1830 (OWID) e a decomposição consumo, investimento e o resto."""
+    owid = carregar_owid()
+    ocde = carregar_ocde()
+    pib = carregar_wb("NY.GDP.MKTP.CN")
+    cons_wb = carregar_wb("NE.CON.GOVT.ZS")
+
+    # 1) série longa do OWID e conferência contra o WEO atual (2011 a 2019)
+    for c, nome in HIST:
+        conferir(c in owid and len(owid[c]) >= 40, "OWID sem %s" % nome)
+        for y in map(str, range(2011, 2020)):
+            if y in owid[c] and y in gasto.get(c, {}):
+                conferir(abs(owid[c][y] - gasto[c][y]) <= 1.5,
+                         "OWID e WEO divergem em %s %s (%.2f x %.2f)" % (nome, y, owid[c][y], gasto[c][y]))
+    print("  OWID, último ano:", ", ".join("%s %s %.1f%%" % (n, max(owid[c], key=int), owid[c][max(owid[c], key=int)])
+                                         for c, n in HIST))
+    g_total = dict(
+        id="gasto-publico-historico",
+        titulo="Gasto do governo em %% do PIB, %s a %s" % (min(min(owid[c], key=int) for c, _ in HIST),
+                                                         max(max(owid[c], key=int) for c, _ in HIST)),
+        subtitulo="Despesa total do governo em % do PIB, inclusive juros da dívida",
+        unidade="%", buracoMax=12,
+        fonte="FMI (Public Finances in Modern History e World Economic Outlook) via Our World in Data",
+        nota=("Governo geral (central, estados, municípios e previdência) quando disponível; nos anos mais antigos, "
+              "só o governo central. É a série do Our World in Data, que usa uma edição anterior do FMI: nos anos "
+              "recentes difere do World Economic Outlook atual em até 1,5 ponto do PIB."),
+        series=[dict(nome=n, cor=COR_HIST[c], largura=5.0 if c == "BRA" else 4.0, rotulo=True,
+                     dados=[["%s-01" % y, round(owid[c][y], 2)] for y in sorted(owid[c], key=int)])
+                for c, n in HIST],
+    )
+
+    # 2) consumo e investimento em % do PIB (OCDE / PIB do Banco Mundial)
+    cons, inv = {}, {}
+    for c, nome in HIST:
+        for t, dest in (("P3", cons), ("P51G", inv)):
+            for y, v in ocde.get((c, t), {}).items():
+                if y in pib.get(c, {}):
+                    dest.setdefault(c, {})[y] = v / pib[c][y] * 100
+        for y, v in cons.get(c, {}).items():
+            if y in cons_wb.get(c, {}):
+                conferir(abs(v - cons_wb[c][y]) <= 1.0, "consumo do governo %s %s: OCDE/PIB %.2f x Banco Mundial %.2f"
+                         % (nome, y, v, cons_wb[c][y]))
+        conferir(c in cons and c in inv, "OCDE sem consumo ou investimento de %s" % nome)
+
+    def linhas(dic):
+        return [dict(nome=n, cor=COR_HIST[c], largura=5.0 if c == "BRA" else 4.0, rotulo=True,
+                     dados=[["%s-01" % y, round(dic[c][y], 2)] for y in sorted(dic[c], key=int)])
+                for c, n in HIST if c in dic]
+    g_ci = dict(
+        id="gasto-publico-consumo-investimento",
+        titulo="Consumo e investimento do governo geral em % do PIB",
+        subtitulo="Contas nacionais: consumo final do governo (o G do PIB pela ótica da demanda) e formação bruta "
+                  "de capital fixo",
+        unidade="%", buracoMax=12,
+        fonte="OCDE (contas do governo geral), Banco Mundial e FtM",
+        nota=("Consumo do governo (P3): salários dos servidores, compras de bens e serviços e a depreciação do "
+              "capital público, menos o que o governo vende, mais os bens e serviços que entrega às famílias (como "
+              "remédios e serviços de saúde comprados do setor privado). Investimento (P51G): obras, equipamentos e "
+              "softwares do governo geral. Os dois em moeda local, divididos pelo PIB nominal do Banco Mundial. Na "
+              "China, as contas da OCDE vão até 2023; no Brasil, o investimento vai até 2020."),
+        variantes=[dict(rot="Consumo do governo", series=linhas(cons)),
+                   dict(rot="Investimento do governo", series=linhas(inv))],
+    )
+    g_ci["series"] = g_ci["variantes"][0]["series"]
+
+    # 3) decomposição do gasto total (WEO atual) por país
+    variantes = []
+    for c, nome in HIST:
+        anos = sorted((y for y in gasto.get(c, {}) if y in cons.get(c, {}) and y in inv.get(c, {})), key=int)
+        anos = [y for y in anos if int(INICIO_COMP.get(c, "0")) <= int(y) <= datetime.date.today().year - 1]
+        conferir(len(anos) >= 15, "decomposição curta para %s (%d anos)" % (nome, len(anos)))
+        resto = {y: gasto[c][y] - cons[c][y] - inv[c][y] for y in anos}
+        for y, v in resto.items():
+            conferir(v >= 0, "resto negativo em %s %s (%.2f)" % (nome, y, v))
+        u = anos[-1]
+        print("  %s %s: total %.1f = consumo %.1f + investimento %.1f + demais %.1f (%% do PIB)"
+              % (nome, u, gasto[c][u], cons[c][u], inv[c][u], resto[u]))
+        variantes.append(dict(
+            rot="%s (%s a %s)" % (nome, anos[0], u), categorias=anos, barra=1,
+            series=[dict(nome="Consumo do governo", cor=AZUL, tipo="barra",
+                         dados=[[str(i), round(cons[c][y], 2)] for i, y in enumerate(anos)]),
+                    dict(nome="Investimento do governo", cor=VERDE, tipo="barra",
+                         dados=[[str(i), round(inv[c][y], 2)] for i, y in enumerate(anos)]),
+                    dict(nome="Demais despesas (transferências, juros, subsídios e outras)", cor=VERMELHO, tipo="barra",
+                         dados=[[str(i), round(resto[y], 2)] for i, y in enumerate(anos)])]))
+    g_comp = dict(
+        id="gasto-publico-composicao",
+        titulo="Composição do gasto do governo geral em % do PIB",
+        subtitulo="Consumo e investimento do governo e as demais despesas, que não entram no PIB pela demanda",
+        unidade="%", fonte="FMI (World Economic Outlook), OCDE, Banco Mundial e FtM",
+        nota=("Gasto total do World Economic Outlook do FMI, inclusive juros. Consumo e investimento pelas contas "
+              "nacionais (OCDE). Demais despesas: o total menos consumo e investimento, isto é, aposentadorias, "
+              "benefícios sociais em dinheiro, juros da dívida, subsídios e outras transferências; são despesas "
+              "que mudam a renda de quem recebe, mas não são compra do governo e não somam no PIB pela ótica da "
+              "demanda. Como as duas fontes usam conceitos um pouco diferentes (o consumo das contas nacionais "
+              "inclui a depreciação do capital público), o resto é uma aproximação. Na China, a decomposição começa em "
+              "2008: antes disso, o total do FMI não cobre todo o governo geral."),
+        variantes=variantes,
+    )
+    for k in ("categorias", "barra", "series"):
+        g_comp[k] = variantes[0][k]
+    return [g_total, g_comp, g_ci]
 
 
 def main():
@@ -223,8 +396,12 @@ def main():
         id="gasto-publico-pib-per-capita-2026",
         tipo="dispersao",
         titulo="Gasto público em %% do PIB vs PIB per capita, %s" % ANO,
-        subtitulo="Despesa total do governo geral (inclui juros) e PIB per capita em PPC (US$ internacionais "
-                  "correntes, eixo logarítmico); %s é estimativa do FMI; bolinha proporcional ao PIB em PPC" % ANO,
+        subtitulo="Despesa do governo geral (% do PIB) e PIB per capita em PPC; tamanho da bolha pelo PIB",
+        nota=("Despesa total do governo geral, inclusive juros da dívida (GGX_NGDP do FMI). PIB per capita em "
+              "paridade de poder de compra, em dólares internacionais correntes (PPPPC), no eixo em escala "
+              "logarítmica. Tamanho da bolha proporcional ao PIB em PPC (PPPGDP). Valores de %s são estimativas "
+              "do FMI no World Economic Outlook. Reta de tendência por mínimos quadrados do gasto sobre o "
+              "logaritmo do PIB per capita, com o mesmo peso para cada país." % ANO),
         fonte="FMI (World Economic Outlook) e FtM",
         legenda=v1["legenda"], eixoX=v1["eixoX"], eixoY=v1["eixoY"], pontos=v1["pontos"], reta=v1["reta"],
         variantes=[v1, v2],
@@ -232,10 +409,13 @@ def main():
     meses = sorted((int(d.split("/")[2]), int(d.split("/")[0])) for d in ed)
     referencia = "%04d-%02d" % meses[-1]
 
+    graficos_hist = historico(gasto)
+
     hoje = datetime.date.today().isoformat()
-    doc = dict(assunto="Gasto público e renda per capita", grupo="Análises Variadas",
-               fonte="FMI (World Economic Outlook) e FtM", referencia=referencia, atualizado=hoje, formato="artigo",
-               secoes=[dict(titulo="Gasto público e renda", texto="", fontes=[], figuras=[], graficos=[g_disp])])
+    doc = dict(assunto="Gasto público", grupo="Análises Variadas",
+               fonte="FMI, OCDE, Banco Mundial, Our World in Data e FtM", referencia=referencia, atualizado=hoje, formato="artigo",
+               secoes=[dict(titulo="O gasto ao longo do tempo", texto="", fontes=[], figuras=[], graficos=graficos_hist),
+                       dict(titulo="Gasto público e renda", texto="", fontes=[], figuras=[], graficos=[g_disp])])
     with open(SAIDA, "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
         f.write("\n")

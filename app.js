@@ -80,7 +80,7 @@
   var FONTES = ["dados/gave.json", "dados/leituras-de-ciclo.json", "dados/cenario-2026-11-08.json",
                 "dados/cenario-2026-10-28-fomc.json",
                 "dados/orcamento-2027.json", "dados/defasagem-combustiveis.json", "dados/eleicoes.json", "dados/midterms-2026.json",
-                "dados/petroleo.json", "dados/ueno-bank.json", "dados/migracao-europa.json",
+                "dados/petroleo.json", "dados/ueno-bank.json", "dados/migracao-europa.json", "dados/gasto-publico.json",
                 "dados/missao-global-miami.json"];
   // Uma página pode pedir outros arquivos: <body data-fontes="dados/x.json">.
   if (document.body && document.body.getAttribute("data-fontes")) {
