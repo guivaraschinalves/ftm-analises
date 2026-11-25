@@ -1191,6 +1191,10 @@
   // y = a + b·x entre x = de e x = ate). "ate" num ponto desenha um traço
   // vertical de y até ate (o resultado parcial e o que falta apurar). O ponto
   // com "destaque" sai maior, com o rótulo em negrito e a "nota" ao lado.
+  // "eixoX": {log: true} põe o eixo X em escala logarítmica (marcas 1, 2 e 5
+  // vezes potências de 10) e a reta passa a ser y = a + b·log10(x). "raio" num
+  // ponto multiplica o tamanho da bolinha (ex.: pela população) e
+  // "opacidade" deixa as bolinhas grandes sem esconder as de baixo.
   // ---------- simulador de valuation (tipo "simulador") ----------
   // Trazido do ftm-dados. A receita cresce "cresc"% ao ano a partir da base
   // escolhida; o preço/vendas de hoje (preço × ações ÷ receita) vai em linha
@@ -1343,19 +1347,30 @@
     var g = graficoDe(cartao), pal = PALETAS[nomeTema], L = Object.assign({}, L0);
     var Fx = UNIDADES[(g.eixoX || {}).unidade] || UNIDADES.n, Fy = UNIDADES[(g.eixoY || {}).unidade] || UNIDADES.n;
     var svg = svgNovo(g, L), pts = g.pontos || [];
+    var logX = !!(g.eixoX || {}).log, tx = function (v) { return logX ? Math.log(v) / Math.LN10 : v; };
+    var yReta = function (r, x) { return r.a + r.b * tx(x); };
     var itensLeg = (g.legenda || []).map(function (it) {
       return it.cor && it.cor.indexOf("linha:") === 0 ? { rot: it.rot, cor: "nenhuma", linha: it.cor.slice(6) } : it;
     });
     var yLeg = legendaLinha(svg, itensLeg, moldura(svg, g, L, pal) + L.legenda.fs * 2.2, L, pal, true);
     var xs = pts.map(function (p) { return p.x; }), ys = [];
     pts.forEach(function (p) { ys.push(p.y); if (p.ate !== undefined) ys.push(p.ate); });
-    if (g.reta) { ys.push(g.reta.a + g.reta.b * g.reta.de, g.reta.a + g.reta.b * g.reta.ate); }
-    var ex = escalaY(Math.min.apply(null, xs), Math.max.apply(null, xs), Object.assign({ zero: false }, g.eixoX));
+    if (g.reta) { ys.push(yReta(g.reta, g.reta.de), yReta(g.reta, g.reta.ate)); }
+    var ex;
+    if (logX) {
+      var lo = Math.min.apply(null, xs) / 1.15, hi = Math.max.apply(null, xs) * 1.15, tk = [];
+      for (var e10 = Math.floor(tx(lo)); e10 <= Math.ceil(tx(hi)); e10++) {
+        [1, 2, 5].forEach(function (d) { var t = d * Math.pow(10, e10); if (t >= lo && t <= hi) tk.push(t); });
+      }
+      ex = { min: tx(lo), max: tx(hi), passo: 1, ticks: tk };
+    } else {
+      ex = escalaY(Math.min.apply(null, xs), Math.max.apply(null, xs), Object.assign({ zero: false }, g.eixoX));
+    }
     var ey = escalaY(Math.min.apply(null, ys.concat([0])), Math.max.apply(null, ys.concat([0])), Object.assign({ zero: false }, g.eixoY));
     var fs = L.tick, tw = Math.max.apply(null, ey.ticks.map(function (t) { return largura(Fy.eixo(t, ey.passo), fs); }));
     var x0 = L.titulo.x + fs * 1.6 + tw + 14, x1 = L.W - L.titulo.x - 20;
     var y0 = yLeg + L.legenda.fs * 1.6, y1 = L.fonte.y - L.fonte.fs * 2 - fs * 3.2;
-    var X = function (v) { return x0 + (v - ex.min) / (ex.max - ex.min) * (x1 - x0); };
+    var X = function (v) { return x0 + (tx(v) - ex.min) / (ex.max - ex.min) * (x1 - x0); };
     var Y = function (v) { return y1 - (v - ey.min) / (ey.max - ey.min) * (y1 - y0); };
     // grade e eixos
     ey.ticks.forEach(function (t) {
@@ -1384,11 +1399,12 @@
       svg.appendChild(el("defs", {}, [el("clipPath", { id: idClipD }, [
         el("rect", { x: x0, y: y0, width: x1 - x0, height: y1 - y0 })])]));
       svg.appendChild(el("line", { "clip-path": "url(#" + idClipD + ")",
-                                   x1: X(r.de), x2: X(r.ate), y1: Y(r.a + r.b * r.de), y2: Y(r.a + r.b * r.ate),
+                                   x1: X(r.de), x2: X(r.ate), y1: Y(yReta(r, r.de)), y2: Y(yReta(r, r.ate)),
                                    stroke: corNoTema(r.cor || "#FFFFFF", pal), "stroke-width": 2.5,
                                    "stroke-dasharray": "3 7", "stroke-linecap": "round", opacity: 0.85 }));
     }
     var raio = Math.max(7, fs * 0.36), fsR = Math.round(fs * 0.72);
+    function raioDe(p) { return p.raio ? raio * p.raio : (p.destaque ? raio * 1.5 : raio); }
     // rótulos: o destaque primeiro; cada um tenta direita, esquerda, cima e
     // baixo, e fica no primeiro lado que não bate em outro rótulo nem sai da
     // área. Quem não couber em lado nenhum fica sem rótulo (a dica continua).
@@ -1402,7 +1418,7 @@
       .forEach(function (k) {
         var p = pts[k];
         if (!p.rot) return;
-        var cx = X(p.x), cy = Y(p.y), rr = p.destaque ? raio * 1.5 : raio, f = p.destaque ? fs : fsR;
+        var cx = X(p.x), cy = Y(p.y), rr = raioDe(p), f = p.destaque ? fs : fsR;
         var w = largura(p.rot, f, p.destaque ? "bold" : "normal"), h = f * 1.15;
         var lados = [
           { x: cx + rr + 6, y: cy, a: "start", b: { x: cx + rr + 6, y: cy - h / 2, w: w, h: h } },
@@ -1420,14 +1436,15 @@
         posRot[k] = lado;
       });
     pts.forEach(function (p, k) {
-      var cor = corNoTema(p.cor || "#4F81BD", pal), cx = X(p.x), cy = Y(p.y), rr = p.destaque ? raio * 1.5 : raio;
+      var cor = corNoTema(p.cor || "#4F81BD", pal), cx = X(p.x), cy = Y(p.y), rr = raioDe(p);
       var gp = el("g", {});
       if (p.ate !== undefined) {
         gp.appendChild(el("line", { x1: cx, x2: cx, y1: cy, y2: Y(p.ate), stroke: cor, "stroke-width": 3,
                                     "stroke-dasharray": "4 4" }));
         gp.appendChild(el("circle", { cx: cx, cy: Y(p.ate), r: rr * 0.8, fill: pal.bg, stroke: cor, "stroke-width": 2.5 }));
       }
-      gp.appendChild(el("circle", { cx: cx, cy: cy, r: rr, fill: cor, stroke: pal.bg, "stroke-width": 2 }));
+      gp.appendChild(el("circle", { cx: cx, cy: cy, r: rr, fill: cor, "fill-opacity": p.opacidade || null,
+                                    stroke: pal.bg, "stroke-width": p.raio ? 1 : 2 }));
       if (p.dica) { var t = el("title", {}); t.textContent = p.dica; gp.appendChild(t); }
       svg.appendChild(gp);
       var lado = posRot[k];
