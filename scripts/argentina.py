@@ -15,12 +15,11 @@ DE ONDE VEM CADA COISA (Ámbito, mercados.ambito.com, histórico geral)
     básicos, desde dez/1998. Datas "dd-mm-aaaa".
   - dolar/informal/historico-general: dólar blue, compra e venda, desde
     jan/2002. Datas "dd/mm/aaaa".
-  - dólar oficial (varejo, média dos bancos; não é o atacado da Com. A
-    3500): a partir de jun/2010, BCRA, API v4.0, variável 4 ("Tipo de cambio
-    minorista, promedio vendedor"), a fonte primária que o Ámbito espelha;
-    de abr/2002 a mai/2010, dolar/oficial/historico-general do Ámbito. O
-    Ámbito tinha um pico falso em 23/04/2025 (1.333,24 contra 1.174,51 do
-    BCRA), achado na auditoria de 26/11/2026.
+  - dolar/oficial/historico-general: dólar oficial do Ámbito (varejo, média
+    dos bancos; não é o atacado da Com. A 3500), desde abr/2002. Fica o
+    Ámbito por decisão dele (26/11/2026), mesmo com dias que destoam do BCRA
+    (ex.: 23/04/2025, 1.333,24 no Ámbito contra 1.174,51 do BCRA, que dá
+    brecha de −9,2% nesse dia).
   - Usa-se a venda nas duas cotações.
 
 ARMADILHA DO ÁMBITO: a lista vem do mais novo para o mais velho e às vezes
@@ -109,7 +108,7 @@ CONFERÊNCIAS QUE ABORTAM (segunda fonte: api.argentinadatos.com)
     2 dias corridos (≤ 0,5%).
   - Oficial do Ámbito × BCRA (variável 4) dia a dia desde jun/2010: mediana
     ≤ 0,1% e no máximo 1% dos dias acima de 1% (os poucos dias fora ficam
-    impressos no log; a série usada é a do BCRA).
+    impressos no log; a série usada continua a do Ámbito).
   - Brecha recalculada a partir da série gravada (arredondada) contra a de
     precisão cheia: ≤ 0,05 p.p.
   - Reserva bruta do FMI (IRFCL65) contra o último dia do mês do BCRA desde
@@ -269,7 +268,7 @@ def conferir_cambio(nome, a, b):
         raise RuntimeError("%s: último fechamento %s (%s) não aparece no ArgentinaDatos" % (nome, ult, a[ult]))
 
 
-def oficial_bcra(amb):
+def conferir_oficial_bcra(amb):
     v4 = bcra(4, INICIO_OFICIAL_BCRA.isoformat())
     hoje = datetime.date.today()
     v4 = {d: x for d, x in v4.items() if d < hoje}
@@ -281,9 +280,6 @@ def oficial_bcra(amb):
           % (len(com), med * 100, len(fora), fora[:3]))
     if len(com) < 3000 or med > 0.001 or len(fora) > 0.01 * len(com):
         raise RuntimeError("oficial do Ámbito não bate com o BCRA")
-    out = {d: x for d, x in amb.items() if d < INICIO_OFICIAL_BCRA}
-    out.update(v4)
-    return out
 
 
 def serie(nome, s, casas, **extra):
@@ -590,7 +586,7 @@ def main():
     conferir_risco(risco, argdatos("finanzas/indices/riesgo-pais", "valor"))
     conferir_cambio("blue", blue, argdatos("cotizaciones/dolares/blue", "venta"))
     conferir_cambio("oficial", oficial, argdatos("cotizaciones/dolares/oficial", "venta"))
-    oficial = oficial_bcra(oficial)
+    conferir_oficial_bcra(oficial)
 
     dias = sorted(d for d in blue if d in oficial)
     brecha = {d: (blue[d] / oficial[d] - 1) * 100 for d in dias}
@@ -632,14 +628,14 @@ def main():
     g_cambio = dict(
         id="argentina-dolar-blue-oficial", titulo="Dólar blue e dólar oficial na Argentina",
         subtitulo="Pesos por dólar, cotação de venda; diário",
-        unidade="n2", diario=True, buracoMax=8, fonte="Ámbito (blue) e BCRA (oficial)",
+        unidade="n2", diario=True, buracoMax=8, fonte="Ámbito",
         variantes=recortes([serie("Dólar blue", blue, 2, cor=BRANCO, largura=3, rotulo=True),
                             serie("Dólar oficial", oficial, 2, cor=AZUL, largura=2.5, rotulo=True)], False),
     )
     g_brecha = dict(
         id="argentina-brecha-cambial", titulo="Brecha cambial na Argentina: dólar blue sobre o dólar oficial",
         subtitulo="Quanto o dólar blue supera o oficial, em % ou em pesos; cotação de venda; diário",
-        diario=True, buracoMax=8, fonte="Ámbito, BCRA e FtM", unidade="pct1",
+        diario=True, buracoMax=8, fonte="Ámbito e FtM", unidade="pct1",
         variantes=recortes([serie("Brecha (%)", brecha, 2, cor=BRANCO, largura=3, rotulo=True)], False, "em %", "pct1")
         + recortes([serie("Brecha (pesos)", dif, 2, cor=BRANCO, largura=3, rotulo=True)], False, "em pesos", "n2"),
     )
