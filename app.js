@@ -2572,6 +2572,10 @@
       } else if (s.tipo === "barra" || s.tipo === "faixa") {
         svg.appendChild(el("rect", { x: it.x + 6, y: y - 10, width: 22, height: 20, fill: cor,
                                      opacity: s.tipo === "faixa" ? (s.opacidade || 0.3) * 1.6 : (s.opacidade || null) }));
+      } else if (s.area && s.legendaQuadrado) {
+        // área com "legendaQuadrado": quadrado na cor e na transparência da área, não um traço
+        svg.appendChild(el("rect", { x: it.x + 6, y: y - 10, width: 22, height: 20, fill: cor,
+                                     opacity: s.opacidadeArea || 0.5 }));
       } else {
         var w = Math.min(s.largura || L.linha, 8);
         svg.appendChild(el("line", {

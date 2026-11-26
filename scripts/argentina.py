@@ -1034,7 +1034,7 @@ def main():
         subtitulo="US$ bilhões; diário; cifras provisórias", unidade="usd-bi", diario=True, buracoMax=8,
         fonte="BCRA (Principales variables)",
         eixo=dict(min=0, max=80),
-        variantes=recortes([serie("Reservas brutas", bi(bruta), 3, cor=AZUL, largura=1, rotulo=True, area=True,
+        variantes=recortes([serie("Reservas brutas", bi(bruta), 3, cor=AZUL, largura=1, rotulo=True, area=True, legendaQuadrado=True,
                                   opacidadeArea=0.85)], False),
     )
     g_comp = dict(
@@ -1056,9 +1056,9 @@ def main():
         unidade="usd-bi", fonte="BCRA (Reservas Internacionais e Liquidez em Moeda Estrangeira, via FMI) e FtM",
         variantes=recortes([
             serie("Reservas líquidas positivas", {m: max(liq[m], 0) / 1000 for m in meses}, 3, cor=AZUL, largura=1,
-                  area=True, opacidadeArea=0.85, rotulo=liq[meses[-1]] >= 0),
+                  area=True, legendaQuadrado=True, opacidadeArea=0.85, rotulo=liq[meses[-1]] >= 0),
             serie("Reservas líquidas negativas", {m: min(liq[m], 0) / 1000 for m in meses}, 3, cor=VERMELHO,
-                  largura=1, area=True, opacidadeArea=0.85, rotulo=liq[meses[-1]] < 0)], True),
+                  largura=1, area=True, legendaQuadrado=True, opacidadeArea=0.85, rotulo=liq[meses[-1]] < 0)], True),
     )
     g_ipc_m = dict(
         id="argentina-inflacao-mensal", titulo="Inflação mensal na Argentina",
