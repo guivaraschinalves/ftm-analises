@@ -356,6 +356,19 @@ def recortes(series, mensal, rot_extra="", unidade=None):
     return [a]
 
 
+def eixo_em(g, rot, eixo):
+    """Fixa o eixo numa opção do cartão (pelo rótulo) ou no cartão todo (rot=None)."""
+    if rot is None:
+        g["eixo"] = eixo
+        return g
+    achou = [v for v in g.get("variantes", []) if v["rot"] == rot]
+    if not achou:
+        raise RuntimeError("%s: opção %r não existe" % (g["id"], rot))
+    for v in achou:
+        v["eixo"] = eixo
+    return g
+
+
 def achatar(g):
     """Cartão com um recorte só não precisa de botões: as séries sobem para o gráfico."""
     if len(g.get("variantes", [])) == 1:
@@ -892,7 +905,9 @@ def main():
         id="argentina-reservas-brutas", titulo="Reservas internacionais brutas do BCRA",
         subtitulo="US$ bilhões; diário; cifras provisórias", unidade="usd-bi", diario=True, buracoMax=8,
         fonte="BCRA (Principales variables)",
-        variantes=recortes([serie("Reservas brutas", bi(bruta), 3, cor=BRANCO, largura=3, rotulo=True)], False),
+        eixo=dict(min=0, max=80),
+        variantes=recortes([serie("Reservas brutas", bi(bruta), 3, cor=AZUL, largura=1, rotulo=True, area=True,
+                                  opacidadeArea=0.85)], False),
     )
     g_comp = dict(
         id="argentina-reservas-ativos-passivos", titulo="Reservas do BCRA: ativos e passivos de curto prazo",
@@ -911,8 +926,11 @@ def main():
         id="argentina-reservas-liquidas", titulo="Reservas internacionais líquidas do BCRA",
         subtitulo="Reservas brutas menos os passivos de curto prazo do BCRA em moeda estrangeira; US$ bilhões, fim de mês",
         unidade="usd-bi", fonte="BCRA (Reservas Internacionais e Liquidez em Moeda Estrangeira, via FMI) e FtM",
-        variantes=recortes([serie("Reservas líquidas", {m: liq[m] / 1000 for m in meses}, 3,
-                                  cor=BRANCO, largura=3, rotulo=True)], True),
+        variantes=recortes([
+            serie("Reservas líquidas positivas", {m: max(liq[m], 0) / 1000 for m in meses}, 3, cor=AZUL, largura=1,
+                  area=True, opacidadeArea=0.85, rotulo=liq[meses[-1]] >= 0),
+            serie("Reservas líquidas negativas", {m: min(liq[m], 0) / 1000 for m in meses}, 3, cor=VERMELHO,
+                  largura=1, area=True, opacidadeArea=0.85, rotulo=liq[meses[-1]] < 0)], True),
     )
     g_ipc_m = dict(
         id="argentina-inflacao-mensal", titulo="Inflação mensal na Argentina",
@@ -1072,6 +1090,7 @@ def main():
             serie("Outros + Derivativos", bi_(f(bpq["outros"])), 3, cor="#4BACC6", tipo="barra"),
             serie("Saldo Conta Financeira", bi_(f(bpq["cf"])), 3, cor=BRANCO, largura=3, rotulo=True)]),
     )
+    eixo_em(g_cf, None, dict(max=60))
     tq = trims[-1]
     a4 = {k: acum4(x)[tq] / 1000 for k, x in bpq.items()}
     print("BP %s, 4 trimestres (US$ bi): CC %.1f, KA %.1f, CF %.1f, reservas %.1f, E&O %.1f; bens %.1f, serv %.1f, "
@@ -1087,13 +1106,17 @@ def main():
         series_qq.append(serie("Prévia pelo EMAE (%s)" % ", ".join(tri_nome(m) for m in sorted(previa)), previa, 2,
                                cor=AZUL, tipo="barra", opacidade=0.4))
     g_pib = dict(
-        id="argentina-pib", titulo="PIB real da Argentina",
-        subtitulo="Variação % real; 4 trimestres sobre os 4 anteriores ou trimestre contra o anterior "
-                  "(dessazonalizado)",
+        id="argentina-pib", titulo="PIB real da Argentina: variação acumulada em 4 trimestres",
+        subtitulo="Variação % real dos 4 últimos trimestres sobre os 4 anteriores; série original; "
+                  "trimestres datados no último mês",
         unidade="pct1", barra=3, buracoMax=3, fonte="INDEC (cuentas nacionales) e FtM",
-        variantes=recortes([serie("PIB, acumulado em 4 trimestres", pib_a4, 2, cor=AZUL, tipo="barra")], True,
-                           "acumulado em 4 trimestres", "pct1")
-        + recortes(series_qq, True, "trimestral, dessazonalizado", "pct1"),
+        variantes=recortes([serie("PIB, acumulado em 4 trimestres", pib_a4, 2, cor=AZUL, tipo="barra")], True),
+    )
+    g_pib_t = dict(
+        id="argentina-pib-trimestral", titulo="PIB real da Argentina: variação trimestral",
+        subtitulo="Variação % real sobre o trimestre anterior; dessazonalizado; trimestres datados no último mês",
+        unidade="pct1", barra=3, buracoMax=3, fonte="INDEC (cuentas nacionales e EMAE) e FtM",
+        variantes=recortes(series_qq, True),
     )
     g_emae_i = dict(
         id="argentina-emae-indice", titulo="EMAE: estimador mensal de atividade econômica da Argentina",
@@ -1126,6 +1149,10 @@ def main():
                                                          emae_a[me], emae_m[me], "sim" if usa_previa else "não",
                                                          dif_emae, {k: round(v, 2) for k, v in previa.items()}))
 
+    eixo_em(g_bm, "em pesos", dict(max=50))
+    for g_ in (g_m2, g_m2_moeda, g_m2_4):
+        eixo_em(g_, "em dólares", dict(max=120))
+
     m = meses_mon[-1]
     print("monetário %s: base %.2f tri, M2 %.2f tri (US$ %.1f bi), %% em moeda estrangeira %.1f%%, "
           "base 12m %.1f%%, M2 12m %.1f%%" % (m, bm[m] / 1e9, m2t[m] / 1e9, m2t[m] / cambio[m] / 1e6,
@@ -1142,7 +1169,7 @@ def main():
                             graficos=[g_bruta, g_comp, g_liq]),
                        dict(titulo="Inflação", texto="", fontes=[], figuras=[], graficos=[g_ipc_m, g_ipc_a]),
                        dict(titulo="Atividade", texto="", fontes=[], figuras=[],
-                            graficos=[g_pib, g_emae_i, g_emae_a, g_emae_m, g_emae_t]),
+                            graficos=[g_pib, g_pib_t, g_emae_i, g_emae_a, g_emae_m, g_emae_t]),
                        dict(titulo="Contas externas", texto="", fontes=[], figuras=[], graficos=[g_bp, g_cc, g_cf]),
                        dict(titulo="Ativos do BCRA", texto="", fontes=[], figuras=[], graficos=[g_ativos, g_ativos_a]),
                        dict(titulo="Base monetária", texto="", fontes=[], figuras=[], graficos=[g_bm, g_bm_a]),
