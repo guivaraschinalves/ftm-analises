@@ -127,6 +127,13 @@ ATIVIDADE (PIB trimestral e EMAE mensal, INDEC)
     comércio (G), demais serviços (E, H a O) e impostos líquidos de
     subsídios. O serviço doméstico (P, 0,6% do PIB de 2004) não tem índice
     mensal e fica de fora, como no próprio EMAE.
+  - Índice por atividade (pedido dele em 26/11/2026, como o gráfico
+    "Actividad económica por sectores"): o INDEC não dessazonaliza o EMAE
+    por setor, então, por escolha dele, cada setor vai em média móvel de 12
+    meses da série original, com base nov/2023 = 100 (BASE_ATIVIDADE).
+    Agro (A), indústria (D), comércio (G), energia e mineração (C + E,
+    somados pelos pesos de 2004) e construção (F); o EMAE total, com o mesmo
+    tratamento, vai de referência.
   - Se o EMAE trimestral acompanhar o PIB (diferença média ≤ TOL_EMAE_PIB
     p.p. em todos os trimestres com os dois), o trimestre que o EMAE já
     fechou e o PIB ainda não vai meio sombreado no gráfico do PIB trimestral.
@@ -244,6 +251,9 @@ INICIO_BP = "1992-03"
 INDEC_FTP = "https://www.indec.gob.ar/ftp/cuadros/economia/"
 TOL_EMAE_PIB = 0.25
 TOL_CONTRIB = 0.6
+BASE_ATIVIDADE = "2023-11"
+SETORES_ATIVIDADE = [("Agro", ["A"], "#4F81BD"), ("Indústria", ["D"], "#C0504D"), ("Comércio", ["G"], "#9BBB59"),
+                     ("Energia e mineração", ["C", "E"], "#8EB4E3"), ("Construção", ["F"], "#1F497D")]
 GRUPOS_EMAE = [("Agro e pesca", ["A", "B"], "#4F81BD"), ("Mineração", ["C"], "#C0504D"),
                ("Indústria", ["D"], "#9BBB59"), ("Construção", ["F"], "#1F497D"),
                ("Comércio", ["G"], "#8EB4E3"), ("Demais serviços", ["E", "H", "I", "J", "K", "L", "M", "N", "O"],
@@ -800,7 +810,7 @@ def pib_emae():
             col["T"] = k
         elif len(t) > 2 and t[1:4].strip().startswith("-") and t[0].isalpha():
             col[t[0]] = k
-    letras = [l for g in GRUPOS_EMAE for l in g[1]]
+    letras = sorted({l for g in GRUPOS_EMAE for l in g[1]} | {l for g in SETORES_ATIVIDADE for l in g[1]})
     if any(l not in col or l not in peso for l in letras):
         raise RuntimeError("EMAE por setor: faltam colunas %r" % [l for l in letras if l not in col])
     setor, ano = {}, None
@@ -833,7 +843,21 @@ def pib_emae():
           "diferença média %.3f p.p. (últimos 8: %.3f), correlação %.4f"
           % (min(eo), max(eo), p1, p2, len(comuns), dif, dif_rec,
              statistics.correlation([tri[m] for m in comuns], [qq[m] for m in comuns])))
-    return orig, des, qq, a4, eo, ed, ea, em, tri, dif, contrib
+    # índice por atividade: média de 12 meses, base BASE_ATIVIDADE = 100
+    def mm12(s_):
+        return {m: statistics.mean(s_[mais(m, -k)] for k in range(12)) for m in s_
+                if all(mais(m, -k) in s_ for k in range(12))}
+    ativ = {}
+    for nome, ls, _ in SETORES_ATIVIDADE:
+        bruto = {m: sum(peso[l] * v[l] for l in ls) for m, v in setor.items()}
+        media = mm12(bruto)
+        ativ[nome] = {m: x / media[BASE_ATIVIDADE] * 100 for m, x in media.items()}
+    media_t = mm12(eo)
+    ativ["EMAE total"] = {m: x / media_t[BASE_ATIVIDADE] * 100 for m, x in media_t.items()}
+    ult = max(ativ["EMAE total"])
+    print("atividade por setor (média de 12 meses, %s = 100), %s: %s" % (
+        BASE_ATIVIDADE, ult, ", ".join("%s %.1f" % (k, v[ult]) for k, v in ativ.items())))
+    return orig, des, qq, a4, eo, ed, ea, em, tri, dif, contrib, ativ
 
 
 def sgs(cod):
@@ -947,7 +971,7 @@ def main():
     meses_bal, bal = balanco_bcra({m: mon[1606][m] for m in meses_mon}, cambio)
     trims, bpq = bp()
     (pib_o, pib_d, pib_qq, pib_a4, emae_o, emae_d, emae_a, emae_m, emae_tri, dif_emae,
-     emae_contrib) = pib_emae()
+     emae_contrib, emae_ativ) = pib_emae()
     u = max(bruta)
     print("última reserva bruta (BCRA): %s = US$ %.0f milhões" % (u, bruta[u]))
     m = meses[-1]
@@ -1200,6 +1224,16 @@ def main():
         subtitulo="Índice, 2004 = 100; dessazonalizado", unidade="ind", fonte="INDEC (EMAE)",
         variantes=recortes([serie("Dessazonalizado", emae_d, 2, cor=BRANCO, largura=3, rotulo=True)], True),
     )
+    g_emae_s = dict(
+        id="argentina-emae-atividade", titulo="EMAE por atividade econômica",
+        subtitulo="Índice, nov/2023 = 100; média móvel de 12 meses da série original (o INDEC não dessazonaliza "
+                  "os setores)",
+        unidade="ind", fonte="INDEC (EMAE) e FtM", eixo=dict(zero=False),
+        variantes=recortes([serie(nome, emae_ativ[nome], 2, cor=cor, largura=2.5, rotulo=True)
+                            for nome, _, cor in SETORES_ATIVIDADE]
+                           + [serie("EMAE total", emae_ativ["EMAE total"], 2, cor=BRANCO, largura=3, rotulo=True)],
+                           True),
+    )
     g_emae_a = dict(
         id="argentina-emae-12m", titulo="EMAE: variação anual e contribuições por setor",
         subtitulo="Variação % sobre o mesmo mês do ano anterior, série original; barras: contribuição de cada "
@@ -1249,7 +1283,7 @@ def main():
                             graficos=[g_bruta, g_comp, g_liq]),
                        dict(titulo="Inflação", texto="", fontes=[], figuras=[], graficos=[g_ipc_m, g_ipc_a]),
                        dict(titulo="Atividade", texto="", fontes=[], figuras=[],
-                            graficos=[g_pib, g_pib_t, g_emae_i, g_emae_a, g_emae_m, g_emae_t]),
+                            graficos=[g_pib, g_pib_t, g_emae_i, g_emae_s, g_emae_a, g_emae_m, g_emae_t]),
                        dict(titulo="Contas externas", texto="", fontes=[], figuras=[], graficos=[g_bp, g_cc, g_cf]),
                        dict(titulo="Ativos do BCRA", texto="", fontes=[], figuras=[], graficos=[g_ativos, g_ativos_a]),
                        dict(titulo="Base monetária", texto="", fontes=[], figuras=[], graficos=[g_bm, g_bm_a]),
