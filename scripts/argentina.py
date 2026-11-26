@@ -1322,7 +1322,11 @@ def main():
     print("Brasil %s: base 12m %.1f%%, M2 12m %.1f%%" % (mb, br_base[mb], br_m2[max(br_m2)]))
 
     ref = max(max(risco), dias[-1], max(bruta))
-    doc = dict(assunto="Argentina", grupo="Análises Variadas", fonte="Ámbito, BCRA, BCB, FMI, INDEC e FtM",
+    MES_CAPA = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
+    hoje_ = datetime.date.today()
+    doc = dict(assunto="Argentina", grupo="Análises Variadas",
+               capaFtm=dict(titulo="Indicadores Econômicos da Argentina",
+                            data="%02d/%s/%d" % (hoje_.day, MES_CAPA[hoje_.month - 1], hoje_.year)), fonte="Ámbito, BCRA, BCB, FMI, INDEC e FtM",
                referencia=ref.strftime("%Y-%m"), atualizado=datetime.date.today().isoformat(), formato="artigo",
                secoes=[dict(titulo="Risco país", texto="", fontes=[], figuras=[], graficos=[g_risco]),
                        dict(titulo="Câmbio", texto="", fontes=[], figuras=[], graficos=[g_cambio, g_brecha]),

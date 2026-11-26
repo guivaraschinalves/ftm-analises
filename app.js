@@ -3252,7 +3252,8 @@
       for (var k = 0; k < porRaiz.length; k++) if (porRaiz[k][0] === raiz) return porRaiz[k][1];
       return null;
     }
-    lista.push({ tipo: "capa", img: dados.capa || null, titulo: dados.assunto || "", assinatura: dados.assinatura || "" });
+    lista.push({ tipo: "capa", img: dados.capa || null, titulo: dados.assunto || "", assinatura: dados.assinatura || "",
+                 ftm: dados.capaFtm || null });
     [].forEach.call(art.children, function (no) {
       if (no.classList.contains("artigo-parte")) {
         parte = no.textContent.trim();
@@ -3454,6 +3455,21 @@
     palco.innerHTML = "";
     palco.className = "apres-palco" + (animar && !SEM_MOVIMENTO ? " ap-entra" : "");
     apres.cartao = s.tipo === "grafico" ? s.cartao : null;
+    if (s.tipo === "capa" && s.ftm) {
+      // capa no padrão do FtM ("capaFtm": {titulo, data}): fundo de notas,
+      // logo branco no alto, o título no meio e a data embaixo
+      var lc = lamina("apres-capa apres-capa-ftm");
+      if (logoSvg) {
+        var lg = el("svg", { "class": "apres-capa-logo", viewBox: logoSvg.viewBox, "aria-label": "Follow the Money" });
+        var gl = el("g", { fill: "#fff" });
+        logoSvg.nos.forEach(function (n) { gl.appendChild(n.cloneNode(true)); });
+        lg.appendChild(gl);
+        lc.appendChild(lg);
+      }
+      lc.appendChild(html("h1", { texto: s.ftm.titulo || s.titulo }));
+      if (s.ftm.data) lc.appendChild(html("p", { "class": "apres-capa-data", texto: s.ftm.data }));
+      return;
+    }
     if (s.tipo === "capa") {
       var l = lamina("apres-capa");
       if (s.img) l.appendChild(html("img", { src: s.img, alt: s.titulo }));

@@ -939,6 +939,11 @@ body.apres-aberta { overflow: hidden; }
   font-size: 34px; letter-spacing: .04em; color: #fff;
   background: linear-gradient(180deg, transparent, rgba(2, 10, 24, .75));
 }
+/* capa no padrão do FtM ("capaFtm" no JSON) */
+.apres-capa-ftm { background: #000 url("assets/fundo.jpg") center / cover no-repeat; }
+.apres-capa-ftm .apres-capa-logo { position: absolute; left: 0; right: 0; top: 112px; width: 480px; height: auto; margin: 0 auto; display: block; }
+.apres-capa-ftm h1 { top: 512px; font-size: 64px; font-weight: 700; color: #fff; }
+.apres-capa-ftm .apres-capa-data { position: absolute; left: 0; right: 0; top: 912px; margin: 0; text-align: center; font-size: 40px; color: #fff; }
 :root[data-marca="missao"] .apres-capa-assinatura { font-family: var(--titulo-missao); font-size: 44px; }
 .apres-parte {
   display: flex; align-items: center; justify-content: center; text-align: center;
