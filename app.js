@@ -3583,6 +3583,9 @@
   // "Apresentar daqui": no HTML avulso (<body data-so-apresentar>), o botão do
   // cartão no lugar de Zoom e Tela cheia, que abre a apresentação nele
   var SO_APRESENTAR = !!(document.body && document.body.hasAttribute("data-so-apresentar"));
+  // <body data-apresentar-daqui>: o mesmo botão em cada cartão, mas mantendo
+  // Zoom e Tela cheia (página da Argentina)
+  var APRESENTAR_DAQUI = SO_APRESENTAR || !!(document.body && document.body.hasAttribute("data-apresentar-daqui"));
   function botaoApresentarDaqui(cartao) {
     var b = html("button", { type: "button", "class": "btn", title: "Apresentar em slides a partir deste gráfico" });
     b.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">' +
@@ -3781,7 +3784,7 @@
     ferramentas.appendChild(esquerda);
 
     var acoes = html("div", { "class": "card-acoes" });
-    if (SO_APRESENTAR) acoes.appendChild(botaoApresentarDaqui(cartao));
+    if (APRESENTAR_DAQUI) acoes.appendChild(botaoApresentarDaqui(cartao));
     if (g.tipo === "figura") {
       // imagem de terceiros (gráfico de outra fonte): o que dá é ir à origem
       if (g.link) {
