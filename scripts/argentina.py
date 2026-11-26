@@ -116,13 +116,13 @@ ATIVIDADE (PIB trimestral e EMAE mensal, INDEC)
     medida comparável à variação trimestral do PIB dessazonalizado.
   - Contribuições por setor: o INDEC só abre o EMAE por setor na série
     original (sh_emae_actividad_base2004.xls, aba "Tabla Letras", índices
-    2004 = 100), então elas são da variação contra o mesmo trimestre do ano
-    anterior, não da variação dessazonalizada. Peso de cada setor = valor
+    2004 = 100), então elas são da variação anual mensal (mês contra o
+    mesmo mês do ano anterior), no gráfico "EMAE: variação anual". Peso de cada setor = valor
     adicionado de 2004 a preços de 2004 (PIB, cuadro 4, coluna "Total" de
     2004; impostos = as três linhas de impostos). A soma ponderada dos
     índices reproduz o EMAE publicado (erro médio de 0,06%); a contribuição
-    é peso × (média do trimestre − média do mesmo trimestre do ano
-    anterior) ÷ soma ponderada do ano anterior. Setores agrupados em 7:
+    é peso × (índice do mês − índice do mesmo mês do ano anterior) ÷ soma
+    ponderada do mesmo mês do ano anterior. Setores agrupados em 7:
     agro e pesca (A, B), mineração (C), indústria (D), construção (F),
     comércio (G), demais serviços (E, H a O) e impostos líquidos de
     subsídios. O serviço doméstico (P, 0,6% do PIB de 2004) não tem índice
@@ -187,7 +187,7 @@ CONFERÊNCIAS QUE ABORTAM (segunda fonte: api.argentinadatos.com)
     (aba "desestacionalizado v", ≤ 0,001 p.p.). EMAE: variação anual e
     mensal refeitas contra as publicadas na planilha (≤ 0,001 p.p.).
   - Contribuições do EMAE: a soma das contribuições contra a variação anual
-    do trimestre pelo EMAE publicado, desde 2005: ≤ TOL_CONTRIB p.p.; a
+    publicada do EMAE, mês a mês desde 2005: ≤ TOL_CONTRIB p.p.; a
     soma dos pesos de 2004 (setores + impostos + P) = PIB de 2004.
   - Brasil: base = papel-moeda emitido + reservas bancárias e M2 = M1 +
     poupança + títulos privados (≤ R$ 2 mil em todo mês); base do BCB contra
@@ -810,19 +810,18 @@ def pib_emae():
         mes = str(la.get((r, 1)) or "").strip()
         if mes in MES and ano and num_(la.get((r, col["A"]))) is not None:
             setor["%04d-%02d" % (ano, MES[mes])] = {l: num_(la[(r, col[l])]) for l in letras}
-    qmed = lambda s_, m: statistics.mean(s_[mais(m, -k)] for k in range(3))
-    contrib, ea_tri = {}, {}
+    contrib = {}
     for m in setor:
-        if int(m[5:]) % 3 or not all(mais(m, -k) in setor and mais(m, -12 - k) in setor for k in range(3)):
+        if mais(m, -12) not in setor:
             continue
-        qa = {l: statistics.mean(setor[mais(m, -k)][l] for k in range(3)) for l in letras}
-        qb = {l: statistics.mean(setor[mais(m, -12 - k)][l] for k in range(3)) for l in letras}
+        qa, qb = setor[m], setor[mais(m, -12)]
         den = sum(peso[l] * qb[l] for l in letras)
         contrib[m] = {g[0]: sum(peso[l] * (qa[l] - qb[l]) for l in g[1]) / den * 100 for g in GRUPOS_EMAE}
-        ea_tri[m] = (qmed(eo, m) / qmed(eo, mais(m, -12)) - 1) * 100
-    difc = max((abs(sum(contrib[m].values()) - ea_tri[m]), m) for m in contrib)
-    print("EMAE por setor: %d trimestres; soma das contribuições × variação anual publicada: maior diferença "
-          "%.3f p.p. (%s)" % (len(contrib), difc[0], difc[1]))
+    difs_c = sorted(((abs(sum(contrib[m].values()) - pub_a[m]), m) for m in contrib if m in pub_a), reverse=True)
+    print("EMAE por setor: %d meses; soma das contribuições × variação anual publicada: maior diferença "
+          "%.3f p.p. (%s), mediana %.3f" % (len(contrib), difs_c[0][0], difs_c[0][1],
+                                          statistics.median(x for x, _ in difs_c)))
+    difc = difs_c[0]
     if difc[0] > TOL_CONTRIB:
         raise RuntimeError("contribuições do EMAE não somam a variação anual")
     pib_a = {m: (orig[m] / orig[mais(m, -12)] - 1) * 100 for m in orig if mais(m, -12) in orig}
@@ -834,7 +833,7 @@ def pib_emae():
           "diferença média %.3f p.p. (últimos 8: %.3f), correlação %.4f"
           % (min(eo), max(eo), p1, p2, len(comuns), dif, dif_rec,
              statistics.correlation([tri[m] for m in comuns], [qq[m] for m in comuns])))
-    return orig, des, qq, a4, eo, ed, ea, em, tri, dif, contrib, ea_tri, pib_a
+    return orig, des, qq, a4, eo, ed, ea, em, tri, dif, contrib
 
 
 def sgs(cod):
@@ -948,7 +947,7 @@ def main():
     meses_bal, bal = balanco_bcra({m: mon[1606][m] for m in meses_mon}, cambio)
     trims, bpq = bp()
     (pib_o, pib_d, pib_qq, pib_a4, emae_o, emae_d, emae_a, emae_m, emae_tri, dif_emae,
-     emae_contrib, emae_a_tri, pib_a) = pib_emae()
+     emae_contrib) = pib_emae()
     u = max(bruta)
     print("última reserva bruta (BCRA): %s = US$ %.0f milhões" % (u, bruta[u]))
     m = meses[-1]
@@ -1202,10 +1201,13 @@ def main():
         variantes=recortes([serie("Dessazonalizado", emae_d, 2, cor=BRANCO, largura=3, rotulo=True)], True),
     )
     g_emae_a = dict(
-        id="argentina-emae-12m", titulo="EMAE: variação anual",
-        subtitulo="Variação % sobre o mesmo mês do ano anterior; série original", unidade="pct1",
-        fonte="INDEC (EMAE) e FtM",
-        variantes=recortes([serie("EMAE", emae_a, 2, cor=BRANCO, largura=3, rotulo=True)], True),
+        id="argentina-emae-12m", titulo="EMAE: variação anual e contribuições por setor",
+        subtitulo="Variação % sobre o mesmo mês do ano anterior, série original; barras: contribuição de cada "
+                  "setor, em p.p.",
+        unidade="pct1", barra=1, fonte="INDEC (EMAE e cuentas nacionales) e FtM",
+        variantes=recortes([serie(nome, {m: v[nome] for m, v in emae_contrib.items()}, 2, cor=cor, tipo="barra")
+                            for nome, _, cor in GRUPOS_EMAE]
+                           + [serie("EMAE", emae_a, 2, cor=BRANCO, largura=3, rotulo=True)], True),
     )
     g_emae_m = dict(
         id="argentina-emae-mensal", titulo="EMAE: variação mensal",
@@ -1215,18 +1217,11 @@ def main():
     )
     g_emae_t = dict(
         id="argentina-emae-trimestre", titulo="EMAE no trimestre e PIB trimestral",
-        subtitulo="Variação % do trimestre; EMAE pela média dos 3 meses; trimestres datados no último mês",
+        subtitulo="Variação % do trimestre contra o anterior, dessazonalizado; EMAE pela média dos 3 meses; "
+                  "trimestres datados no último mês",
         unidade="pct1", barra=3, buracoMax=3, fonte="INDEC (EMAE e cuentas nacionales) e FtM",
         variantes=recortes([serie("EMAE, média do trimestre", emae_tri, 2, cor=AZUL, tipo="barra"),
-                            serie("PIB", pib_qq, 2, cor=BRANCO, largura=3, rotulo=True)], True,
-                           "contra o trimestre anterior, dessazonalizado", "pct1")
-        + recortes([serie(nome, {m: v[nome] for m, v in emae_contrib.items()}, 2, cor=cor, tipo="barra")
-                    for nome, _, cor in GRUPOS_EMAE]
-                   + [serie("EMAE", emae_a_tri, 2, cor=BRANCO, largura=3, rotulo=True),
-                      # sem rótulo: o PIB termina um trimestre antes do EMAE; o valor fica na caixa do mouse
-                      serie("PIB", {m: x for m, x in pib_a.items() if m >= min(emae_contrib)}, 2, cor="#8a8a86",
-                            largura=2.5)], True,
-                   "contra o mesmo trimestre do ano anterior, contribuições por setor (p.p.)", "pct1"),
+                            serie("PIB", pib_qq, 2, cor=BRANCO, largura=3, rotulo=True)], True),
     )
     mq, me = max(pib_qq), max(emae_o)
     print("PIB %s: trimestral %.2f%%, 4 trimestres %.2f%% | EMAE %s: índice %.2f, anual %.2f%%, mensal %.2f%% | "
