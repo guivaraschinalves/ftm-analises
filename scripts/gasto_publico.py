@@ -62,6 +62,14 @@ CRÉDITO AO SETOR NÃO FINANCEIRO (seção nova, 26/11/2026)
     empréstimos, com qualquer credor), não só crédito bancário; pode diferir da
     dívida bruta publicada por cada país.
 
+APOSENTADORIAS (seção nova, 26/11/2026)
+
+  - OCDE, Pensions at a Glance: taxa bruta de reposição (GPRR100, homens, regimes
+    obrigatórios) da API (DSD_PAG@DF_PRR, só a edição corrente) e idade futura de
+    aposentadoria (DF_DPS, FRPLF22). As edições anteriores ficam em PRR_EDICOES.
+  - Conferência: as médias da OCDE (38) e da UE (27) refeitas como média simples
+    dos membros batem com as publicadas (≤ 0,1 p.p.).
+
 A reta: gasto (% do PIB) = a + b · log10(PIB per capita), mínimos quadrados
 sem ponderação (cada país conta um). Como o eixo X é logarítmico, ela sai reta.
 
@@ -111,6 +119,37 @@ NOMES_BIS = {"AR": "Argentina", "AT": "Áustria", "AU": "Austrália", "BE": "Bé
              "SE": "Suécia", "SG": "Singapura", "TH": "Tailândia", "TR": "Turquia", "US": "Estados Unidos",
              "ZA": "África do Sul"}
 TOP_CREDITO = 20
+OCDE_PRR = ("https://sdmx.oecd.org/public/rest/data/OECD.ELS.SPD,DSD_PAG@DF_PRR,/"
+            "all?format=csvfilewithlabels")
+OCDE_DPS = ("https://sdmx.oecd.org/public/rest/data/OECD.ELS.SPD,DSD_PAG@DF_DPS,/"
+            "all?format=csvfilewithlabels")
+# Taxa bruta de reposição da aposentadoria, homem com salário médio, regimes obrigatórios, nas
+# edições anteriores do Pensions at a Glance (a API da OCDE só tem a edição corrente). Extraídas
+# em 26/11/2026 por código das tabelas oficiais: PDFs de 2011 a 2021 (tabela "Gross pension
+# replacement rates by earnings", coluna 1,0 vez o salário médio, homens) e página HTML de 2023;
+# 2019 e 2021 conferidos PDF x HTML sem diferença. Trocar só se a OCDE corrigir uma edição antiga.
+# Média da OCDE: OECD34 até 2015 e todos os membros depois; UE: EU27 ou EU28, conforme a edição.
+PRR_EDICOES = {
+    "2011": dict(BRA=85.9, CHN=77.9, ESP=81.2, ITA=64.5, FRA=49.1, GBR=31.9, USA=39.4, JPN=34.5, OECD=57.3, EU=61.6, media_ocde="OECD34", media_ue="EU27", tabela="II.2"),
+    "2013": dict(BRA=57.5, CHN=77.9, ESP=73.9, ITA=71.2, FRA=58.8, GBR=32.6, USA=38.3, JPN=35.6, OECD=54.4, EU=58.0, media_ocde="OECD34", media_ue="EU27", tabela="4.1"),
+    "2015": dict(BRA=69.5, CHN=74.0, ESP=82.1, ITA=69.5, FRA=55.4, GBR=21.6, USA=35.2, JPN=35.1, OECD=52.9, EU=59.0, media_ocde="OECD34", media_ue="EU28", tabela="6.1"),
+    "2017": dict(BRA=69.5, CHN=76.0, ESP=72.3, ITA=83.1, FRA=60.5, GBR=22.1, USA=38.3, JPN=34.6, OECD=52.9, EU=58.3, media_ocde="OECD", media_ue="EU28", tabela="4.2"),
+    "2019": dict(BRA=58.9, CHN=71.6, ESP=72.3, ITA=79.5, FRA=60.1, GBR=21.7, USA=39.4, JPN=32.0, OECD=49.0, EU=52.0, media_ocde="OECD", media_ue="EU28", tabela="5.1"),
+    "2021": dict(BRA=88.4, CHN=71.6, ESP=73.9, ITA=74.6, FRA=60.2, GBR=49.0, USA=39.2, JPN=32.4, OECD=51.8, EU=53.4, media_ocde="OECD", media_ue="EU27", tabela="4.1"),
+    "2023": dict(BRA=88.4, CHN=68.3, ESP=80.4, ITA=76.1, FRA=57.6, GBR=41.9, USA=39.1, JPN=32.4, OECD=50.7, EU=54.8, media_ocde="OECD", media_ue="EU27", tabela="4.1"),
+}
+PRR_PAISES = [("BRA", "Brasil"), ("CHN", "China"), ("ESP", "Espanha"), ("ITA", "Itália"), ("FRA", "França"),
+              ("GBR", "Reino Unido"), ("USA", "Estados Unidos"), ("JPN", "Japão")]
+PRR_COR = {"BRA": "#FFFFFF", "CHN": "#FFFF00", "ESP": "#C0504D", "ITA": "#9BBB59", "FRA": "#4F81BD",
+           "GBR": "#8EB4E3", "USA": "#1F497D", "JPN": "#632523"}
+# os 26 países do gráfico do Financial Times (fonte: OCDE), para a versão "seleção"
+PRR_FT = ["BRA", "CHN", "ESP", "GRC", "NLD", "AUT", "DNK", "PRT", "ITA", "TUR", "FIN", "FRA", "HUN", "NOR", "GBR",
+          "BEL", "CHE", "DEU", "AUS", "USA", "NZL", "CAN", "JPN", "POL", "IRL", "ZAF"]
+MEMBROS_OCDE = ["AUS", "AUT", "BEL", "CAN", "CHL", "COL", "CRI", "CZE", "DNK", "EST", "FIN", "FRA", "DEU", "GRC", "HUN",
+                "ISL", "IRL", "ISR", "ITA", "JPN", "KOR", "LVA", "LTU", "LUX", "MEX", "NLD", "NZL", "NOR", "POL", "PRT",
+                "SVK", "SVN", "ESP", "SWE", "CHE", "TUR", "GBR", "USA"]
+MEMBROS_UE = ["AUT", "BEL", "BGR", "HRV", "CYP", "CZE", "DNK", "EST", "FIN", "FRA", "DEU", "GRC", "HUN", "IRL", "ITA",
+              "LVA", "LTU", "LUX", "MLT", "NLD", "POL", "PRT", "ROU", "SVK", "SVN", "ESP", "SWE"]
 # GGX_NGDP x GGX / NGDP: tolerância por país (p.p.), de 2001 a 2026 no WEO de set/2026.
 # Ano fiscal: o FMI divide pelo PIB do ano fiscal (diferença de até 4,2 p.p., Dominica).
 # Venezuela: na hiperinflação o FMI usa outra base de PIB (até 7,9 p.p.). Polônia: 0,17 p.p.
@@ -432,6 +471,93 @@ def credito_bis():
     return g
 
 
+def aposentadorias():
+    """Taxa bruta de reposição (OCDE): ranking da edição corrente e a série das edições desde 2011."""
+    import csv
+    import io
+    prr, idade, ano_par = {}, {}, set()
+    for r in csv.DictReader(io.StringIO(baixar(OCDE_PRR).decode("utf-8-sig"))):
+        if r["MEASURE"] == "GPRR100" and r["SEX"] == "M" and r["OPTIONALITY"] == "M":
+            prr[r["REF_AREA"]] = float(r["OBS_VALUE"])
+            ano_par.add(r["TIME_PERIOD"])
+    for r in csv.DictReader(io.StringIO(baixar(OCDE_DPS).decode("utf-8-sig"))):
+        if r["MEASURE"] == "FRPLF22" and r["SEX"] == "M" and r["OBS_VALUE"]:
+            idade[r["REF_AREA"]] = float(r["OBS_VALUE"])
+    conferir(len(ano_par) == 1, "OCDE: mais de um ano de parâmetros na taxa de reposição (%s)" % sorted(ano_par))
+    ano_par = ano_par.pop()
+    edicao = str(int(ano_par) + 1)          # parâmetros de 2024 = Pensions at a Glance 2025
+    conferir(edicao not in PRR_EDICOES, "a edição %s já está em PRR_EDICOES" % edicao)
+    for nome, membros, cod in (("OCDE", MEMBROS_OCDE, "OECD_REP"), ("UE", MEMBROS_UE, "EU27")):
+        falta = [c for c in membros if c not in prr]
+        conferir(not falta, "OCDE: média da %s sem %s" % (nome, falta))
+        media = sum(prr[c] for c in membros) / len(membros)
+        conferir(abs(media - prr[cod]) <= 0.1, "média da %s refeita %.2f x OCDE %.2f" % (nome, media, prr[cod]))
+    for c, _ in PRR_PAISES:
+        conferir(c in prr, "OCDE sem taxa de reposição de %s" % c)
+    print("  OCDE, taxa de reposição (parâmetros de %s): " % ano_par
+          + ", ".join("%s %.1f%%" % (c, prr[c]) for c in ("BRA", "CHN", "ESP", "OECD_REP", "EU27")))
+
+    def nome(c):
+        return {"OECD_REP": "Média da OCDE", "EU27": "Média da UE-27"}.get(c, NOMES.get(c, c))
+
+    def itens(codigos):
+        cods = sorted(codigos + ["OECD_REP", "EU27"], key=lambda c: -prr[c])
+        out = []
+        for c in cods:
+            rot = nome(c) + (" (%d)" % round(idade[c]) if c in idade and c not in ("OECD_REP", "EU27") else "")
+            cor = VERMELHO if c == DESTAQUE else (CINZA if c in ("OECD_REP", "EU27") else AZUL)
+            out.append([rot, round(prr[c], 1), cor, c in (DESTAQUE, "OECD_REP", "EU27")])
+        return out
+    todos = [c for c in prr if c not in ("OECD_REP", "EU27")]
+    nota_base = ("Taxa bruta de reposição: aposentadoria dos regimes obrigatórios (públicos e privados) em %% do "
+                 "salário, para um homem que ganha o salário médio e trabalha a carreira inteira, desde os 22 anos, "
+                 "até a idade normal de aposentadoria, entre parênteses. É uma projeção do modelo da OCDE para quem "
+                 "começa a trabalhar hoje, com as regras de %s (Pensions at a Glance %s). Médias simples dos 38 "
+                 "países da OCDE e dos 27 da UE." % (ano_par, edicao))
+    g_rank = dict(
+        id="aposentadoria-taxa-reposicao-ranking", tipo="ranking", unidade="pct1",
+        titulo="Taxa bruta de reposição da aposentadoria, regras de %s" % ano_par,
+        subtitulo="Aposentadoria em % do salário, homem com salário médio; idade de aposentadoria entre parênteses",
+        fonte="OCDE (Pensions at a Glance %s) e FtM" % edicao, nota=nota_base,
+        itens=itens(PRR_FT),
+        variantes=[dict(rot="Países do gráfico do Financial Times", itens=itens(PRR_FT)),
+                   dict(rot="Todos os países da base (%d)" % len(todos), itens=itens(todos))],
+    )
+
+    serie = {e: dict(v) for e, v in PRR_EDICOES.items()}
+    serie[edicao] = dict({c: prr[c] for c, _ in PRR_PAISES}, OECD=prr["OECD_REP"], EU=prr["EU27"])
+    eds = sorted(serie, key=int)
+
+    def linha(chave, nome_s, cor, principal=False):
+        return dict(nome=nome_s, cor=cor, largura=5.0 if principal else 4.0, rotulo=True,
+                    dados=[["%s-01" % e, round(serie[e][chave], 1)] for e in eds])
+    nota_t = ("Cada ponto é uma edição do Pensions at a Glance (%s a %s): a taxa bruta de reposição projetada para "
+              "um homem com salário médio e carreira completa, sob as regras em vigor na época da edição. As "
+              "mudanças vêm de reformas, como a do Brasil em 2019 (idade mínima de 65 anos para homens), e também de "
+              "revisões do modelo da OCDE: a carreira começa aos 20 anos até a edição de 2017 e aos 22 a partir de "
+              "2019. Média da OCDE: 34 países até 2015 e todos os membros depois; UE: 27 ou 28 países, conforme a "
+              "edição. Edições de %s a %s extraídas das tabelas oficiais (PDF e página); %s, da API da OCDE."
+              % (eds[0], eds[-1], eds[0], eds[-2], edicao))
+    g_paises = dict(
+        id="aposentadoria-taxa-reposicao-paises", titulo="Taxa bruta de reposição da aposentadoria, %s a %s"
+        % (eds[0], eds[-1]),
+        subtitulo="Aposentadoria em % do salário, homem com salário médio; por edição do Pensions at a Glance",
+        unidade="pct1", buracoMax=25, fonte="OCDE (Pensions at a Glance, edições de %s a %s) e FtM" % (eds[0], eds[-1]),
+        nota=nota_t,
+        series=[linha(c, n, PRR_COR[c], c == "BRA") for c, n in PRR_PAISES],
+    )
+    g_medias = dict(
+        id="aposentadoria-taxa-reposicao-medias",
+        titulo="Taxa bruta de reposição: Brasil, EUA e médias da OCDE e da UE, %s a %s" % (eds[0], eds[-1]),
+        subtitulo="Aposentadoria em % do salário, homem com salário médio; por edição do Pensions at a Glance",
+        unidade="pct1", buracoMax=25, fonte="OCDE (Pensions at a Glance, edições de %s a %s) e FtM" % (eds[0], eds[-1]),
+        nota=nota_t,
+        series=[linha("BRA", "Brasil", BRANCO, True), linha("USA", "Estados Unidos", VERMELHO),
+                linha("OECD", "Média da OCDE", AZUL), linha("EU", "Média da UE", VERDE)],
+    )
+    return [g_rank, g_paises, g_medias]
+
+
 def main():
     gasto, ed = weo("GGX_NGDP")
     ppc, _ = weo("PPPPC")
@@ -551,7 +677,8 @@ def main():
                secoes=[dict(titulo="O gasto ao longo do tempo", texto="", fontes=[], figuras=[], graficos=graficos_hist),
                        dict(titulo="Gasto público e renda", texto="", fontes=[], figuras=[], graficos=[g_disp]),
                        dict(titulo="Crédito ao setor não financeiro", texto="", fontes=[], figuras=[],
-                            graficos=[credito_bis()])])
+                            graficos=[credito_bis()]),
+                       dict(titulo="Aposentadorias", texto="", fontes=[], figuras=[], graficos=aposentadorias())])
     with open(SAIDA, "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
         f.write("\n")
