@@ -85,6 +85,23 @@ ATIVOS DO BCRA (mensal, fim de mês, desde jan/1990)
     o mesmo câmbio da base e do M2, e a coluna "1 u$s =" fica como
     conferência a partir de abr/2002.
 
+BALANÇO DE PAGAMENTOS (trimestral, BPM6, desde 1992)
+  - INDEC é quem compila o BP. As aberturas (rendas primária e secundária,
+    ativos e passivos de ID e carteira) vêm do FMI (IMF.STA/BOP, ARG, que
+    recebe o BP do INDEC), porque a API de séries do governo argentino
+    (apis.datos.gob.ar, conjunto 160.2 do INDEC, desde 2006) deixa algumas
+    vazias; os totais do INDEC conferem os do FMI.
+  - Sinais como no FtM Dados (scripts/bp.py), em que entrada de dinheiro é
+    positiva: conta financeira = −(financeira total − ativos de reserva);
+    reservas = −(ativos de reserva); ID no exterior = −ativos; ID no país =
+    passivos; carteira no exterior = −ativos; carteira no país = passivos;
+    outros + derivativos = −(outros investimentos líquidos + derivativos).
+    Conta corrente + capital + financeira + reservas + erros e omissões = 0.
+  - Cada trimestre vai datado no último mês (mar, jun, set, dez); a soma de
+    4 trimestres é o equivalente ao acumulado em 12 meses do Brasil.
+  - Começa em 1992, o início do BP trimestral do INDEC (o FMI tem desde
+    1976, mas antes de 1992 são estimativas anuais repartidas).
+
 BRASIL, PARA COMPARAR (variação em 12 meses no mesmo gráfico da Argentina)
   - BCB, SGS: 1788 base monetária restrita (saldo de fim de período) =
     1786 papel-moeda emitido + 1787 reservas bancárias; 27810 M2 (conceito
@@ -129,6 +146,13 @@ CONFERÊNCIAS QUE ABORTAM (segunda fonte: api.argentinadatos.com)
     exceções da própria planilha em TOTAL_ERRADO e ABSORCAO_ERRADA, e o total
     usado é sempre a soma das três contas); essa base contra a série 1606 da API do BCRA (≤ 0,01%); câmbio
     de valuação contra o câmbio usado na base e no M2, desde abr/2002 (≤ 3,5%, TOL_VALUACAO; mar/2002, o primeiro mês do câmbio de referência, fica de fora).
+  - BP: conta corrente = bens + serviços + rendas; conta corrente + capital
+    − financeira + erros e omissões = 0; financeira = ID + carteira +
+    derivativos + outros + reservas (≤ US$ 1 milhão em todo trimestre desde
+    1992). Totais do FMI contra o INDEC (conta corrente, bens, serviços,
+    capital, financeira, ID, carteira, outros, derivativos, reservas e erros e
+    omissões) desde 2006: ≤ US$ 0,5 milhão (a conta capital de 2016 difere
+    US$ 1 a 2 milhões, revisão do INDEC: ≤ US$ 3 milhões).
   - Brasil: base = papel-moeda emitido + reservas bancárias e M2 = M1 +
     poupança + títulos privados (≤ R$ 2 mil em todo mês); base do BCB contra
     a do FMI (MFS_MA, NDMBM_MAI): ≤ 0,01%.
@@ -171,6 +195,16 @@ TOTAL_ERRADO = {"2014-01", "2014-02", "2014-09", "2014-10", "2014-11", "2014-12"
 ABSORCAO_ERRADA = {"2009-11"}
 MESES_ES = {"Ene.": 1, "Feb.": 2, "Mar.": 3, "Abr.": 4, "May.": 5, "Jun.": 6, "Jul.": 7, "Ago.": 8,
             "Sep.": 9, "Set.": 9, "Oct.": 10, "Nov.": 11, "Dic.": 12}
+FMI_BOP = "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/BOP/+/ARG.*.*.*.Q?attributes=dsd&measures=all"
+INDEC_BOP = "https://apis.datos.gob.ar/series/api/series/?ids=%s&format=json&limit=1000&metadata=none"
+# código do INDEC (conjunto 160.2) -> chave do FMI (entrada|indicador), em US$ milhões
+INDEC_X_FMI = {"160.2_TL_CUENNTE_0_T_22": "NETCD_T|CAB", "160.2_CTA_CORNES_0_T_46": "NETCD_T|G",
+               "160.2_CTA_CORIOS_0_T_49": "NETCD_T|S", "160.2_TL_CUENTAL_0_T_20": "NETCD_T|KAB",
+               "160.2_TL_CUENERA_0_T_23": "NNAFANIL_T|FAB", "160.2_CTA_FINCTA_0_T_41": "NNAFANIL_T|D_F",
+               "160.2_CTA_FINERA_0_T_41": "NNAFANIL_T|P_F", "160.2_CTA_FINION_0_T_38": "NNAFANIL_T|O_F",
+               "160.2_CTA_FINROS_0_T_36": "NNAFANIL_T|F_F7", "160.2_AVOS_RERVA_0_T_15": "A_T|R_F",
+               "160.2_ERES_OMTOS_0_T_23": "NETCD_T|EO"}
+INICIO_BP = "1992-03"
 INICIO_MON = "1990-01"
 INICIO_YOY = "1992-01"
 TOL_CAMBIO = 0.03
@@ -178,6 +212,7 @@ TOL_CAMBIO = 0.03
 # depois da desvalorização (a data de valuação nem sempre é o último dia útil)
 TOL_VALUACAO = 0.035
 INDEC = "https://www.indec.gob.ar/ftp/cuadros/economia/serie_ipc_divisiones.csv"
+ESPESSURA = 1.5
 POSSE = datetime.date(2023, 12, 10)
 INICIO_OFICIAL_BCRA = datetime.date(2010, 6, 1)
 # de jan a mai/2017 o BCRA (variáveis 27 e 28) traz o IPC GBA: o nacional só
@@ -283,6 +318,8 @@ def conferir_oficial_bcra(amb):
 
 
 def serie(nome, s, casas, **extra):
+    if "largura" in extra:                  # linhas 50% mais grossas (pedido dele em 26/11/2026)
+        extra["largura"] = round(extra["largura"] * ESPESSURA, 2)
     chave = lambda d: d if isinstance(d, str) else d.isoformat()
     return dict(nome=nome, dados=[[chave(d), round(s[d], casas)] for d in sorted(s)], **extra)
 
@@ -501,6 +538,71 @@ def balanco_bcra(base_api, cambio):
     return meses, out
 
 
+def bp():
+    """BP trimestral em US$ milhões, chave = último mês do trimestre."""
+    d = baixar(FMI_BOP)
+    st = d["data"]["structures"][0]
+    dims = st["dimensions"]["series"]
+    nomes = [x["id"] for x in dims]
+    pe, pi = nomes.index("BOP_ACCOUNTING_ENTRY"), nomes.index("INDICATOR")
+    per = [o["value"] for o in st["dimensions"]["observation"][0]["values"]]
+    t = {}
+    for k, s_ in d["data"]["dataSets"][0]["series"].items():
+        idx = [int(i) for i in k.split(":")]
+        chave = dims[pe]["values"][idx[pe]]["id"] + "|" + dims[pi]["values"][idx[pi]]["id"]
+        for i, o in s_["observations"].items():
+            if o[0] in (None, "NaN"):
+                continue
+            a, q = per[int(i)].split("-Q")
+            t.setdefault(chave, {})["%s-%02d" % (a, int(q) * 3)] = float(o[0]) / 1e6
+    g = lambda c: t.get(c, {})
+    cc = g("NETCD_T|CAB")
+    trims = [m for m in sorted(cc) if m >= INICIO_BP]
+    v = lambda c, m: g(c).get(m, 0.0)
+    for m in trims:
+        e1 = cc[m] - sum(v("NETCD_T|" + c, m) for c in ("G", "S", "IN1", "IN2"))
+        e2 = cc[m] + v("NETCD_T|KAB", m) - v("NNAFANIL_T|FAB", m) + v("NETCD_T|EO", m)
+        e3 = v("NNAFANIL_T|FAB", m) - sum(v(c, m) for c in ("NNAFANIL_T|D_F", "NNAFANIL_T|P_F", "NNAFANIL_T|F_F7",
+                                                             "NNAFANIL_T|O_F", "A_T|R_F"))
+        e4 = v("NNAFANIL_T|D_F", m) - v("A_NFA_T|D_F", m) + v("L_NIL_T|D_F", m)
+        e5 = v("NNAFANIL_T|P_F", m) - v("A_NFA_T|P_F", m) + v("L_NIL_T|P_F", m)
+        if max(abs(e1), abs(e2), abs(e3), abs(e4), abs(e5)) > 1:
+            raise RuntimeError("BP de %s não fecha: %r" % (m, (e1, e2, e3, e4, e5)))
+    print("BP (FMI): %d trimestres, %s a %s; identidades fecham" % (len(trims), trims[0], trims[-1]))
+    # INDEC
+    ids = list(INDEC_X_FMI)
+    r = baixar(INDEC_BOP % ",".join(ids))
+    pior, n = (0, None), 0
+    for linha in r["data"]:
+        a, mm = linha[0][:4], int(linha[0][5:7])
+        m = "%s-%02d" % (a, mm + 2)                 # o INDEC data o trimestre no primeiro mês
+        for i, x in zip(ids, linha[1:]):
+            if x is None:
+                continue
+            dif = abs(x - v(INDEC_X_FMI[i], m))
+            if i == "160.2_TL_CUENTAL_0_T_20" and m[:4] == "2016":
+                if dif > 3:
+                    raise RuntimeError("conta capital de %s: INDEC × FMI passou de US$ 3 milhões" % m)
+                continue                            # revisão do INDEC em 2016: US$ 1 a 2 milhões
+            n += 1
+            pior = max(pior, (dif, "%s %s" % (i, m)))
+    print("BP INDEC × FMI: %d valores, maior diferença US$ %.3f milhões (%s)" % (n, pior[0], pior[1]))
+    if n < 800 or pior[0] > 0.5:
+        raise RuntimeError("BP do FMI não bate com o INDEC")
+    sel = lambda c, sinal=1: {m: sinal * v(c, m) for m in trims}
+    out = dict(
+        cc=sel("NETCD_T|CAB"), bens=sel("NETCD_T|G"), serv=sel("NETCD_T|S"), r1=sel("NETCD_T|IN1"),
+        r2=sel("NETCD_T|IN2"), ck=sel("NETCD_T|KAB"), eo=sel("NETCD_T|EO"), res=sel("A_T|R_F", -1),
+        id_ext=sel("A_NFA_T|D_F", -1), id_pais=sel("L_NIL_T|D_F"), cart_ext=sel("A_NFA_T|P_F", -1),
+        cart_pais=sel("L_NIL_T|P_F"),
+        outros={m: -(v("NNAFANIL_T|O_F", m) + v("NNAFANIL_T|F_F7", m)) for m in trims})
+    out["cf"] = {m: -(v("NNAFANIL_T|FAB", m) - v("A_T|R_F", m)) for m in trims}
+    for m in trims:
+        if abs(out["cc"][m] + out["ck"][m] + out["cf"][m] + out["res"][m] + out["eo"][m]) > 1:
+            raise RuntimeError("BP com sinais do FtM não fecha em %s" % m)
+    return trims, out
+
+
 def sgs(cod):
     hoje = datetime.date.today().strftime("%d/%m/%Y")
     d = baixar(SGS % (cod, hoje))
@@ -610,6 +712,7 @@ def main():
     mon, meses_mon, cambio = monetario()
     br_base, br_m2 = brasil()
     meses_bal, bal = balanco_bcra({m: mon[1606][m] for m in meses_mon}, cambio)
+    trims, bpq = bp()
     u = max(bruta)
     print("última reserva bruta (BCRA): %s = US$ %.0f milhões" % (u, bruta[u]))
     m = meses[-1]
@@ -781,6 +884,55 @@ def main():
           % (mb_, bal["total"][mb_] / 1e9, bal["total"][mb_] / cambio[mb_] / 1e6, bal["externos"][mb_] / 1e9,
              bal["oficial"][mb_] / 1e9, bal["bancos"][mb_] / 1e9, yoy(bal["total"])[mb_]))
 
+    def acum4(s_):
+        return {m: sum(s_[mais(m, -3 * k)] for k in range(4)) for m in s_
+                if all(mais(m, -3 * k) in s_ for k in range(4))}
+
+    def bp_var(series_fn):
+        """4 recortes: acumulado em 4 trimestres e trimestral, série inteira e desde Milei."""
+        return (recortes(series_fn(acum4), True, "acumulado em 4 trimestres", "usd-bi")
+                + recortes(series_fn(lambda s_: dict(s_)), True, "trimestral", "usd-bi"))
+
+    bi_ = lambda s_: {m: x / 1000 for m, x in s_.items()}
+    sub_bp = "US$ bilhões; trimestres datados no último mês"
+    g_bp = dict(
+        id="argentina-bp", titulo="Balanço de pagamentos da Argentina", subtitulo=sub_bp,
+        unidade="usd-bi", barra=3, buracoMax=3, fonte="INDEC (via FMI) e FtM",
+        variantes=bp_var(lambda f: [
+            serie("Conta Corrente", bi_(f(bpq["cc"])), 3, cor=AZUL, tipo="barra"),
+            serie("Conta Capital", bi_(f(bpq["ck"])), 3, cor="#FFFF00", tipo="barra"),
+            serie("Conta Financeira", bi_(f(bpq["cf"])), 3, cor=VERDE, tipo="barra"),
+            serie("Reservas Intern.", bi_(f(bpq["res"])), 3, cor="#F79646", tipo="barra", contorno=True),
+            serie("Erros e Omissões", bi_(f(bpq["eo"])), 3, cor=VERMELHO, tipo="barra")]),
+    )
+    g_cc = dict(
+        id="argentina-bp-cc", titulo="Conta corrente da Argentina", subtitulo=sub_bp,
+        unidade="usd-bi", barra=3, buracoMax=3, fonte="INDEC (via FMI) e FtM",
+        variantes=bp_var(lambda f: [
+            serie("Balança Comercial", bi_(f(bpq["bens"])), 3, cor=AZUL, tipo="barra"),
+            serie("Serviços", bi_(f(bpq["serv"])), 3, cor=VERMELHO, tipo="barra"),
+            serie("Renda Primária", bi_(f(bpq["r1"])), 3, cor=VERDE, tipo="barra"),
+            serie("Renda Secundária", bi_(f(bpq["r2"])), 3, cor=AZUL_ESC, tipo="barra"),
+            serie("Saldo Conta Corrente", bi_(f(bpq["cc"])), 3, cor=BRANCO, largura=3, rotulo=True)]),
+    )
+    g_cf = dict(
+        id="argentina-bp-cf", titulo="Conta financeira da Argentina",
+        subtitulo=sub_bp + "; entrada de recursos é positiva, como no Brasil", unidade="usd-bi", barra=3,
+        buracoMax=3, fonte="INDEC (via FMI) e FtM",
+        variantes=bp_var(lambda f: [
+            serie("ID no Exterior", bi_(f(bpq["id_ext"])), 3, cor=AZUL, tipo="barra"),
+            serie("ID no País", bi_(f(bpq["id_pais"])), 3, cor=VERMELHO, tipo="barra"),
+            serie("Carteira no Exterior", bi_(f(bpq["cart_ext"])), 3, cor=VERDE, tipo="barra"),
+            serie("Carteira no País", bi_(f(bpq["cart_pais"])), 3, cor=AZUL_ESC, tipo="barra"),
+            serie("Outros + Derivativos", bi_(f(bpq["outros"])), 3, cor="#4BACC6", tipo="barra"),
+            serie("Saldo Conta Financeira", bi_(f(bpq["cf"])), 3, cor=BRANCO, largura=3, rotulo=True)]),
+    )
+    tq = trims[-1]
+    a4 = {k: acum4(x)[tq] / 1000 for k, x in bpq.items()}
+    print("BP %s, 4 trimestres (US$ bi): CC %.1f, KA %.1f, CF %.1f, reservas %.1f, E&O %.1f; bens %.1f, serv %.1f, "
+          "r1 %.1f, r2 %.1f" % (tq, a4["cc"], a4["ck"], a4["cf"], a4["res"], a4["eo"], a4["bens"], a4["serv"],
+                               a4["r1"], a4["r2"]))
+
     m = meses_mon[-1]
     print("monetário %s: base %.2f tri, M2 %.2f tri (US$ %.1f bi), %% em moeda estrangeira %.1f%%, "
           "base 12m %.1f%%, M2 12m %.1f%%" % (m, bm[m] / 1e9, m2t[m] / 1e9, m2t[m] / cambio[m] / 1e6,
@@ -796,6 +948,7 @@ def main():
                        dict(titulo="Reservas internacionais", texto="", fontes=[], figuras=[],
                             graficos=[g_bruta, g_comp, g_liq]),
                        dict(titulo="Inflação", texto="", fontes=[], figuras=[], graficos=[g_ipc_m, g_ipc_a]),
+                       dict(titulo="Contas externas", texto="", fontes=[], figuras=[], graficos=[g_bp, g_cc, g_cf]),
                        dict(titulo="Ativos do BCRA", texto="", fontes=[], figuras=[], graficos=[g_ativos, g_ativos_a]),
                        dict(titulo="Base monetária", texto="", fontes=[], figuras=[], graficos=[g_bm, g_bm_a]),
                        dict(titulo="M2", texto="", fontes=[], figuras=[],
