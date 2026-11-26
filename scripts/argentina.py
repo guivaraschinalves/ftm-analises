@@ -251,6 +251,13 @@ INICIO_BP = "1992-03"
 INDEC_FTP = "https://www.indec.gob.ar/ftp/cuadros/economia/"
 TOL_EMAE_PIB = 0.25
 TOL_CONTRIB = 0.6
+# nomes dos setores do EMAE (letras da CIIU no INDEC) no gráfico estático
+NOMES_SETOR = {"A": "Agropecuária e silvicultura", "B": "Pesca", "C": "Minas e pedreiras",
+               "D": "Indústria manufatureira", "E": "Eletricidade, gás e água", "F": "Construção",
+               "G": "Comércio e reparações", "H": "Hotéis e restaurantes", "I": "Transporte e comunicações",
+               "J": "Intermediação financeira", "K": "Atividades imobiliárias e empresariais",
+               "L": "Administração pública e defesa", "M": "Ensino", "N": "Saúde e serviços sociais",
+               "O": "Outros serviços comunitários e pessoais", "T": "Impostos líquidos de subsídios"}
 BASE_ATIVIDADE = "2023-11"
 SETORES_ATIVIDADE = [("Agro", ["A"], "#4F81BD"), ("Indústria", ["D"], "#C0504D"), ("Comércio", ["G"], "#9BBB59"),
                      ("Energia e mineração", ["C", "E"], "#8EB4E3"), ("Construção", ["F"], "#1F497D")]
@@ -810,7 +817,7 @@ def pib_emae():
             col["T"] = k
         elif len(t) > 2 and t[1:4].strip().startswith("-") and t[0].isalpha():
             col[t[0]] = k
-    letras = sorted({l for g in GRUPOS_EMAE for l in g[1]} | {l for g in SETORES_ATIVIDADE for l in g[1]})
+    letras = sorted(set(NOMES_SETOR) | {l for g in GRUPOS_EMAE for l in g[1]} | {l for g in SETORES_ATIVIDADE for l in g[1]})
     if any(l not in col or l not in peso for l in letras):
         raise RuntimeError("EMAE por setor: faltam colunas %r" % [l for l in letras if l not in col])
     setor, ano = {}, None
@@ -843,6 +850,26 @@ def pib_emae():
           "diferença média %.3f p.p. (últimos 8: %.3f), correlação %.4f"
           % (min(eo), max(eo), p1, p2, len(comuns), dif, dif_rec,
              statistics.correlation([tri[m] for m in comuns], [qq[m] for m in comuns])))
+    # gráfico estático do último mês: incidência e variação anual de cada setor
+    lv = xls_indec("sh_emae_actividad_base2004.xls")["Tabla Var Letras"]
+    var_pub, ano = {}, None
+    for r in sorted({r for r, _ in lv}):
+        if ano_(lv.get((r, 0))):
+            ano = ano_(lv.get((r, 0)))
+        mes = str(lv.get((r, 1)) or "").strip()
+        if mes in MES and ano and num_(lv.get((r, col["A"]))) is not None:
+            var_pub["%04d-%02d" % (ano, MES[mes])] = {l: num_(lv[(r, col[l])]) for l in NOMES_SETOR}
+    mu = max(m for m in contrib if m in var_pub)
+    prev = setor[mais(mu, -12)]
+    den_u = sum(peso[l] * prev[l] for l in letras)
+    inc_u = {l: peso[l] * (setor[mu][l] - prev[l]) / den_u * 100 for l in NOMES_SETOR}
+    var_u = {l: (setor[mu][l] / prev[l] - 1) * 100 for l in NOMES_SETOR}
+    pv = max(abs(var_u[l] - var_pub[mu][l]) for l in NOMES_SETOR)
+    print("EMAE %s por setor: variação refeita × publicada %.5f p.p.; soma das incidências %.3f contra %.3f "
+          "publicado" % (mu, pv, sum(inc_u.values()), pub_a[mu]))
+    if pv > 0.001 or abs(sum(inc_u.values()) - pub_a[mu]) > TOL_CONTRIB:
+        raise RuntimeError("EMAE por setor do último mês não confere")
+    estatico = dict(mes=mu, total=pub_a[mu], inc=inc_u, var=var_u)
     # índice por atividade: média de 12 meses, base BASE_ATIVIDADE = 100
     def mm12(s_):
         return {m: statistics.mean(s_[mais(m, -k)] for k in range(12)) for m in s_
@@ -857,7 +884,7 @@ def pib_emae():
     ult = max(ativ["EMAE total"])
     print("atividade por setor (média de 12 meses, %s = 100), %s: %s" % (
         BASE_ATIVIDADE, ult, ", ".join("%s %.1f" % (k, v[ult]) for k, v in ativ.items())))
-    return orig, des, qq, a4, eo, ed, ea, em, tri, dif, contrib, ativ
+    return orig, des, qq, a4, eo, ed, ea, em, tri, dif, contrib, ativ, estatico
 
 
 def sgs(cod):
@@ -971,7 +998,7 @@ def main():
     meses_bal, bal = balanco_bcra({m: mon[1606][m] for m in meses_mon}, cambio)
     trims, bpq = bp()
     (pib_o, pib_d, pib_qq, pib_a4, emae_o, emae_d, emae_a, emae_m, emae_tri, dif_emae,
-     emae_contrib, emae_ativ) = pib_emae()
+     emae_contrib, emae_ativ, emae_est) = pib_emae()
     u = max(bruta)
     print("última reserva bruta (BCRA): %s = US$ %.0f milhões" % (u, bruta[u]))
     m = meses[-1]
@@ -1235,13 +1262,31 @@ def main():
                            True),
     )
     g_emae_a = dict(
-        id="argentina-emae-12m", titulo="EMAE: variação anual e contribuições por setor",
-        subtitulo="Variação % sobre o mesmo mês do ano anterior, série original; barras: contribuição de cada "
-                  "setor, em p.p.",
+        id="argentina-emae-12m", titulo="EMAE: variação anual",
+        subtitulo="Variação % sobre o mesmo mês do ano anterior; série original", unidade="pct1",
+        fonte="INDEC (EMAE) e FtM",
+        variantes=recortes([serie("EMAE", emae_a, 2, cor=BRANCO, largura=3, rotulo=True)], True),
+    )
+    g_emae_c = dict(
+        id="argentina-emae-contribuicoes", titulo="EMAE: contribuições por setor para a variação anual",
+        subtitulo="Pontos percentuais da variação sobre o mesmo mês do ano anterior; série original",
         unidade="pct1", barra=1, fonte="INDEC (EMAE e cuentas nacionales) e FtM",
         variantes=recortes([serie(nome, {m: v[nome] for m, v in emae_contrib.items()}, 2, cor=cor, tipo="barra")
                             for nome, _, cor in GRUPOS_EMAE]
                            + [serie("EMAE", emae_a, 2, cor=BRANCO, largura=3, rotulo=True)], True),
+    )
+    MESES_PT = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro",
+                "outubro", "novembro", "dezembro"]
+    mu = emae_est["mes"]
+    ordem = sorted(NOMES_SETOR, key=lambda l: -emae_est["inc"][l])
+    g_emae_inc = dict(
+        id="argentina-emae-setores-mes", tipo="ranking",
+        titulo="EMAE por setor: variação anual e incidência, %s de %s" % (MESES_PT[int(mu[5:]) - 1], mu[:4]),
+        subtitulo="Incidência: pontos percentuais da variação do EMAE; variação: % sobre o mesmo mês do ano anterior",
+        unidade="pp", unidade2="pct1", limite=15, fonte="INDEC (EMAE e cuentas nacionales) e FtM",
+        legendaPar=[["Incidência (p.p.)", AZUL], ["Variação (%)", "#8a8a86"]],
+        itens=[["EMAE, nível geral", round(emae_est["total"], 2), BRANCO, True, None]]
+        + [[NOMES_SETOR[l], round(emae_est["inc"][l], 2), AZUL, False, round(emae_est["var"][l], 1)] for l in ordem],
     )
     g_emae_m = dict(
         id="argentina-emae-mensal", titulo="EMAE: variação mensal",
@@ -1283,7 +1328,7 @@ def main():
                             graficos=[g_bruta, g_comp, g_liq]),
                        dict(titulo="Inflação", texto="", fontes=[], figuras=[], graficos=[g_ipc_m, g_ipc_a]),
                        dict(titulo="Atividade", texto="", fontes=[], figuras=[],
-                            graficos=[g_pib, g_pib_t, g_emae_i, g_emae_s, g_emae_a, g_emae_m, g_emae_t]),
+                            graficos=[g_pib, g_pib_t, g_emae_i, g_emae_s, g_emae_a, g_emae_c, g_emae_inc, g_emae_m, g_emae_t]),
                        dict(titulo="Contas externas", texto="", fontes=[], figuras=[], graficos=[g_bp, g_cc, g_cf]),
                        dict(titulo="Ativos do BCRA", texto="", fontes=[], figuras=[], graficos=[g_ativos, g_ativos_a]),
                        dict(titulo="Base monetária", texto="", fontes=[], figuras=[], graficos=[g_bm, g_bm_a]),

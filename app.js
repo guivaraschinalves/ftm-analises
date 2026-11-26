@@ -705,6 +705,87 @@
     return { svg: svg, L: L, pal: pal, ranking: true };
   }
 
+  function construirRankingPar(g, L, pal, svg, itens) {
+    var F1 = unidade(g), F2 = UNIDADES[g.unidade2] || F1;
+    var leg = g.legendaPar || [["", "#4F81BD"], ["", "#8a8a86"]];
+    var fs = Math.round(L.tick * 0.95), fsV = Math.round(L.tick * 0.85);
+    var yLeg = L.sub.y + L.sub.fs * 2.2, y0 = yLeg + fs * 1.6, y1 = L.y1;
+    var passo = (y1 - y0) / Math.max(itens.length, 1), alt = passo * 0.36;
+    var lim = g.limite || Infinity, corta = function (v) { return Math.max(-lim, Math.min(lim, v)); };
+    var r1 = function (v) { return F1.valor(v); }, r2 = function (v) { return F2.valor(v); };
+    var lw = Math.max.apply(null, [0].concat(itens.map(function (it) { return largura(it[0], fs, it[3] ? "bold" : "normal"); })));
+    var vw = Math.max.apply(null, [0].concat(itens.map(function (it) {
+      return Math.max(largura(r1(it[1]), fsV, "bold"), it[4] == null ? 0 : largura(r2(it[4]), fsV, "bold"));
+    })));
+    var x0 = L.titulo.x + lw + 18 + vw + 12, x1 = L.W - L.titulo.x - vw - 16;
+    var vals = [0];
+    itens.forEach(function (it) { vals.push(corta(it[1])); if (it[4] != null) vals.push(corta(it[4])); });
+    var mx = Math.max.apply(null, vals), mn = Math.min.apply(null, vals);
+    if (mx - mn <= 0) mx = mn + 1;
+    var X = function (v) { return x0 + (x1 - x0) * (corta(v) - mn) / (mx - mn); }, xz = X(0);
+    // legenda das duas barras, no alto à direita
+    var xl = x1 + vw;
+    [leg[1], leg[0]].forEach(function (l) {
+      var tw = largura(l[0], fs);
+      svg.appendChild(texto(l[0], { x: xl, y: yLeg, "font-size": fs, fill: pal.texto, "text-anchor": "end",
+                                     "dominant-baseline": "central" }));
+      svg.appendChild(el("rect", { x: xl - tw - 22, y: yLeg - fs * 0.4, width: 14, height: fs * 0.8, rx: 2,
+                                   fill: corNoTema(l[1], pal) }));
+      xl -= tw + 44;
+    });
+    function barra(v, y, cor, rot) {
+      var xa = X(Math.min(0, v)), xb = X(Math.max(0, v)), w = Math.max(1, xb - xa);
+      svg.appendChild(el("rect", { x: xa, y: y, width: w, height: alt, rx: 2, fill: corNoTema(cor, pal) }));
+      if (Math.abs(v) > lim) {          // marca de corte: dois traços na ponta cortada
+        var xc = v > 0 ? xb - 18 : xa + 10;
+        [0, 7].forEach(function (d) {
+          svg.appendChild(el("line", { x1: xc + d, x2: xc + d + 5, y1: y + alt + 2, y2: y - 2,
+                                       stroke: pal.bg, "stroke-width": 3 }));
+        });
+      }
+      svg.appendChild(texto(rot, { x: v >= 0 ? xb + 8 : xa - 8, y: y + alt / 2, "font-size": fsV, "font-weight": "bold",
+                                   fill: pal.texto, "text-anchor": v >= 0 ? "start" : "end", "dominant-baseline": "central" }));
+    }
+    itens.forEach(function (it, k) {
+      var yc = y0 + passo * (k + 0.5);
+      if (k % 2 === 1) {
+        svg.appendChild(el("rect", { x: L.titulo.x, y: yc - passo / 2, width: L.W - 2 * L.titulo.x, height: passo,
+                                     fill: pal.texto, opacity: 0.04 }));
+      }
+      svg.appendChild(texto(it[0], { x: L.titulo.x + lw, y: yc, "font-size": fs, fill: pal.texto, "text-anchor": "end",
+                                     "dominant-baseline": "central", "font-weight": it[3] ? "bold" : null }));
+      if (it[4] == null) {
+        barra(it[1], yc - alt / 2, it[2] || leg[0][1], r1(it[1]));
+      } else {
+        barra(it[1], yc - alt - 1, it[2] || leg[0][1], r1(it[1]));
+        barra(it[4], yc + 1, leg[1][1], r2(it[4]));
+      }
+    });
+    svg.appendChild(el("line", { x1: xz, x2: xz, y1: y0, y2: y1, stroke: pal.zero || pal.texto, "stroke-width": 1.5 }));
+    svg.appendChild(texto(g.titulo, {
+      x: L.titulo.x, y: L.titulo.y, "font-weight": "bold", fill: pal.texto,
+      "font-size": corpoQueCabe(g.titulo, L.titulo.fs, L.titulo.max, "bold")
+    }));
+    if (g.subtitulo) {
+      svg.appendChild(texto(g.subtitulo, {
+        x: L.sub.x, y: L.sub.y, "font-style": "italic", fill: pal.texto,
+        "font-size": corpoQueCabe(g.subtitulo, L.sub.fs, L.sub.max, "italic")
+      }));
+    }
+    svg.appendChild(texto("Fonte: " + g.fonte + ".", {
+      x: L.fonte.x, y: L.fonte.y, "font-size": L.fonte.fs, fill: pal.texto, "text-anchor": "end"
+    }));
+    if (logoSvg) {
+      var lh = L.logo.w * logoSvg.razao;
+      var gl = el("svg", { x: L.logo.x, y: L.logo.y, width: L.logo.w, height: lh, viewBox: logoSvg.viewBox });
+      var gg = el("g", { fill: pal.logo });
+      logoSvg.nos.forEach(function (n) { gg.appendChild(n.cloneNode(true)); });
+      gl.appendChild(gg);
+      svg.appendChild(gl);
+    }
+    return { svg: svg, L: L, pal: pal, ranking: true };
+  }
+
   function construirRanking(cartao, L0, nomeTema) {
     var g = graficoDe(cartao), pal = PALETAS[nomeTema], F = unidade(g);
     var L = Object.assign({}, L0);
@@ -713,6 +794,13 @@
       role: "img", "aria-label": g.titulo + (g.subtitulo ? " — " + g.subtitulo : "")
     });
     var itens = g.itens || [];
+    // par: o item traz um segundo valor (it[4]), desenhado numa segunda barra
+    // logo abaixo, na mesma escala (incidência e variação de cada setor, como
+    // no gráfico do INDEC); "legendaPar" [[rot, cor], [rot, cor]] nomeia as
+    // duas; "limite" corta a barra que passa dele, com a marca de corte e o
+    // valor cheio no rótulo; "unidade2" formata o segundo valor
+    var par = itens.some(function (it) { return it[4] !== undefined && it[4] !== null; });
+    if (par) return construirRankingPar(g, L, pal, svg, itens);
     var fs = Math.round(L.tick * 1.15);
     var y0 = L.sub.y + L.sub.fs * 2.4, y1 = L.y1;
     var passo = (y1 - y0) / Math.max(itens.length, 1), alt = passo * 0.66;
