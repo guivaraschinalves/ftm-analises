@@ -15,8 +15,12 @@ DE ONDE VEM CADA COISA (Ámbito, mercados.ambito.com, histórico geral)
     básicos, desde dez/1998. Datas "dd-mm-aaaa".
   - dolar/informal/historico-general: dólar blue, compra e venda, desde
     jan/2002. Datas "dd/mm/aaaa".
-  - dolar/oficial/historico-general: dólar oficial do Ámbito (varejo, média
-    dos bancos; não é o atacado da Com. A 3500), desde abr/2002.
+  - dólar oficial (varejo, média dos bancos; não é o atacado da Com. A
+    3500): a partir de jun/2010, BCRA, API v4.0, variável 4 ("Tipo de cambio
+    minorista, promedio vendedor"), a fonte primária que o Ámbito espelha;
+    de abr/2002 a mai/2010, dolar/oficial/historico-general do Ámbito. O
+    Ámbito tinha um pico falso em 23/04/2025 (1.333,24 contra 1.174,51 do
+    BCRA), achado na auditoria de 26/11/2026.
   - Usa-se a venda nas duas cotações.
 
 ARMADILHA DO ÁMBITO: a lista vem do mais novo para o mais velho e às vezes
@@ -39,11 +43,11 @@ RESERVAS
     até 12 meses), em três partes:
       depósitos, empréstimos e títulos em moeda estrangeira = IRFCL78 (ou,
         quando falta, IRFCL79 + IRFCL80 saídas + IRFCL80 entradas); aqui
-        entram os depósitos dos bancos no BCRA (encaixes), repos, BIS;
+        entram os depósitos dos bancos no BCRA (encaixes) e empréstimos;
       swaps e futuros, posição vendida = IRFCL1T (o swap com a China a
         partir de dez/2022);
-      outros drenos = IRFCL85 (até nov/2022 o BCRA lançava aqui o swap com
-        a China).
+      outros drenos = IRFCL85 (inclui os repos, IRFCL48T; até nov/2022 o
+        BCRA lançava aqui também o swap com a China).
   - Reserva líquida = ativos de reserva + drenos (que vêm negativos), só do
     BCRA. Os vencimentos do Tesouro (setor S1311) ficam de fora.
 
@@ -103,6 +107,9 @@ CONFERÊNCIAS QUE ABORTAM (segunda fonte: api.argentinadatos.com)
     Banco Nación (em 2024 ficam a uns 3%).
   - O último fechamento do Ámbito tem de aparecer no ArgentinaDatos em até
     2 dias corridos (≤ 0,5%).
+  - Oficial do Ámbito × BCRA (variável 4) dia a dia desde jun/2010: mediana
+    ≤ 0,1% e no máximo 1% dos dias acima de 1% (os poucos dias fora ficam
+    impressos no log; a série usada é a do BCRA).
   - Brecha recalculada a partir da série gravada (arredondada) contra a de
     precisão cheia: ≤ 0,05 p.p.
   - Reserva bruta do FMI (IRFCL65) contra o último dia do mês do BCRA desde
@@ -173,6 +180,7 @@ TOL_CAMBIO = 0.03
 TOL_VALUACAO = 0.035
 INDEC = "https://www.indec.gob.ar/ftp/cuadros/economia/serie_ipc_divisiones.csv"
 POSSE = datetime.date(2023, 12, 10)
+INICIO_OFICIAL_BCRA = datetime.date(2010, 6, 1)
 # de jan a mai/2017 o BCRA (variáveis 27 e 28) traz o IPC GBA: o nacional só
 # saiu depois, retroativo a jan/2017
 INICIO_BCRA_IPC = "2017-06"
@@ -216,6 +224,8 @@ def ambito(caminho, sep):
             repetidas += 1
             continue
         out[d] = num_ar(r[col])
+    # o dia de hoje é cotação intradia, não fechamento
+    out.pop(datetime.date.today(), None)
     if len(out) < 4000:
         raise RuntimeError("Ámbito %s: só %d dias" % (caminho, len(out)))
     print("Ámbito %-15s %d dias (%d datas repetidas descartadas), %s a %s"
@@ -257,6 +267,23 @@ def conferir_cambio(nome, a, b):
     ok = [d for d in b if 0 <= (d - ult).days <= 2 and abs(b[d] / a[ult] - 1) <= 0.005]
     if not ok:
         raise RuntimeError("%s: último fechamento %s (%s) não aparece no ArgentinaDatos" % (nome, ult, a[ult]))
+
+
+def oficial_bcra(amb):
+    v4 = bcra(4, INICIO_OFICIAL_BCRA.isoformat())
+    hoje = datetime.date.today()
+    v4 = {d: x for d, x in v4.items() if d < hoje}
+    com = [d for d in amb if d in v4]
+    difs = sorted(((abs(amb[d] / v4[d] - 1), d) for d in com), reverse=True)
+    med = statistics.median(x for x, _ in difs)
+    fora = [(str(d), amb[d], v4[d]) for x, d in difs if x > 0.01]
+    print("oficial Ámbito × BCRA (var. 4): %d dias, mediana %.3f%%, %d dias acima de 1%%; maiores: %r"
+          % (len(com), med * 100, len(fora), fora[:3]))
+    if len(com) < 3000 or med > 0.001 or len(fora) > 0.01 * len(com):
+        raise RuntimeError("oficial do Ámbito não bate com o BCRA")
+    out = {d: x for d, x in amb.items() if d < INICIO_OFICIAL_BCRA}
+    out.update(v4)
+    return out
 
 
 def serie(nome, s, casas, **extra):
@@ -563,6 +590,7 @@ def main():
     conferir_risco(risco, argdatos("finanzas/indices/riesgo-pais", "valor"))
     conferir_cambio("blue", blue, argdatos("cotizaciones/dolares/blue", "venta"))
     conferir_cambio("oficial", oficial, argdatos("cotizaciones/dolares/oficial", "venta"))
+    oficial = oficial_bcra(oficial)
 
     dias = sorted(d for d in blue if d in oficial)
     brecha = {d: (blue[d] / oficial[d] - 1) * 100 for d in dias}
@@ -604,14 +632,14 @@ def main():
     g_cambio = dict(
         id="argentina-dolar-blue-oficial", titulo="Dólar blue e dólar oficial na Argentina",
         subtitulo="Pesos por dólar, cotação de venda; diário",
-        unidade="n2", diario=True, buracoMax=8, fonte="Ámbito",
+        unidade="n2", diario=True, buracoMax=8, fonte="Ámbito (blue) e BCRA (oficial)",
         variantes=recortes([serie("Dólar blue", blue, 2, cor=BRANCO, largura=3, rotulo=True),
                             serie("Dólar oficial", oficial, 2, cor=AZUL, largura=2.5, rotulo=True)], False),
     )
     g_brecha = dict(
-        id="argentina-brecha-cambial", titulo="Brecha cambial na Argentina: dólar blue menos dólar oficial",
-        subtitulo="Diferença entre o dólar blue e o oficial, cotação de venda; diário",
-        diario=True, buracoMax=8, fonte="Ámbito e FtM", unidade="pct1",
+        id="argentina-brecha-cambial", titulo="Brecha cambial na Argentina: dólar blue sobre o dólar oficial",
+        subtitulo="Quanto o dólar blue supera o oficial, em % ou em pesos; cotação de venda; diário",
+        diario=True, buracoMax=8, fonte="Ámbito, BCRA e FtM", unidade="pct1",
         variantes=recortes([serie("Brecha (%)", brecha, 2, cor=BRANCO, largura=3, rotulo=True)], False, "em %", "pct1")
         + recortes([serie("Brecha (pesos)", dif, 2, cor=BRANCO, largura=3, rotulo=True)], False, "em pesos", "n2"),
     )
@@ -673,7 +701,6 @@ def main():
     poupl = {m: m2l[m] - m1l[m] for m in meses_mon}
     poupe = {m: (m2t[m] - m2l[m]) - m1e[m] for m in meses_mon}
     m2e = {m: m2t[m] - m2l[m] for m in meses_mon}
-    sub = lambda moeda: "trilhões de pesos" if moeda == "pesos" else "US$ bilhões"
     g_bm = dict(
         id="argentina-base-monetaria", titulo="Base monetária na Argentina e seus componentes",
         subtitulo="Fim de mês; trilhões de pesos ou US$ bilhões pelo câmbio oficial de fim de mês",
@@ -694,7 +721,7 @@ def main():
     )
     g_m2 = dict(
         id="argentina-m2-m1-poupanca", titulo="Agregado monetário M2 na Argentina: M1 e depósitos de poupança",
-        subtitulo="M2 = M1 + depósitos de poupança (cajas de ahorro), em pesos e em moeda estrangeira; fim de mês",
+        subtitulo="M2 = M1 + depósitos de poupança (cajas de ahorro), em pesos e em moeda estrangeira; fim de mês; trilhões de pesos ou US$ bilhões",
         unidade="n2", fonte="BCRA, FMI (câmbio) e FtM",
         variantes=quatro(lambda moeda: [
             serie("M1", conv(m1t, moeda), 4, cor=VERMELHO, tipo="barra"),
@@ -703,7 +730,7 @@ def main():
     )
     g_m2_moeda = dict(
         id="argentina-m2-por-moeda", titulo="Agregado monetário M2 na Argentina: moeda nacional e estrangeira",
-        subtitulo="Depósitos em dólar convertidos pelo câmbio oficial; fim de mês",
+        subtitulo="Depósitos em dólar convertidos pelo câmbio oficial; fim de mês; trilhões de pesos ou US$ bilhões",
         unidade="n2", fonte="BCRA, FMI (câmbio) e FtM",
         variantes=quatro(lambda moeda: [
             serie("M2 em moeda nacional", conv(m2l, moeda), 4, cor=AZUL, tipo="barra"),
@@ -712,7 +739,7 @@ def main():
     )
     g_m2_4 = dict(
         id="argentina-m2-componentes", titulo="Agregado monetário M2 na Argentina: componentes por moeda",
-        subtitulo="M1 e depósitos de poupança, em moeda nacional e estrangeira; fim de mês",
+        subtitulo="M1 e depósitos de poupança, em moeda nacional e estrangeira; fim de mês; trilhões de pesos ou US$ bilhões",
         unidade="n2", fonte="BCRA, FMI (câmbio) e FtM",
         variantes=quatro(lambda moeda: [
             serie("M1 em moeda nacional", conv(m1l, moeda), 4, cor=AZUL, tipo="barra"),
