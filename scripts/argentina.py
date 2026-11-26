@@ -54,6 +54,21 @@ INFLAÇÃO
     emenda índices de outra cobertura, os números de 2007 a 2015 e um
     substituto no apagão estatístico de 2015/16, e por isso não entra.
 
+BASE MONETÁRIA E M2 (mensal, fim de mês, desde jan/1990)
+  - BCRA, API v4.0, séries históricas mensais em milhares de pesos:
+    1606 base monetária = 1608 moeda em poder do público + 1609 moeda nos
+    bancos + 1610 contas correntes dos bancos no BCRA (reservas bancárias);
+    1611/1612 M1 total/em moeda local; 1617/1618 M2 total/em moeda local.
+    M1 em moeda estrangeira = 1611 − 1612; poupança (cajas de ahorro) em
+    moeda local = 1618 − 1612; em moeda estrangeira = (1617 − 1618) − (1611 −
+    1612). Os depósitos em dólar já vêm convertidos em pesos pelo BCRA.
+  - Em dólares: dividido pelo câmbio de referência do BCRA (Com. A 3500,
+    variável 5, último dia útil do mês) a partir de mar/2002, quando a série
+    começa; antes, pelo câmbio oficial de fim de mês do FMI (IMF.STA/ER,
+    XDC_USD, EOP_RT), que cobre 1990 a fev/2002.
+  - Variação em 12 meses a partir de jan/1992: em 1990 e 1991, saindo da
+    hiperinflação, passa de 1.000% e achata o resto da série.
+
 CONFERÊNCIAS QUE ABORTAM (segunda fonte: api.argentinadatos.com)
   - Risco país: mesmo dia nas duas fontes, diferença ≤ 1% em pelo menos 99%
     dos dias em comum, e o último ponto igual.
@@ -73,6 +88,14 @@ CONFERÊNCIAS QUE ABORTAM (segunda fonte: api.argentinadatos.com)
     antes no FMI; ≤ 6%) e jan/2002 e dez/2003 (≤ 2,5%).
   - As três partes dos drenos somam o total da seção II (IRFCLDT2): ≤ US$ 2
     milhões em todo mês.
+  - Base monetária = soma dos três componentes; M1 e M2 totais = moeda local
+    + estrangeira (cc e cajas de ahorro, 1613 a 1616, 1619 a 1622): ≤ 1 mil
+    pesos em todo mês desde 1990.
+  - Base monetária do BCRA contra a do FMI (MFS_CBS, S121_L_MB_CBS, desde
+    2017): ≤ 0,01%.
+  - Câmbio do FMI contra o de referência do BCRA (variável 5, último dia
+    útil do mês) desde abr/2002: ≤ TOL_CAMBIO (3%; o FMI usa outra cotação
+    oficial e chega a 2,3% de distância; a mediana fica perto de zero).
   - IPC: variação mensal e em 12 meses refeitas do índice contra as
     publicadas pelo INDEC (≤ 0,051 p.p., o INDEC publica com uma casa) e
     contra as variáveis 27 e 28 da API do BCRA a partir de jun/2017 (≤ 0,051
@@ -94,6 +117,13 @@ UA = {"User-Agent": "Mozilla/5.0 (ftm-analises)"}
 BCRA = "https://api.bcra.gob.ar/estadisticas/v4.0/Monetarias/%d?desde=%s&hasta=%s&limit=3000&offset=%d"
 FMI = ("https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/IRFCL/+/ARG.*.S1X.M"
        "?attributes=dsd&measures=all")
+FMI_ER = ("https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/ER/+/ARG.XDC_USD.EOP_RT.M"
+          "?attributes=dsd&measures=all")
+FMI_CBS = ("https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/MFS_CBS/+/ARG.S121_L_MB_CBS.*.M"
+           "?attributes=dsd&measures=all")
+INICIO_MON = "1990-01"
+INICIO_YOY = "1992-01"
+TOL_CAMBIO = 0.03
 INDEC = "https://www.indec.gob.ar/ftp/cuadros/economia/serie_ipc_divisiones.csv"
 POSSE = datetime.date(2023, 12, 10)
 # de jan a mai/2017 o BCRA (variáveis 27 e 28) traz o IPC GBA: o nacional só
@@ -107,6 +137,7 @@ TOL_MES = {"blue": 0.03, "oficial": 0.04}   # na média mensal, além de 0,5 pes
 INICIO_CONF = "2014-01"
 
 BRANCO, AZUL, VERMELHO, VERDE, AZUL_ESC = "#FFFFFF", "#4F81BD", "#C0504D", "#9BBB59", "#1F497D"
+AZUL_CLARO = "#8EB4E3"
 
 
 def baixar(url, tentativas=4):
@@ -270,6 +301,65 @@ def reservas_mensais(tab, bruta_dia):
     return meses, ativo, dep, swaps, outros, liq
 
 
+def sdmx_mensal(url):
+    """Série única mensal do FMI: {"aaaa-mm": valor}."""
+    d = baixar(url)
+    st = d["data"]["structures"][0]
+    per = [o["value"] for o in st["dimensions"]["observation"][0]["values"]]
+    series = list(d["data"]["dataSets"][0]["series"].values())
+    if len(series) != 1:
+        raise RuntimeError("FMI: esperava 1 série, vieram %d (%s)" % (len(series), url))
+    return {per[int(i)].replace("-M", "-"): float(o[0]) for i, o in series[0]["observations"].items()
+            if o[0] not in (None, "NaN")}
+
+
+def mais(m, k):
+    t = int(m[:4]) * 12 + int(m[5:]) - 1 + k
+    return "%04d-%02d" % (t // 12, t % 12 + 1)
+
+
+def monetario():
+    v = {}
+    for n in list(range(1606, 1634)):
+        if n in (1607, 1623, 1624) or n >= 1625:
+            continue
+        v[n] = {d.strftime("%Y-%m"): x for d, x in bcra(n, "1940-01-01").items()}
+    meses = [m for m in sorted(v[1606]) if m >= INICIO_MON]
+    for m in meses:
+        g = lambda n: v[n].get(m, 0.0)
+        for nome, a, b in (("base", g(1606), g(1608) + g(1609) + g(1610)),
+                           ("M1 local", g(1612), g(1608) + g(1613) + g(1614)),
+                           ("M1 estrangeira", g(1611) - g(1612), g(1615) + g(1616)),
+                           ("M2 local", g(1618), g(1612) + g(1619) + g(1620)),
+                           ("M2 estrangeira", g(1617) - g(1618), g(1615) + g(1616) + g(1621) + g(1622))):
+            if abs(a - b) > 1:
+                raise RuntimeError("%s de %s não fecha: %.0f × %.0f" % (nome, m, a, b))
+    print("identidades da base, M1 e M2: %d meses, de %s a %s" % (len(meses), meses[0], meses[-1]))
+    cbs = sdmx_mensal(FMI_CBS)
+    pior = max(abs(cbs[m] / 1000 / v[1606][m] - 1) for m in cbs if m in v[1606])
+    print("base monetária BCRA × FMI (MFS): %d meses, maior diferença %.4f%%"
+          % (len([m for m in cbs if m in v[1606]]), pior * 100))
+    if pior > 0.0001:
+        raise RuntimeError("base monetária não bate com o FMI")
+    cambio = sdmx_mensal(FMI_ER)
+    ref = {}
+    for d, x in bcra(5, "2002-03-01").items():
+        k = d.strftime("%Y-%m")
+        if k not in ref or d > ref[k][0]:
+            ref[k] = (d, x)
+    difs = sorted(((abs(ref[m][1] / cambio[m] - 1), m) for m in cambio if m in ref and m >= "2002-04"), reverse=True)
+    print("câmbio FMI × BCRA (var. 5): %d meses, maior diferença %.3f%% (%s)" % (len(difs), difs[0][0] * 100, difs[0][1]))
+    if difs[0][0] > TOL_CAMBIO:
+        raise RuntimeError("câmbio do FMI não bate com o BCRA: %r" % difs[:5])
+    print("câmbio FMI × BCRA: mediana %.3f%%" % (statistics.median(x for x, _ in difs) * 100))
+    cambio = {m: x for m, x in cambio.items() if m < "2002-03"}
+    cambio.update({m: x for m, (_, x) in ref.items()})
+    falta = [m for m in meses if m not in cambio]
+    if falta:
+        print("meses sem câmbio do FMI (ficam buraco em dólares):", falta)
+    return v, meses, cambio
+
+
 def ipc():
     with urllib.request.urlopen(urllib.request.Request(INDEC, headers=UA), timeout=120) as r:
         linhas = r.read().decode("latin-1").splitlines()
@@ -338,6 +428,7 @@ def main():
     bruta = bcra(1)
     meses, ativo, dep, swaps, outros, liq = reservas_mensais(irfcl(), bruta)
     vm, via = ipc()
+    mon, meses_mon, cambio = monetario()
     u = max(bruta)
     print("última reserva bruta (BCRA): %s = US$ %.0f milhões" % (u, bruta[u]))
     m = meses[-1]
@@ -407,6 +498,89 @@ def main():
         variantes=recortes([serie("Inflação em 12 meses", via, 1, cor=BRANCO, largura=3, rotulo=True)], True),
     )
 
+    def quatro(series_fn, unidade_pesos="n2"):
+        return (recortes(series_fn("pesos"), True, "em pesos", unidade_pesos)
+                + recortes(series_fn("usd"), True, "em dólares", "usd-bi"))
+
+    def conv(serie_mil, moeda):
+        """milhares de pesos -> trilhões de pesos ou bilhões de dólares"""
+        if moeda == "pesos":
+            return {m: x / 1e9 for m, x in serie_mil.items()}
+        return {m: x / cambio[m] / 1e6 for m, x in serie_mil.items() if m in cambio}
+
+    sel = lambda n: {m: mon[n][m] for m in meses_mon}
+    bm, pub, bancos, resb = sel(1606), sel(1608), sel(1609), sel(1610)
+    m1l, m1t, m2l, m2t = sel(1612), sel(1611), sel(1618), sel(1617)
+    m1e = {m: m1t[m] - m1l[m] for m in meses_mon}
+    poup = {m: m2t[m] - m1t[m] for m in meses_mon}
+    poupl = {m: m2l[m] - m1l[m] for m in meses_mon}
+    poupe = {m: (m2t[m] - m2l[m]) - m1e[m] for m in meses_mon}
+    m2e = {m: m2t[m] - m2l[m] for m in meses_mon}
+    sub = lambda moeda: "trilhões de pesos" if moeda == "pesos" else "US$ bilhões"
+    g_bm = dict(
+        id="argentina-base-monetaria", titulo="Base monetária na Argentina e seus componentes",
+        subtitulo="Fim de mês; trilhões de pesos ou US$ bilhões pelo câmbio oficial de fim de mês",
+        unidade="n2", fonte="BCRA, FMI (câmbio) e FtM",
+        variantes=quatro(lambda moeda: [
+            serie("Moeda em poder do público", conv(pub, moeda), 4, cor=VERDE, tipo="barra"),
+            serie("Moeda nos bancos", conv(bancos, moeda), 4, cor=VERMELHO, tipo="barra"),
+            serie("Reservas bancárias no BCRA", conv(resb, moeda), 4, cor=AZUL_CLARO, tipo="barra"),
+            serie("Base monetária", conv(bm, moeda), 4, cor=BRANCO, largura=3, rotulo=True)]),
+    )
+    yoy = lambda s_: {m: (s_[m] / s_[mais(m, -12)] - 1) * 100 for m in s_ if m >= INICIO_YOY and mais(m, -12) in s_}
+    g_bm_a = dict(
+        id="argentina-base-monetaria-12m", titulo="Base monetária na Argentina: variação em 12 meses",
+        subtitulo="Variação % do saldo de fim de mês em pesos sobre o mesmo mês do ano anterior",
+        unidade="pct1", fonte="BCRA e FtM",
+        variantes=recortes([serie("Base monetária", yoy(bm), 2, cor=BRANCO, largura=3, rotulo=True)], True),
+    )
+    g_m2 = dict(
+        id="argentina-m2-m1-poupanca", titulo="Agregado monetário M2 na Argentina: M1 e depósitos de poupança",
+        subtitulo="M2 = M1 + depósitos de poupança (cajas de ahorro), em pesos e em moeda estrangeira; fim de mês",
+        unidade="n2", fonte="BCRA, FMI (câmbio) e FtM",
+        variantes=quatro(lambda moeda: [
+            serie("M1", conv(m1t, moeda), 4, cor=VERMELHO, tipo="barra"),
+            serie("Depósitos de poupança", conv(poup, moeda), 4, cor=VERDE, tipo="barra"),
+            serie("M2", conv(m2t, moeda), 4, cor=BRANCO, largura=3, rotulo=True)]),
+    )
+    g_m2_moeda = dict(
+        id="argentina-m2-por-moeda", titulo="Agregado monetário M2 na Argentina: moeda nacional e estrangeira",
+        subtitulo="Depósitos em dólar convertidos pelo câmbio oficial; fim de mês",
+        unidade="n2", fonte="BCRA, FMI (câmbio) e FtM",
+        variantes=quatro(lambda moeda: [
+            serie("M2 em moeda nacional", conv(m2l, moeda), 4, cor=AZUL, tipo="barra"),
+            serie("M2 em moeda estrangeira", conv(m2e, moeda), 4, cor=VERDE, tipo="barra"),
+            serie("M2 total", conv(m2t, moeda), 4, cor=BRANCO, largura=3, rotulo=True)]),
+    )
+    g_m2_4 = dict(
+        id="argentina-m2-componentes", titulo="Agregado monetário M2 na Argentina: componentes por moeda",
+        subtitulo="M1 e depósitos de poupança, em moeda nacional e estrangeira; fim de mês",
+        unidade="n2", fonte="BCRA, FMI (câmbio) e FtM",
+        variantes=quatro(lambda moeda: [
+            serie("M1 em moeda nacional", conv(m1l, moeda), 4, cor=AZUL, tipo="barra"),
+            serie("M1 em moeda estrangeira", conv(m1e, moeda), 4, cor=VERMELHO, tipo="barra"),
+            serie("Poupança em moeda nacional", conv(poupl, moeda), 4, cor=AZUL_ESC, tipo="barra"),
+            serie("Poupança em moeda estrangeira", conv(poupe, moeda), 4, cor=VERDE, tipo="barra"),
+            serie("M2 total", conv(m2t, moeda), 4, cor=BRANCO, largura=3, rotulo=True)]),
+    )
+    g_m2_a = dict(
+        id="argentina-m2-12m", titulo="Agregado monetário M2 na Argentina: variação em 12 meses",
+        subtitulo="Variação % do saldo de fim de mês em pesos sobre o mesmo mês do ano anterior",
+        unidade="pct1", fonte="BCRA e FtM",
+        variantes=recortes([serie("M2 total", yoy(m2t), 2, cor=BRANCO, largura=3, rotulo=True),
+                            serie("M2 em moeda nacional", yoy(m2l), 2, cor=AZUL, largura=2.5, rotulo=True)], True),
+    )
+    g_m2_pct = dict(
+        id="argentina-m2-pct-estrangeira", titulo="Parcela do M2 em moeda estrangeira na Argentina",
+        subtitulo="% do M2 total; fim de mês", unidade="pct1", fonte="BCRA e FtM",
+        variantes=recortes([serie("M2 em moeda estrangeira", {m: m2e[m] / m2t[m] * 100 for m in meses_mon}, 2,
+                                  cor=AZUL, tipo="barra", rotulo=True)], True),
+    )
+    m = meses_mon[-1]
+    print("monetário %s: base %.2f tri, M2 %.2f tri (US$ %.1f bi), %% em moeda estrangeira %.1f%%, "
+          "base 12m %.1f%%, M2 12m %.1f%%" % (m, bm[m] / 1e9, m2t[m] / 1e9, m2t[m] / cambio[m] / 1e6,
+                                               m2e[m] / m2t[m] * 100, yoy(bm)[m], yoy(m2t)[m]))
+
     ref = max(max(risco), dias[-1], max(bruta))
     doc = dict(assunto="Argentina", grupo="Análises Variadas", fonte="Ámbito, BCRA, FMI, INDEC e FtM",
                referencia=ref.strftime("%Y-%m"), atualizado=datetime.date.today().isoformat(), formato="artigo",
@@ -414,7 +588,10 @@ def main():
                        dict(titulo="Câmbio", texto="", fontes=[], figuras=[], graficos=[g_cambio, g_brecha]),
                        dict(titulo="Reservas internacionais", texto="", fontes=[], figuras=[],
                             graficos=[g_bruta, g_comp, g_liq]),
-                       dict(titulo="Inflação", texto="", fontes=[], figuras=[], graficos=[g_ipc_m, g_ipc_a])])
+                       dict(titulo="Inflação", texto="", fontes=[], figuras=[], graficos=[g_ipc_m, g_ipc_a]),
+                       dict(titulo="Base monetária", texto="", fontes=[], figuras=[], graficos=[g_bm, g_bm_a]),
+                       dict(titulo="M2", texto="", fontes=[], figuras=[],
+                            graficos=[g_m2, g_m2_moeda, g_m2_4, g_m2_a, g_m2_pct])])
     with open(SAIDA, "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
         f.write("\n")
