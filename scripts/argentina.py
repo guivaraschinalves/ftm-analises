@@ -1097,9 +1097,8 @@ def main():
     )
     g_emae_i = dict(
         id="argentina-emae-indice", titulo="EMAE: estimador mensal de atividade econômica da Argentina",
-        subtitulo="Índice, 2004 = 100", unidade="ind", fonte="INDEC (EMAE)",
-        variantes=recortes([serie("Série original", emae_o, 2, cor=AZUL, largura=2.5),
-                            serie("Dessazonalizado", emae_d, 2, cor=BRANCO, largura=3, rotulo=True)], True),
+        subtitulo="Índice, 2004 = 100; dessazonalizado", unidade="ind", fonte="INDEC (EMAE)",
+        variantes=recortes([serie("Dessazonalizado", emae_d, 2, cor=BRANCO, largura=3, rotulo=True)], True),
     )
     g_emae_a = dict(
         id="argentina-emae-12m", titulo="EMAE: variação anual",
