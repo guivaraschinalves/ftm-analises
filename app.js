@@ -89,7 +89,7 @@
                 "dados/cenario-2026-10-28-fomc.json",
                 "dados/orcamento-2027.json", "dados/defasagem-combustiveis.json", "dados/eleicoes.json", "dados/midterms-2026.json",
                 "dados/petroleo.json", "dados/ueno-bank.json", "dados/migracao-europa.json", "dados/gasto-publico.json",
-                "dados/missao-global-miami.json"];
+                "dados/argentina.json", "dados/missao-global-miami.json"];
   // Uma página pode pedir outros arquivos: <body data-fontes="dados/x.json">.
   if (document.body && document.body.getAttribute("data-fontes")) {
     FONTES = document.body.getAttribute("data-fontes").split(/\s*,\s*/);
@@ -3925,7 +3925,8 @@
     ferramentas.appendChild(esquerda);
 
     var acoes = html("div", { "class": "card-acoes" });
-    if (APRESENTAR_DAQUI) acoes.appendChild(botaoApresentarDaqui(cartao));
+    // "apresentarDaqui" no gráfico: o botão também no índice (a Argentina)
+    if (APRESENTAR_DAQUI || g.apresentarDaqui) acoes.appendChild(botaoApresentarDaqui(cartao));
     if (g.tipo === "figura") {
       // imagem de terceiros (gráfico de outra fonte): o que dá é ir à origem
       if (g.link) {

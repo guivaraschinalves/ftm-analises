@@ -1342,6 +1342,8 @@ def main():
                             graficos=[g_m2, g_m2_moeda, g_m2_4, g_m2_a, g_m2_pct])])
     for sec in doc["secoes"]:
         sec["graficos"] = [achatar(g) for g in sec["graficos"]]
+        for g in sec["graficos"]:
+            g["apresentarDaqui"] = True     # o botão "Apresentar daqui" também no índice
     with open(SAIDA, "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
         f.write("\n")
