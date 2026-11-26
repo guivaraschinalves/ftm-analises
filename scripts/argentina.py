@@ -102,6 +102,22 @@ BALANÇO DE PAGAMENTOS (trimestral, BPM6, desde 1992)
   - Começa em 1992, o início do BP trimestral do INDEC (o FMI tem desde
     1976, mas antes de 1992 são estimativas anuais repartidas).
 
+ATIVIDADE (PIB trimestral e EMAE mensal, INDEC)
+  - PIB: planilhas do INDEC sh_oferta_demanda_MM_AA.xls (cuadro 1, linha
+    B1b, milhões de pesos de 2004, série original) e
+    sh_oferta_demanda_desest_MM_AA.xls (aba "desestacionalizado n", PIB);
+    MM_AA é o mês de publicação, e o script pega a mais nova que existir.
+    Variação acumulada em 4 trimestres = soma dos 4 últimos trimestres sobre
+    a dos 4 anteriores (série original); variação trimestral = trimestre
+    contra o anterior na série dessazonalizada.
+  - EMAE: sh_emae_mensual_base2004.xls (aba "Tabla"): índice original,
+    dessazonalizado e variações publicadas. "Acumulado no trimestre" = média
+    dos 3 meses dessazonalizados contra a média do trimestre anterior, a
+    medida comparável à variação trimestral do PIB dessazonalizado.
+  - Se o EMAE trimestral acompanhar o PIB (diferença média ≤ TOL_EMAE_PIB
+    p.p. em todos os trimestres com os dois), o trimestre que o EMAE já
+    fechou e o PIB ainda não vai meio sombreado no gráfico do PIB trimestral.
+
 BRASIL, PARA COMPARAR (variação em 12 meses no mesmo gráfico da Argentina)
   - BCB, SGS: 1788 base monetária restrita (saldo de fim de período) =
     1786 papel-moeda emitido + 1787 reservas bancárias; 27810 M2 (conceito
@@ -153,6 +169,10 @@ CONFERÊNCIAS QUE ABORTAM (segunda fonte: api.argentinadatos.com)
     capital, financeira, ID, carteira, outros, derivativos, reservas e erros e
     omissões) desde 2006: ≤ US$ 0,5 milhão (a conta capital de 2016 difere
     US$ 1 a 2 milhões, revisão do INDEC: ≤ US$ 3 milhões).
+  - PIB: a coluna "Total" de cada ano é a média dos 4 trimestres (≤ 0,01%);
+    variação trimestral refeita da série dessazonalizada contra a publicada
+    (aba "desestacionalizado v", ≤ 0,001 p.p.). EMAE: variação anual e
+    mensal refeitas contra as publicadas na planilha (≤ 0,001 p.p.).
   - Brasil: base = papel-moeda emitido + reservas bancárias e M2 = M1 +
     poupança + títulos privados (≤ R$ 2 mil em todo mês); base do BCB contra
     a do FMI (MFS_MA, NDMBM_MAI): ≤ 0,01%.
@@ -205,6 +225,8 @@ INDEC_X_FMI = {"160.2_TL_CUENNTE_0_T_22": "NETCD_T|CAB", "160.2_CTA_CORNES_0_T_4
                "160.2_CTA_FINROS_0_T_36": "NNAFANIL_T|F_F7", "160.2_AVOS_RERVA_0_T_15": "A_T|R_F",
                "160.2_ERES_OMTOS_0_T_23": "NETCD_T|EO"}
 INICIO_BP = "1992-03"
+INDEC_FTP = "https://www.indec.gob.ar/ftp/cuadros/economia/"
+TOL_EMAE_PIB = 0.25
 INICIO_MON = "1990-01"
 INICIO_YOY = "1992-01"
 TOL_CAMBIO = 0.03
@@ -603,6 +625,121 @@ def bp():
     return trims, out
 
 
+def xls_indec(nome):
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from xls import abas
+    with urllib.request.urlopen(urllib.request.Request(INDEC_FTP + nome, headers=UA), timeout=120) as r:
+        dados = r.read()
+    if dados[:8] != b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1":
+        raise RuntimeError("INDEC: %s não é .xls" % nome)
+    return abas(dados)
+
+
+def xls_indec_recente(prefixo):
+    """A planilha publicada mais recente: prefixo_MM_AA.xls, do mês atual para trás."""
+    hoje = datetime.date.today()
+    for k in range(0, 15):
+        t = hoje.year * 12 + hoje.month - 1 - k
+        nome = "%s_%02d_%02d.xls" % (prefixo, t % 12 + 1, (t // 12) % 100)
+        try:
+            a = xls_indec(nome)
+            print("INDEC: %s" % nome)
+            return a
+        except Exception:                      # noqa: BLE001
+            continue
+    raise RuntimeError("INDEC: nenhuma planilha %s nos últimos 15 meses" % prefixo)
+
+
+def pib_emae():
+    num_ = lambda v: float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+    ano_ = lambda v: int(str(v)[:4]) if v is not None and str(v)[:4].isdigit() else (int(v) if num_(v) else None)
+    # PIB original (cuadro 1)
+    c = xls_indec_recente("sh_oferta_demanda")["cuadro 1"]
+    cols = sorted({k for _, k in c})
+    linha = [r for r in sorted({r for r, _ in c}) if str(c.get((r, 0)) or "").strip() == "B1b"][0]
+    lin_ano = [r for r in range(0, 8) if any(ano_(c.get((r, k))) for k in cols[2:6])][0]
+    lin_tri = lin_ano + 1
+    orig, ano, totais = {}, None, {}
+    for k in cols:
+        if ano_(c.get((lin_ano, k))):
+            ano = ano_(c.get((lin_ano, k)))
+        rot, v = str(c.get((lin_tri, k)) or ""), num_(c.get((linha, k)))
+        if ano is None or v is None:
+            continue
+        if "trimestre" in rot:
+            orig["%04d-%02d" % (ano, int(rot[0]) * 3)] = v
+        elif rot.strip().startswith("Total"):
+            totais[ano] = v
+    for a, tot in totais.items():
+        qs = [orig.get("%04d-%02d" % (a, 3 * q)) for q in range(1, 5)]
+        if None not in qs and abs(statistics.mean(qs) / tot - 1) > 0.0001:
+            raise RuntimeError("PIB de %d: total não é a média dos trimestres" % a)
+    # PIB dessazonalizado
+    d = xls_indec_recente("sh_oferta_demanda_desest")
+    Q = {"I": 3, "II": 6, "III": 9, "IV": 12}
+
+    def tabela(aba):
+        out, ano = {}, None
+        for r in sorted({r for r, _ in aba}):
+            if ano_(aba.get((r, 0))):
+                ano = ano_(aba.get((r, 0)))
+            tq = str(aba.get((r, 1)) or "").strip()
+            if tq in Q and ano and num_(aba.get((r, 2))) is not None:
+                out["%04d-%02d" % (ano, Q[tq])] = num_(aba.get((r, 2)))
+        return out
+    des = tabela(d["desestacionalizado n"])
+    pub_qq = tabela(d["desestacionalizado v"])
+    qq = {m: (des[m] / des[mais(m, -3)] - 1) * 100 for m in des if mais(m, -3) in des}
+    pior = max(abs(qq[m] - pub_qq[m]) for m in qq if m in pub_qq)
+    if pior > 0.001 or len(qq) < 80:
+        raise RuntimeError("PIB: variação trimestral não bate com a publicada (%.4f)" % pior)
+    a4 = {}
+    for m in orig:
+        ult = [mais(m, -3 * k) for k in range(4)]
+        ant = [mais(m, -3 * k) for k in range(4, 8)]
+        if all(x in orig for x in ult + ant):
+            a4[m] = (sum(orig[x] for x in ult) / sum(orig[x] for x in ant) - 1) * 100
+    print("PIB: original %s a %s, dessazonalizado %s a %s; trimestral × publicada %.5f p.p."
+          % (min(orig), max(orig), min(des), max(des), pior))
+    # EMAE
+    e = xls_indec("sh_emae_mensual_base2004.xls")["Tabla"]
+    MES = {"Enero": 1, "Febrero": 2, "Marzo": 3, "Abril": 4, "Mayo": 5, "Junio": 6, "Julio": 7, "Agosto": 8,
+           "Septiembre": 9, "Octubre": 10, "Noviembre": 11, "Diciembre": 12}
+    eo, ed, pub_a, pub_m, ano = {}, {}, {}, {}, None
+    for r in sorted({r for r, _ in e}):
+        if ano_(e.get((r, 0))):
+            ano = ano_(e.get((r, 0)))
+        mes = str(e.get((r, 1)) or "").strip()
+        if mes in MES and ano and num_(e.get((r, 2))) is not None:
+            m = "%04d-%02d" % (ano, MES[mes])
+            eo[m], ed[m] = num_(e[(r, 2)]), num_(e[(r, 4)])
+            if num_(e.get((r, 3))) is not None and ano > 2004:
+                pub_a[m] = num_(e[(r, 3)])
+            if num_(e.get((r, 5))) is not None:
+                pub_m[m] = num_(e[(r, 5)])
+    ea = {m: (eo[m] / eo[mais(m, -12)] - 1) * 100 for m in eo if mais(m, -12) in eo}
+    em = {m: (ed[m] / ed[mais(m, -1)] - 1) * 100 for m in ed if mais(m, -1) in ed}
+    p1 = max(abs(ea[m] - pub_a[m]) for m in ea if m in pub_a)
+    p2 = max(abs(em[m] - pub_m[m]) for m in em if m in pub_m)
+    if p1 > 0.001 or p2 > 0.001:
+        raise RuntimeError("EMAE: variações não batem com as publicadas (%.4f, %.4f)" % (p1, p2))
+    tri = {}
+    for m in ed:
+        if int(m[5:]) % 3 == 0 and all(mais(m, -k) in ed for k in range(6)):
+            atual = statistics.mean(ed[mais(m, -k)] for k in range(3))
+            antes = statistics.mean(ed[mais(m, -k)] for k in range(3, 6))
+            tri[m] = (atual / antes - 1) * 100
+    comuns = [m for m in tri if m in qq]
+    dif = statistics.mean(abs(tri[m] - qq[m]) for m in comuns)
+    rec = [m for m in comuns][-8:]
+    dif_rec = statistics.mean(abs(tri[m] - qq[m]) for m in rec)
+    print("EMAE: %s a %s; anual e mensal × publicadas %.5f e %.5f p.p.; trimestre EMAE × PIB: %d trimestres, "
+          "diferença média %.3f p.p. (últimos 8: %.3f), correlação %.4f"
+          % (min(eo), max(eo), p1, p2, len(comuns), dif, dif_rec,
+             statistics.correlation([tri[m] for m in comuns], [qq[m] for m in comuns])))
+    return orig, des, qq, a4, eo, ed, ea, em, tri, dif
+
+
 def sgs(cod):
     hoje = datetime.date.today().strftime("%d/%m/%Y")
     d = baixar(SGS % (cod, hoje))
@@ -713,6 +850,7 @@ def main():
     br_base, br_m2 = brasil()
     meses_bal, bal = balanco_bcra({m: mon[1606][m] for m in meses_mon}, cambio)
     trims, bpq = bp()
+    pib_o, pib_d, pib_qq, pib_a4, emae_o, emae_d, emae_a, emae_m, emae_tri, dif_emae = pib_emae()
     u = max(bruta)
     print("última reserva bruta (BCRA): %s = US$ %.0f milhões" % (u, bruta[u]))
     m = meses[-1]
@@ -933,6 +1071,55 @@ def main():
           "r1 %.1f, r2 %.1f" % (tq, a4["cc"], a4["ck"], a4["cf"], a4["res"], a4["eo"], a4["bens"], a4["serv"],
                                a4["r1"], a4["r2"]))
 
+    # atividade
+    previa = {m: x for m, x in emae_tri.items() if m > max(pib_qq)}
+    usa_previa = dif_emae <= TOL_EMAE_PIB and bool(previa)
+    tri_nome = lambda m: "%dº tri/%s" % (int(m[5:]) // 3, m[:4])
+    series_qq = [serie("PIB, variação trimestral", pib_qq, 2, cor=AZUL, tipo="barra")]
+    if usa_previa:
+        series_qq.append(serie("Prévia pelo EMAE (%s)" % ", ".join(tri_nome(m) for m in sorted(previa)), previa, 2,
+                               cor=AZUL, tipo="barra", opacidade=0.4))
+    g_pib = dict(
+        id="argentina-pib", titulo="PIB real da Argentina",
+        subtitulo="Variação % real; 4 trimestres sobre os 4 anteriores ou trimestre contra o anterior "
+                  "(dessazonalizado)",
+        unidade="pct1", barra=3, buracoMax=3, fonte="INDEC (cuentas nacionales) e FtM",
+        variantes=recortes([serie("PIB, acumulado em 4 trimestres", pib_a4, 2, cor=AZUL, tipo="barra")], True,
+                           "acumulado em 4 trimestres", "pct1")
+        + recortes(series_qq, True, "trimestral, dessazonalizado", "pct1"),
+    )
+    g_emae_i = dict(
+        id="argentina-emae-indice", titulo="EMAE: estimador mensal de atividade econômica da Argentina",
+        subtitulo="Índice, 2004 = 100", unidade="ind", fonte="INDEC (EMAE)",
+        variantes=recortes([serie("Série original", emae_o, 2, cor=AZUL, largura=2.5),
+                            serie("Dessazonalizado", emae_d, 2, cor=BRANCO, largura=3, rotulo=True)], True),
+    )
+    g_emae_a = dict(
+        id="argentina-emae-12m", titulo="EMAE: variação anual",
+        subtitulo="Variação % sobre o mesmo mês do ano anterior; série original", unidade="pct1",
+        fonte="INDEC (EMAE) e FtM",
+        variantes=recortes([serie("EMAE", emae_a, 2, cor=BRANCO, largura=3, rotulo=True)], True),
+    )
+    g_emae_m = dict(
+        id="argentina-emae-mensal", titulo="EMAE: variação mensal",
+        subtitulo="Variação % sobre o mês anterior; série dessazonalizada", unidade="pct1",
+        fonte="INDEC (EMAE) e FtM",
+        variantes=recortes([serie("EMAE", emae_m, 2, cor=AZUL, tipo="barra", rotulo=True)], True),
+    )
+    g_emae_t = dict(
+        id="argentina-emae-trimestre", titulo="EMAE no trimestre e PIB trimestral",
+        subtitulo="Variação % do trimestre contra o anterior, dessazonalizado; EMAE pela média dos 3 meses; "
+                  "trimestres datados no último mês",
+        unidade="pct1", barra=3, buracoMax=3, fonte="INDEC (EMAE e cuentas nacionales) e FtM",
+        variantes=recortes([serie("EMAE, média do trimestre", emae_tri, 2, cor=AZUL, tipo="barra"),
+                            serie("PIB", pib_qq, 2, cor=BRANCO, largura=3, rotulo=True)], True),
+    )
+    mq, me = max(pib_qq), max(emae_o)
+    print("PIB %s: trimestral %.2f%%, 4 trimestres %.2f%% | EMAE %s: índice %.2f, anual %.2f%%, mensal %.2f%% | "
+          "prévia %s (diferença média %.3f p.p.): %r" % (mq, pib_qq[mq], pib_a4[max(pib_a4)], me, emae_o[me],
+                                                         emae_a[me], emae_m[me], "sim" if usa_previa else "não",
+                                                         dif_emae, {k: round(v, 2) for k, v in previa.items()}))
+
     m = meses_mon[-1]
     print("monetário %s: base %.2f tri, M2 %.2f tri (US$ %.1f bi), %% em moeda estrangeira %.1f%%, "
           "base 12m %.1f%%, M2 12m %.1f%%" % (m, bm[m] / 1e9, m2t[m] / 1e9, m2t[m] / cambio[m] / 1e6,
@@ -948,6 +1135,8 @@ def main():
                        dict(titulo="Reservas internacionais", texto="", fontes=[], figuras=[],
                             graficos=[g_bruta, g_comp, g_liq]),
                        dict(titulo="Inflação", texto="", fontes=[], figuras=[], graficos=[g_ipc_m, g_ipc_a]),
+                       dict(titulo="Atividade", texto="", fontes=[], figuras=[],
+                            graficos=[g_pib, g_emae_i, g_emae_a, g_emae_m, g_emae_t]),
                        dict(titulo="Contas externas", texto="", fontes=[], figuras=[], graficos=[g_bp, g_cc, g_cf]),
                        dict(titulo="Ativos do BCRA", texto="", fontes=[], figuras=[], graficos=[g_ativos, g_ativos_a]),
                        dict(titulo="Base monetária", texto="", fontes=[], figuras=[], graficos=[g_bm, g_bm_a]),
