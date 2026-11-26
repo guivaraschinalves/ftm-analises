@@ -794,6 +794,86 @@
     return { svg: svg, L: L, pal: pal, ranking: true };
   }
 
+  // Ranking empilhado: uma barra deitada por item com as partes lado a lado
+  // (composição). O número de cada parte vai dentro dela quando cabe; o total
+  // vai na ponta, a não ser com "semTotal" (partes que somam 100%). "eixoMax"
+  // fixa o fim da escala (100 numa composição em %).
+  function construirRankingPilha(g, L, pal, svg, itens) {
+    var F = unidade(g), partes = g.partes || [];
+    var fs = Math.round(L.tick * 1.0), fsV = Math.round(L.tick * 0.78);
+    var yLeg = L.sub.y + L.sub.fs * 2.2, y0 = yLeg + fs * 1.4, y1 = L.y1;
+    var passo = (y1 - y0) / Math.max(itens.length, 1), alt = passo * 0.7;
+    var lw = Math.max.apply(null, [0].concat(itens.map(function (it) { return largura(it[0], fs, it[3] ? "bold" : "normal"); })));
+    var tot = function (it) { return it[5].reduce(function (a, v) { return a + Math.max(0, v); }, 0); };
+    var vw = g.semTotal ? 0 : Math.max.apply(null, [0].concat(itens.map(function (it) { return largura(F.valor(tot(it)), fsV, "bold"); })));
+    var x0 = L.titulo.x + lw + 16, x1 = L.W - L.titulo.x - (vw ? vw + 14 : 4);
+    var mx = g.eixoMax || Math.max.apply(null, [1].concat(itens.map(tot)));
+    var X = function (v) { return x0 + (x1 - x0) * v / mx; };
+    // legenda das partes, em linha
+    var xl = x0;
+    partes.forEach(function (pt) {
+      svg.appendChild(el("rect", { x: xl, y: yLeg - fs * 0.4, width: 14, height: fs * 0.8, rx: 2, fill: corNoTema(pt.cor, pal) }));
+      svg.appendChild(texto(pt.nome, { x: xl + 20, y: yLeg, "font-size": fs, fill: pal.texto, "dominant-baseline": "central" }));
+      xl += 20 + largura(pt.nome, fs) + 28;
+    });
+    function claro(hex) {
+      var h = String(hex).replace("#", "");
+      if (h.length !== 6) return false;
+      var r = parseInt(h.slice(0, 2), 16), gg = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+      return (0.299 * r + 0.587 * gg + 0.114 * b) > 150;
+    }
+    itens.forEach(function (it, k) {
+      var yc = y0 + passo * (k + 0.5), xa = x0;
+      if (k % 2 === 1) {
+        svg.appendChild(el("rect", { x: L.titulo.x, y: yc - passo / 2, width: L.W - 2 * L.titulo.x, height: passo,
+                                     fill: pal.texto, opacity: 0.04 }));
+      }
+      svg.appendChild(texto(it[0], { x: x0 - 12, y: yc, "font-size": fs, fill: pal.texto, "text-anchor": "end",
+                                     "dominant-baseline": "central", "font-weight": it[3] ? "bold" : null }));
+      it[5].forEach(function (v, j) {
+        if (!(v > 0)) return;
+        var cor = corNoTema((partes[j] || {}).cor || "#4F81BD", pal), w = X(v) - x0;
+        var r = el("rect", { x: xa, y: yc - alt / 2, width: Math.max(0.5, w), height: alt, fill: cor,
+                             stroke: pal.bg, "stroke-width": 1 });
+        var t = el("title", {}); t.textContent = it[0] + " · " + (partes[j] || {}).nome + ": " + F.valor(v); r.appendChild(t);
+        svg.appendChild(r);
+        var rot = F.valor(v);
+        if (largura(rot, fsV, "bold") + 10 < w) {
+          svg.appendChild(texto(rot, { x: xa + w / 2, y: yc, "font-size": fsV, "font-weight": "bold", "text-anchor": "middle",
+                                       "dominant-baseline": "central", fill: claro(cor) ? "#000" : "#fff",
+                                       "pointer-events": "none" }));
+        }
+        xa += w;
+      });
+      if (!g.semTotal) {
+        svg.appendChild(texto(F.valor(tot(it)), { x: xa + 8, y: yc, "font-size": fsV, "font-weight": "bold", fill: pal.texto,
+                                                   "dominant-baseline": "central" }));
+      }
+    });
+    svg.appendChild(texto(g.titulo, {
+      x: L.titulo.x, y: L.titulo.y, "font-weight": "bold", fill: pal.texto,
+      "font-size": corpoQueCabe(g.titulo, L.titulo.fs, L.titulo.max, "bold")
+    }));
+    if (g.subtitulo) {
+      svg.appendChild(texto(g.subtitulo, {
+        x: L.sub.x, y: L.sub.y, "font-style": "italic", fill: pal.texto,
+        "font-size": corpoQueCabe(g.subtitulo, L.sub.fs, L.sub.max, "italic")
+      }));
+    }
+    svg.appendChild(texto("Fonte: " + g.fonte + ".", {
+      x: L.fonte.x, y: L.fonte.y, "font-size": L.fonte.fs, fill: pal.texto, "text-anchor": "end"
+    }));
+    if (logoSvg) {
+      var lh = L.logo.w * logoSvg.razao;
+      var gl = el("svg", { x: L.logo.x, y: L.logo.y, width: L.logo.w, height: lh, viewBox: logoSvg.viewBox });
+      var gg = el("g", { fill: pal.logo });
+      logoSvg.nos.forEach(function (n) { gg.appendChild(n.cloneNode(true)); });
+      gl.appendChild(gg);
+      svg.appendChild(gl);
+    }
+    return { svg: svg, L: L, pal: pal, ranking: true };
+  }
+
   function construirRanking(cartao, L0, nomeTema) {
     var g = graficoDe(cartao), pal = PALETAS[nomeTema], F = unidade(g);
     var L = Object.assign({}, L0);
@@ -809,6 +889,9 @@
     // valor cheio no rótulo; "unidade2" formata o segundo valor
     var par = itens.some(function (it) { return it[4] !== undefined && it[4] !== null; });
     if (par) return construirRankingPar(g, L, pal, svg, itens);
+    // pilha: o item traz as partes em it[5] ([v1, v2, ...], na ordem de
+    // "partes": [{nome, cor}]), empilhadas na mesma barra deitada
+    if (itens.some(function (it) { return Array.isArray(it[5]); })) return construirRankingPilha(g, L, pal, svg, itens);
     var fs = Math.round(L.tick * 1.15);
     var y0 = L.sub.y + L.sub.fs * 2.4, y1 = L.y1;
     var passo = (y1 - y0) / Math.max(itens.length, 1), alt = passo * 0.66;

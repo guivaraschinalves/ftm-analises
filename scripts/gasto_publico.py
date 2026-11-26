@@ -392,24 +392,26 @@ def credito_bis():
     top = sorted(linhas, key=lambda d: -d["sG"])[:TOP_CREDITO]
     print("  BIS %s, %d países; maior fatia do governo:" % (tri, len(linhas)),
           ", ".join("%s %.1f%%" % (d["nome"], d["sG"]) for d in top[:6]), "...", "%s %.1f%%" % (top[-1]["nome"], top[-1]["sG"]))
-    cats = [d["nome"] for d in top]
     rot_tri = "%sº tri/%s" % (tri[-1], tri[:4])
 
-    def barras(campos):
-        return [dict(nome=nome, cor=cor, tipo="barra", dados=[[str(i), round(d[k], 1)] for i, d in enumerate(top)])
-                for k, nome, cor in campos]
-    GOV = ("sG", "Governo geral", VERMELHO)
+    def itens(chaves):
+        return [[d["nome"], round(sum(d[k] for k in chaves), 1), None, d["c"] == "BR", None,
+                 [round(d[k], 1) for k in chaves]] for d in top]
+    GOV = dict(nome="Governo geral", cor=VERMELHO)
+    FAM = dict(nome="Famílias", cor=AZUL)
+    EMP = dict(nome="Empresas não financeiras", cor=VERDE)
     variantes = [
-        dict(rot="Governo, famílias e empresas (% do total)", unidade="%", eixo=dict(max=100, passo=20),
-             series=barras([GOV, ("sH", "Famílias", AZUL), ("sN", "Empresas não financeiras", VERDE)])),
-        dict(rot="Governo e setor privado (% do total)", unidade="%", eixo=dict(max=100, passo=20),
-             series=barras([GOV, ("sP", "Setor privado não financeiro (famílias + empresas)", AZUL_CLARO)])),
-        dict(rot="Governo, famílias e empresas (% do PIB)", unidade="%",
-             series=barras([("G", "Governo geral", VERMELHO), ("H", "Famílias", AZUL),
-                            ("N", "Empresas não financeiras", VERDE)])),
+        dict(rot="Governo, famílias e empresas (% do total)", semTotal=True, eixoMax=100,
+             partes=[GOV, FAM, EMP], itens=itens(["sG", "sH", "sN"])),
+        dict(rot="Governo e setor privado (% do total)", semTotal=True, eixoMax=100,
+             partes=[GOV, dict(nome="Setor privado não financeiro (famílias + empresas)", cor=AZUL_CLARO)],
+             itens=itens(["sG", "sP"])),
+        dict(rot="Governo, famílias e empresas (% do PIB)", semTotal=False, eixoMax=None,
+             partes=[GOV, FAM, EMP], itens=itens(["G", "H", "N"])),
     ]
     g = dict(
         id="credito-setor-nao-financeiro-composicao",
+        tipo="ranking", unidade="pct1",
         titulo="Composição do crédito ao setor não financeiro, %s" % rot_tri,
         subtitulo="Os %d países com a maior fatia do governo geral no total, entre os %d do BIS"
                   % (TOP_CREDITO, len(linhas)),
@@ -422,10 +424,11 @@ def credito_bis():
               "não financeiras; por isso ele aparece numa versão separada, para não ser contado duas vezes. Países "
               "ordenados pela fatia do governo no total, também na versão em %% do PIB. Dados de %s."
               % rot_tri),
-        categorias=cats, barra=0.8, unidade="%", eixo=variantes[0]["eixo"],
-        series=variantes[0]["series"],
-        variantes=[dict(v, categorias=cats, barra=0.8) for v in variantes],
+        variantes=variantes,
     )
+    for k in ("partes", "itens", "semTotal", "eixoMax"):
+        if k in variantes[0]:
+            g[k] = variantes[0][k]
     return g
 
 
