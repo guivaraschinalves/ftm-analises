@@ -1261,35 +1261,34 @@ def main():
                            + [serie("EMAE total", emae_ativ["EMAE total"], 2, cor=BRANCO, largura=3, rotulo=True)],
                            True),
     )
-    g_emae_a = dict(
-        id="argentina-emae-12m", titulo="EMAE: variação anual",
-        slideJunto="emae-anual",
-        subtitulo="Variação % sobre o mesmo mês do ano anterior; série original", unidade="pct1",
-        fonte="INDEC (EMAE) e FtM",
-        variantes=recortes([serie("EMAE", emae_a, 2, cor=BRANCO, largura=3, rotulo=True)], True),
-    )
-    g_emae_c = dict(
-        id="argentina-emae-contribuicoes", titulo="EMAE: contribuições por setor para a variação anual",
-        slideJunto="emae-anual",
-        subtitulo="Pontos percentuais da variação sobre o mesmo mês do ano anterior; série original",
-        unidade="pct1", barra=1, fonte="INDEC (EMAE e cuentas nacionales) e FtM",
-        variantes=recortes([serie(nome, {m: v[nome] for m, v in emae_contrib.items()}, 2, cor=cor, tipo="barra")
-                            for nome, _, cor in GRUPOS_EMAE]
-                           + [serie("EMAE", emae_a, 2, cor=BRANCO, largura=3, rotulo=True)], True),
-    )
     MESES_PT = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro",
                 "outubro", "novembro", "dezembro"]
     mu = emae_est["mes"]
     ordem = sorted(NOMES_SETOR, key=lambda l: -emae_est["inc"][l])
-    g_emae_inc = dict(
-        id="argentina-emae-setores-mes", tipo="ranking",
-        slideJunto="emae-anual",
-        titulo="EMAE por setor: variação anual e contribuição, %s de %s" % (MESES_PT[int(mu[5:]) - 1], mu[:4]),
-        subtitulo="Contribuição: pontos percentuais da variação do EMAE; variação: % sobre o mesmo mês do ano anterior",
-        unidade="pp", unidade2="pct1", limite=15, fonte="INDEC (EMAE e cuentas nacionales) e FtM",
-        legendaPar=[["Contribuição (p.p.)", AZUL], ["Variação (%)", "#8a8a86"]],
-        itens=[["EMAE, nível geral", round(emae_est["total"], 2), BRANCO, True, None]]
-        + [[NOMES_SETOR[l], round(emae_est["inc"][l], 2), AZUL, False, round(emae_est["var"][l], 1)] for l in ordem],
+    mes_txt = "%s de %s" % (MESES_PT[int(mu[5:]) - 1], mu[:4])
+    marca = [dict(em=POSSE_MES, rot="Posse de Milei")]
+    # um cartão, três visualizações (pedido dele em 26/11/2026): a variação anual,
+    # as contribuições por setor ao longo do tempo e o mês por setor, como o INDEC
+    g_emae_a = dict(
+        id="argentina-emae-12m", titulo="EMAE: variação anual",
+        subtitulo="Sobre o mesmo mês do ano anterior; série original", unidade="pct1",
+        fonte="INDEC (EMAE e cuentas nacionales) e FtM",
+        variantes=[
+            dict(rot="variação anual", unidade="pct1", eventos=marca,
+                 series=[serie("EMAE", emae_a, 2, cor=BRANCO, largura=3, rotulo=True)]),
+            dict(rot="contribuições por setor (p.p.)", unidade="pct1", barra=1, eventos=marca,
+                 titulo="EMAE: contribuições por setor para a variação anual",
+                 series=[serie(nome, {m: v[nome] for m, v in emae_contrib.items()}, 2, cor=cor, tipo="barra")
+                         for nome, _, cor in GRUPOS_EMAE]
+                 + [serie("EMAE", emae_a, 2, cor=BRANCO, largura=3, rotulo=True)]),
+            dict(rot="por setor, " + mes_txt, tipo="ranking",
+                 titulo="EMAE por setor: variação anual e contribuição, " + mes_txt,
+                 unidade="pp", unidade2="pct1", limite=15,
+                 legendaPar=[["Contribuição (p.p.)", AZUL], ["Variação (%)", "#8a8a86"]],
+                 itens=[["EMAE, nível geral", round(emae_est["total"], 2), BRANCO, True, None]]
+                 + [[NOMES_SETOR[l], round(emae_est["inc"][l], 2), AZUL, False, round(emae_est["var"][l], 1)]
+                    for l in ordem]),
+        ],
     )
     g_emae_m = dict(
         id="argentina-emae-mensal", titulo="EMAE: variação mensal",
@@ -1331,7 +1330,7 @@ def main():
                             graficos=[g_bruta, g_comp, g_liq]),
                        dict(titulo="Inflação", texto="", fontes=[], figuras=[], graficos=[g_ipc_m, g_ipc_a]),
                        dict(titulo="Atividade", texto="", fontes=[], figuras=[],
-                            graficos=[g_pib, g_pib_t, g_emae_i, g_emae_s, g_emae_a, g_emae_c, g_emae_inc, g_emae_m, g_emae_t]),
+                            graficos=[g_pib, g_pib_t, g_emae_i, g_emae_s, g_emae_a, g_emae_m, g_emae_t]),
                        dict(titulo="Contas externas", texto="", fontes=[], figuras=[], graficos=[g_bp, g_cc, g_cf]),
                        dict(titulo="Ativos do BCRA", texto="", fontes=[], figuras=[], graficos=[g_ativos, g_ativos_a]),
                        dict(titulo="Base monetária", texto="", fontes=[], figuras=[], graficos=[g_bm, g_bm_a]),
