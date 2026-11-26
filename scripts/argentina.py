@@ -850,7 +850,7 @@ def pib_emae():
           "diferença média %.3f p.p. (últimos 8: %.3f), correlação %.4f"
           % (min(eo), max(eo), p1, p2, len(comuns), dif, dif_rec,
              statistics.correlation([tri[m] for m in comuns], [qq[m] for m in comuns])))
-    # gráfico estático do último mês: incidência e variação anual de cada setor
+    # gráfico estático do último mês: contribuição (a "incidencia" do INDEC) e variação anual de cada setor
     lv = xls_indec("sh_emae_actividad_base2004.xls")["Tabla Var Letras"]
     var_pub, ano = {}, None
     for r in sorted({r for r, _ in lv}):
@@ -865,7 +865,7 @@ def pib_emae():
     inc_u = {l: peso[l] * (setor[mu][l] - prev[l]) / den_u * 100 for l in NOMES_SETOR}
     var_u = {l: (setor[mu][l] / prev[l] - 1) * 100 for l in NOMES_SETOR}
     pv = max(abs(var_u[l] - var_pub[mu][l]) for l in NOMES_SETOR)
-    print("EMAE %s por setor: variação refeita × publicada %.5f p.p.; soma das incidências %.3f contra %.3f "
+    print("EMAE %s por setor: variação refeita × publicada %.5f p.p.; soma das contribuições %.3f contra %.3f "
           "publicado" % (mu, pv, sum(inc_u.values()), pub_a[mu]))
     if pv > 0.001 or abs(sum(inc_u.values()) - pub_a[mu]) > TOL_CONTRIB:
         raise RuntimeError("EMAE por setor do último mês não confere")
@@ -1284,10 +1284,10 @@ def main():
     g_emae_inc = dict(
         id="argentina-emae-setores-mes", tipo="ranking",
         slideJunto="emae-anual",
-        titulo="EMAE por setor: variação anual e incidência, %s de %s" % (MESES_PT[int(mu[5:]) - 1], mu[:4]),
-        subtitulo="Incidência: pontos percentuais da variação do EMAE; variação: % sobre o mesmo mês do ano anterior",
+        titulo="EMAE por setor: variação anual e contribuição, %s de %s" % (MESES_PT[int(mu[5:]) - 1], mu[:4]),
+        subtitulo="Contribuição: pontos percentuais da variação do EMAE; variação: % sobre o mesmo mês do ano anterior",
         unidade="pp", unidade2="pct1", limite=15, fonte="INDEC (EMAE e cuentas nacionales) e FtM",
-        legendaPar=[["Incidência (p.p.)", AZUL], ["Variação (%)", "#8a8a86"]],
+        legendaPar=[["Contribuição (p.p.)", AZUL], ["Variação (%)", "#8a8a86"]],
         itens=[["EMAE, nível geral", round(emae_est["total"], 2), BRANCO, True, None]]
         + [[NOMES_SETOR[l], round(emae_est["inc"][l], 2), AZUL, False, round(emae_est["var"][l], 1)] for l in ordem],
     )
