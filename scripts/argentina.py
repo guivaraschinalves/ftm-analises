@@ -234,7 +234,7 @@ TOL_CAMBIO = 0.03
 # depois da desvalorização (a data de valuação nem sempre é o último dia útil)
 TOL_VALUACAO = 0.035
 INDEC = "https://www.indec.gob.ar/ftp/cuadros/economia/serie_ipc_divisiones.csv"
-ESPESSURA = 1.5
+ESPESSURA = 1.95                         # 1,5 × 1,3: +50% e depois mais +30% (pedidos dele em 26/11/2026)
 POSSE = datetime.date(2023, 12, 10)
 INICIO_OFICIAL_BCRA = datetime.date(2010, 6, 1)
 # de jan a mai/2017 o BCRA (variáveis 27 e 28) traz o IPC GBA: o nacional só
