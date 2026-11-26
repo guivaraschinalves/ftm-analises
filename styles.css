@@ -896,6 +896,12 @@ body.apres-aberta { overflow: hidden; }
   width: min(100vw, calc(100vh * 16 / 9)); background: var(--chart-bg);
 }
 .apres-palco > svg { display: block; width: 100%; height: 100%; }
+/* slide com vários gráficos ("slideJunto" no JSON) */
+.apres-grade { position: absolute; inset: 0; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.apres-grade-2 { grid-template-rows: 1fr; }
+.apres-grade-3 .apres-grade-cel:nth-child(3) { grid-column: 2; grid-row: 1 / span 2; }
+.apres-grade-cel { min-width: 0; min-height: 0; overflow: hidden; }
+.apres-grade-cel > svg { display: block; width: 100%; height: 100%; }
 .apres-lamina {
   position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0;
   line-height: 1.3; color: var(--ink); font-family: Calibri, Carlito, "Segoe UI", "Helvetica Neue", Arial, sans-serif;

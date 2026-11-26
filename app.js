@@ -60,6 +60,14 @@
     };
   }
 
+  // meia lâmina em pé (960 × 1080 na apresentação): o terceiro gráfico de um slide com três
+  var LAYOUT_ALTO = Object.assign({}, LAYOUTS.wide, {
+    W: 1440, H: 1620, y1: 1620 - 135,
+    titulo: { x: 35, y: 66, fs: 40, max: 1180 }, sub: { x: 36, y: 104, fs: 24, max: 1180 },
+    logo: { x: 1440 - 208, y: 20, w: 180 }, fonte: { x: 1425, y: 1610, fs: 16 },
+    legenda: { y: 181, fs: 24, passo: 40, colunas: 3, larguraCol: 440 }
+  });
+
   // Tamanhos para baixar. escala = quantas vezes os pixels do layout (o desenho
   // é vetorial, então 2× sai nítido, não esticado).
   var TAMANHOS = [
@@ -3254,7 +3262,12 @@
       var textos = [].filter.call(no.children, function (x) { return x.classList.contains("artigo-texto"); });
       [].forEach.call(no.querySelectorAll(".card"), function (raiz) {
         var c = cartaoDe(raiz);
-        if (c) lista.push({ tipo: "grafico", cartao: c, onde: [parte, secao].filter(Boolean).join(" · "), textos: textos });
+        if (!c) return;
+        // "slideJunto": cartões seguidos com a mesma marca dividem um slide (em grade)
+        var junto = c.grafico.slideJunto, ult = lista[lista.length - 1];
+        if (junto && ult && ult.tipo === "grafico" && ult.junto === junto) { ult.cartoes.push(c); return; }
+        lista.push({ tipo: "grafico", cartao: c, cartoes: [c], junto: junto || null,
+                     onde: [parte, secao].filter(Boolean).join(" · "), textos: textos });
       });
     });
     return lista;
@@ -3446,6 +3459,24 @@
     }
     if (s.tipo === "parte") {
       lamina("apres-parte").appendChild(html("span", { texto: s.titulo }));
+      return;
+    }
+    if (s.cartoes && s.cartoes.length > 1) {
+      // slide com vários gráficos: grade de 2 colunas; com 3, o terceiro ocupa
+      // a coluna da direita inteira, desenhado em pé
+      apres.cartao = null;
+      var grade = html("div", { "class": "apres-grade apres-grade-" + s.cartoes.length });
+      s.cartoes.forEach(function (cc, k) {
+        var lay = s.cartoes.length === 3 && k === 2 ? LAYOUT_ALTO : LAYOUTS.wide;
+        var dd = construir(cc, lay, tema());
+        ligarHover(cc, dd);
+        idsProprios(dd.svg);
+        var cel = html("div", { "class": "apres-grade-cel" });
+        cel.appendChild(dd.svg);
+        grade.appendChild(cel);
+        if (animar) animarGrafico(dd.svg, graficoDe(cc).tipo);
+      });
+      palco.appendChild(grade);
       return;
     }
     var c = s.cartao, g = graficoDe(c);
@@ -3681,7 +3712,9 @@
     b.appendChild(html("span", { texto: "Apresentar daqui" }));
     b.addEventListener("click", function () {
       var ss = slidesDaPagina(), k = 0;
-      for (var j = 0; j < ss.length; j++) if (ss[j].cartao === cartao) { k = j; break; }
+      for (var j = 0; j < ss.length; j++) {
+        if (ss[j].cartao === cartao || (ss[j].cartoes && ss[j].cartoes.indexOf(cartao) >= 0)) { k = j; break; }
+      }
       abrirApresentacao(k);
     });
     return b;

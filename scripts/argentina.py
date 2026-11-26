@@ -1263,12 +1263,14 @@ def main():
     )
     g_emae_a = dict(
         id="argentina-emae-12m", titulo="EMAE: variação anual",
+        slideJunto="emae-anual",
         subtitulo="Variação % sobre o mesmo mês do ano anterior; série original", unidade="pct1",
         fonte="INDEC (EMAE) e FtM",
         variantes=recortes([serie("EMAE", emae_a, 2, cor=BRANCO, largura=3, rotulo=True)], True),
     )
     g_emae_c = dict(
         id="argentina-emae-contribuicoes", titulo="EMAE: contribuições por setor para a variação anual",
+        slideJunto="emae-anual",
         subtitulo="Pontos percentuais da variação sobre o mesmo mês do ano anterior; série original",
         unidade="pct1", barra=1, fonte="INDEC (EMAE e cuentas nacionales) e FtM",
         variantes=recortes([serie(nome, {m: v[nome] for m, v in emae_contrib.items()}, 2, cor=cor, tipo="barra")
@@ -1281,6 +1283,7 @@ def main():
     ordem = sorted(NOMES_SETOR, key=lambda l: -emae_est["inc"][l])
     g_emae_inc = dict(
         id="argentina-emae-setores-mes", tipo="ranking",
+        slideJunto="emae-anual",
         titulo="EMAE por setor: variação anual e incidência, %s de %s" % (MESES_PT[int(mu[5:]) - 1], mu[:4]),
         subtitulo="Incidência: pontos percentuais da variação do EMAE; variação: % sobre o mesmo mês do ano anterior",
         unidade="pp", unidade2="pct1", limite=15, fonte="INDEC (EMAE e cuentas nacionales) e FtM",
