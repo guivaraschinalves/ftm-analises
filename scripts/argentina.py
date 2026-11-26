@@ -69,6 +69,15 @@ BASE MONETÁRIA E M2 (mensal, fim de mês, desde jan/1990)
   - Variação em 12 meses a partir de jan/1992: em 1990 e 1991, saindo da
     hiperinflação, passa de 1.000% e achata o resto da série.
 
+BRASIL, PARA COMPARAR (variação em 12 meses no mesmo gráfico da Argentina)
+  - BCB, SGS: 1788 base monetária restrita (saldo de fim de período) =
+    1786 papel-moeda emitido + 1787 reservas bancárias; 27810 M2 (conceito
+    atual, saldo de fim de período) = 27791 M1 + 1835 depósitos de poupança +
+    27809 títulos privados em poder do público.
+  - A base vem em unidade monetária corrente: a variação em 12 meses só
+    começa em jul/1995, um ano depois do real. O M2 no conceito atual começa
+    em dez/2001, então a variação começa em dez/2002.
+
 CONFERÊNCIAS QUE ABORTAM (segunda fonte: api.argentinadatos.com)
   - Risco país: mesmo dia nas duas fontes, diferença ≤ 1% em pelo menos 99%
     dos dias em comum, e o último ponto igual.
@@ -96,6 +105,9 @@ CONFERÊNCIAS QUE ABORTAM (segunda fonte: api.argentinadatos.com)
   - Câmbio do FMI contra o de referência do BCRA (variável 5, último dia
     útil do mês) desde abr/2002: ≤ TOL_CAMBIO (3%; o FMI usa outra cotação
     oficial e chega a 2,3% de distância; a mediana fica perto de zero).
+  - Brasil: base = papel-moeda emitido + reservas bancárias e M2 = M1 +
+    poupança + títulos privados (≤ R$ 2 mil em todo mês); base do BCB contra
+    a do FMI (MFS_MA, NDMBM_MAI): ≤ 0,01%.
   - IPC: variação mensal e em 12 meses refeitas do índice contra as
     publicadas pelo INDEC (≤ 0,051 p.p., o INDEC publica com uma casa) e
     contra as variáveis 27 e 28 da API do BCRA a partir de jun/2017 (≤ 0,051
@@ -121,6 +133,11 @@ FMI_ER = ("https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/ER/+/ARG.
           "?attributes=dsd&measures=all")
 FMI_CBS = ("https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/MFS_CBS/+/ARG.S121_L_MB_CBS.*.M"
            "?attributes=dsd&measures=all")
+SGS = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.%d/dados?formato=json&dataInicial=01/01/1990&dataFinal=%s"
+FMI_MA_BR = ("https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/MFS_MA/+/BRA.NDMBM_MAI.*.M"
+             "?attributes=dsd&measures=all")
+INICIO_YOY_BR_BASE = "1995-07"
+INICIO_YOY_BR_M2 = "2002-12"
 INICIO_MON = "1990-01"
 INICIO_YOY = "1992-01"
 TOL_CAMBIO = 0.03
@@ -360,6 +377,43 @@ def monetario():
     return v, meses, cambio
 
 
+def sgs(cod):
+    hoje = datetime.date.today().strftime("%d/%m/%Y")
+    d = baixar(SGS % (cod, hoje))
+    out = {}
+    for x in d:
+        if x["valor"] not in (None, ""):
+            dd, mm, aa = x["data"].split("/")
+            out["%s-%s" % (aa, mm)] = float(x["valor"])
+    if not out:
+        raise RuntimeError("SGS %d vazio" % cod)
+    print("BCB SGS %-5d %d meses, %s a %s" % (cod, len(out), min(out), max(out)))
+    return out
+
+
+def brasil():
+    base, pme, resb = sgs(1788), sgs(1786), sgs(1787)
+    m2, m1, poup, tit = sgs(27810), sgs(27791), sgs(1835), sgs(27809)
+    for m in base:
+        if m >= "1995-01" and abs(base[m] - pme.get(m, 0) - resb.get(m, 0)) > 2:
+            raise RuntimeError("base do Brasil de %s não fecha: %.0f" % (m, base[m] - pme.get(m, 0) - resb.get(m, 0)))
+    comuns_m2 = [m for m in m2 if m in m1 and m in poup and m in tit]
+    if len(comuns_m2) < len(m2) - 1:      # o M1 do conceito atual começa um mês depois (jan/2002)
+        raise RuntimeError("M2 do Brasil: faltam componentes em %d meses" % (len(m2) - len(comuns_m2)))
+    for m in comuns_m2:
+        if abs(m2[m] - m1[m] - poup[m] - tit[m]) > 2:
+            raise RuntimeError("M2 do Brasil de %s não fecha: %.0f" % (m, m2[m] - m1[m] - poup[m] - tit[m]))
+    fmi = sdmx_mensal(FMI_MA_BR)
+    comuns = [m for m in fmi if m in base and m >= "1995-01"]
+    pior = max(abs(fmi[m] / 1000 / base[m] - 1) for m in comuns)
+    print("base do Brasil BCB × FMI: %d meses, maior diferença %.4f%%" % (len(comuns), pior * 100))
+    if len(comuns) < 300 or pior > 0.0001:
+        raise RuntimeError("base do Brasil não bate com o FMI")
+    yoy_ = lambda s_, ini: {m: (s_[m] / s_[mais(m, -12)] - 1) * 100 for m in s_
+                            if m >= ini and mais(m, -12) in s_}
+    return yoy_(base, INICIO_YOY_BR_BASE), yoy_(m2, INICIO_YOY_BR_M2)
+
+
 def ipc():
     with urllib.request.urlopen(urllib.request.Request(INDEC, headers=UA), timeout=120) as r:
         linhas = r.read().decode("latin-1").splitlines()
@@ -429,6 +483,7 @@ def main():
     meses, ativo, dep, swaps, outros, liq = reservas_mensais(irfcl(), bruta)
     vm, via = ipc()
     mon, meses_mon, cambio = monetario()
+    br_base, br_m2 = brasil()
     u = max(bruta)
     print("última reserva bruta (BCRA): %s = US$ %.0f milhões" % (u, bruta[u]))
     m = meses[-1]
@@ -529,10 +584,11 @@ def main():
     )
     yoy = lambda s_: {m: (s_[m] / s_[mais(m, -12)] - 1) * 100 for m in s_ if m >= INICIO_YOY and mais(m, -12) in s_}
     g_bm_a = dict(
-        id="argentina-base-monetaria-12m", titulo="Base monetária na Argentina: variação em 12 meses",
-        subtitulo="Variação % do saldo de fim de mês em pesos sobre o mesmo mês do ano anterior",
-        unidade="pct1", fonte="BCRA e FtM",
-        variantes=recortes([serie("Base monetária", yoy(bm), 2, cor=BRANCO, largura=3, rotulo=True)], True),
+        id="argentina-base-monetaria-12m", titulo="Base monetária: variação em 12 meses, Argentina e Brasil",
+        subtitulo="Variação % do saldo de fim de mês em moeda local sobre o mesmo mês do ano anterior",
+        unidade="pct1", fonte="BCRA, BCB e FtM",
+        variantes=recortes([serie("Argentina", yoy(bm), 2, cor=BRANCO, largura=3, rotulo=True),
+                            serie("Brasil", br_base, 2, cor=VERDE, largura=2.5, rotulo=True)], True),
     )
     g_m2 = dict(
         id="argentina-m2-m1-poupanca", titulo="Agregado monetário M2 na Argentina: M1 e depósitos de poupança",
@@ -564,11 +620,12 @@ def main():
             serie("M2 total", conv(m2t, moeda), 4, cor=BRANCO, largura=3, rotulo=True)]),
     )
     g_m2_a = dict(
-        id="argentina-m2-12m", titulo="Agregado monetário M2 na Argentina: variação em 12 meses",
-        subtitulo="Variação % do saldo de fim de mês em pesos sobre o mesmo mês do ano anterior",
-        unidade="pct1", fonte="BCRA e FtM",
-        variantes=recortes([serie("M2 total", yoy(m2t), 2, cor=BRANCO, largura=3, rotulo=True),
-                            serie("M2 em moeda nacional", yoy(m2l), 2, cor=AZUL, largura=2.5, rotulo=True)], True),
+        id="argentina-m2-12m", titulo="Agregado monetário M2: variação em 12 meses, Argentina e Brasil",
+        subtitulo="Variação % do saldo de fim de mês em moeda local sobre o mesmo mês do ano anterior",
+        unidade="pct1", fonte="BCRA, BCB e FtM",
+        variantes=recortes([serie("Argentina: M2 total", yoy(m2t), 2, cor=BRANCO, largura=3, rotulo=True),
+                            serie("Argentina: M2 em moeda nacional", yoy(m2l), 2, cor=AZUL, largura=2.5, rotulo=True),
+                            serie("Brasil: M2", br_m2, 2, cor=VERDE, largura=2.5, rotulo=True)], True),
     )
     g_m2_pct = dict(
         id="argentina-m2-pct-estrangeira", titulo="Parcela do M2 em moeda estrangeira na Argentina",
@@ -580,9 +637,11 @@ def main():
     print("monetário %s: base %.2f tri, M2 %.2f tri (US$ %.1f bi), %% em moeda estrangeira %.1f%%, "
           "base 12m %.1f%%, M2 12m %.1f%%" % (m, bm[m] / 1e9, m2t[m] / 1e9, m2t[m] / cambio[m] / 1e6,
                                                m2e[m] / m2t[m] * 100, yoy(bm)[m], yoy(m2t)[m]))
+    mb = max(br_base)
+    print("Brasil %s: base 12m %.1f%%, M2 12m %.1f%%" % (mb, br_base[mb], br_m2[max(br_m2)]))
 
     ref = max(max(risco), dias[-1], max(bruta))
-    doc = dict(assunto="Argentina", grupo="Análises Variadas", fonte="Ámbito, BCRA, FMI, INDEC e FtM",
+    doc = dict(assunto="Argentina", grupo="Análises Variadas", fonte="Ámbito, BCRA, BCB, FMI, INDEC e FtM",
                referencia=ref.strftime("%Y-%m"), atualizado=datetime.date.today().isoformat(), formato="artigo",
                secoes=[dict(titulo="Risco país", texto="", fontes=[], figuras=[], graficos=[g_risco]),
                        dict(titulo="Câmbio", texto="", fontes=[], figuras=[], graficos=[g_cambio, g_brecha]),
