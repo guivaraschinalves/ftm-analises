@@ -69,6 +69,19 @@ BASE MONETÁRIA E M2 (mensal, fim de mês, desde jan/1990)
   - Variação em 12 meses a partir de jan/1992: em 1990 e 1991, saindo da
     hiperinflação, passa de 1.000% e achata o resto da série.
 
+ATIVOS DO BCRA (mensal, fim de mês, desde jan/1990)
+  - Balanço do BCRA, planilha balbcrhis.xls do próprio BCRA (Cuadro I-2,
+    aba "B.C.R.A."), lida pelo rótulo do código de cada coluna (bcra2...):
+    ativos externos líquidos (activos externos netos, total), crédito ao
+    setor oficial (sector oficial, total) e créditos a entidades financeiras
+    em moeda nacional; a soma é o total das fontes da base monetária.
+  - Valores convertidos a milhares de pesos atuais com as colunas
+    "Unidades monetarias originales representadas" e "Equivalencia" (nota
+    da aba Observaciones). O câmbio de valuação da própria
+    planilha não serve antes de 2002 (vem na unidade antiga): em dólares usa
+    o mesmo câmbio da base e do M2, e a coluna "1 u$s =" fica como
+    conferência a partir de abr/2002.
+
 BRASIL, PARA COMPARAR (variação em 12 meses no mesmo gráfico da Argentina)
   - BCB, SGS: 1788 base monetária restrita (saldo de fim de período) =
     1786 papel-moeda emitido + 1787 reservas bancárias; 27810 M2 (conceito
@@ -105,6 +118,11 @@ CONFERÊNCIAS QUE ABORTAM (segunda fonte: api.argentinadatos.com)
   - Câmbio do FMI contra o de referência do BCRA (variável 5, último dia
     útil do mês) desde abr/2002: ≤ TOL_CAMBIO (3%; o FMI usa outra cotação
     oficial e chega a 2,3% de distância; a mediana fica perto de zero).
+  - Balanço do BCRA: ativos externos + setor oficial + crédito a bancos =
+    total das fontes, e essa soma − absorção = base monetária (≤ 1 mil pesos;
+    exceções da própria planilha em TOTAL_ERRADO e ABSORCAO_ERRADA, e o total
+    usado é sempre a soma das três contas); essa base contra a série 1606 da API do BCRA (≤ 0,01%); câmbio
+    de valuação contra o câmbio usado na base e no M2, desde abr/2002 (≤ 3,5%, TOL_VALUACAO; mar/2002, o primeiro mês do câmbio de referência, fica de fora).
   - Brasil: base = papel-moeda emitido + reservas bancárias e M2 = M1 +
     poupança + títulos privados (≤ R$ 2 mil em todo mês); base do BCB contra
     a do FMI (MFS_MA, NDMBM_MAI): ≤ 0,01%.
@@ -138,9 +156,21 @@ FMI_MA_BR = ("https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/MFS_MA
              "?attributes=dsd&measures=all")
 INICIO_YOY_BR_BASE = "1995-07"
 INICIO_YOY_BR_M2 = "2002-12"
+BALBCR = "https://www.bcra.gob.ar/archivos/Pdfs/PublicacionesEstadisticas/balbcrhis.xls"
+# meses em que a própria planilha não fecha (conferido à mão em 26/11/2026):
+# em 2014 a célula do total diverge da soma das três contas, mas a soma menos
+# a absorção dá a base exata (o total publicado é que está errado); em
+# nov/2009 a absorção difere em 4,1 bi de pesos. Trocar se o BCRA corrigir.
+TOTAL_ERRADO = {"2014-01", "2014-02", "2014-09", "2014-10", "2014-11", "2014-12"}
+ABSORCAO_ERRADA = {"2009-11"}
+MESES_ES = {"Ene.": 1, "Feb.": 2, "Mar.": 3, "Abr.": 4, "May.": 5, "Jun.": 6, "Jul.": 7, "Ago.": 8,
+            "Sep.": 9, "Set.": 9, "Oct.": 10, "Nov.": 11, "Dic.": 12}
 INICIO_MON = "1990-01"
 INICIO_YOY = "1992-01"
 TOL_CAMBIO = 0.03
+# valuação do balanço × câmbio de fim de mês: até 3,1% em 2002 e 2003, logo
+# depois da desvalorização (a data de valuação nem sempre é o último dia útil)
+TOL_VALUACAO = 0.035
 INDEC = "https://www.indec.gob.ar/ftp/cuadros/economia/serie_ipc_divisiones.csv"
 POSSE = datetime.date(2023, 12, 10)
 # de jan a mai/2017 o BCRA (variáveis 27 e 28) traz o IPC GBA: o nacional só
@@ -377,6 +407,77 @@ def monetario():
     return v, meses, cambio
 
 
+def balanco_bcra(base_api, cambio):
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from xls import abas
+    with urllib.request.urlopen(urllib.request.Request(BALBCR, headers=UA), timeout=120) as r:
+        c = abas(r.read())["B.C.R.A."]
+    cols = sorted({k for _, k in c})
+    linhas = sorted({r for r, _ in c})
+    # cada coluna tem um código (bcra2, bcra6...) numa linha do cabeçalho
+    cod = {}
+    for k in cols:
+        for r in linhas[:40]:
+            v = c.get((r, k))
+            if isinstance(v, str) and v.strip().startswith("bcra"):
+                cod[v.strip()] = k
+    precisa = {"externos": "bcra2", "oficial": "bcra6", "bancos": "bcra17", "absorcao": "bcra19",
+               "base": "bcra29", "cambio": "bcra34"}
+    falta = [v for v in precisa.values() if v not in cod]
+    if falta:
+        raise RuntimeError("balbcrhis: códigos não achados %r" % falta)
+    # a coluna do total das fontes não tem código: é a de rótulo "Total" logo antes de "Fuentes de absorción"
+    k_total = cod["bcra19"] - 1
+    # externos: o código bcra2 é "Oro y divisas"; o total de ativos externos é a coluna anterior
+    k_ext = cod["bcra2"] - 1
+    k_uni, k_eq = 4, 5
+    # o leitor devolve RK inteiro como int: vale como número também
+    num = lambda v: float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+    out = {n: {} for n in ("externos", "oficial", "bancos", "total", "absorcao", "base", "cambio")}
+    for r in linhas:
+        ano, mes = c.get((r, 0)), c.get((r, 1))
+        # o rótulo do mês às vezes traz marca ("Ene. *", "Ene. ")
+        mes = mes.split()[0] if isinstance(mes, str) and mes.split() else mes
+        if num(ano) is None or mes not in MESES_ES:
+            continue
+        m = "%04d-%02d" % (int(ano), MESES_ES[mes])
+        if m < INICIO_MON or num(c.get((r, k_total))) is None:
+            continue
+        fator = c[(r, k_uni)] * c[(r, k_eq)] / 1000      # -> milhares de pesos atuais
+        for n, k in (("externos", k_ext), ("oficial", cod["bcra6"]), ("bancos", cod["bcra17"]),
+                     ("total", k_total), ("absorcao", cod["bcra19"]), ("base", cod["bcra29"])):
+            v = num(c.get((r, k)))
+            out[n][m] = (v or 0.0) * fator
+        if num(c.get((r, cod["bcra34"]))):
+            out["cambio"][m] = c[(r, cod["bcra34"])]
+    meses = sorted(out["total"])
+    todos = [mais(meses[0], k) for k in range(len(meses) + 24) if mais(meses[0], k) <= meses[-1]]
+    if [m for m in todos if m not in out["total"]]:
+        raise RuntimeError("balbcrhis: meses faltando %r" % [m for m in todos if m not in out["total"]])
+    for m in meses:
+        soma = out["externos"][m] + out["oficial"][m] + out["bancos"][m]
+        ok_total = abs(soma - out["total"][m]) <= 1 or m in TOTAL_ERRADO
+        ok_base = abs(soma - out["absorcao"][m] - out["base"][m]) <= 1 or m in ABSORCAO_ERRADA
+        if not (ok_total and ok_base):
+            raise RuntimeError("balanço do BCRA de %s não fecha: soma %.0f, total %.0f, base %.0f"
+                               % (m, soma, out["total"][m], out["base"][m]))
+        out["total"][m] = soma            # o total é a soma das três contas
+    # dez/2007: a base do balanço fica 0,30% acima da série 1606 (revisão); os demais meses batem exatamente
+    pior = max((abs(out["base"][m] / base_api[m] - 1), m) for m in meses if m in base_api and m != "2007-12")
+    if abs(out["base"]["2007-12"] / base_api["2007-12"] - 1) > 0.005:
+        raise RuntimeError("base de dez/2007 do balanço passou de 0,5% da API")
+    print("balanço do BCRA: %d meses (%s a %s); base contra a API, maior diferença %.4f%% (%s)"
+          % (len(meses), meses[0], meses[-1], pior[0] * 100, pior[1]))
+    if pior[0] > 0.0001:
+        raise RuntimeError("base do balanço não bate com a API do BCRA")
+    # a coluna de valuação só vale como conferência a partir de mar/2002 (antes vem na unidade antiga)
+    difc = max((abs(out["cambio"][m] / cambio[m] - 1), m) for m in out["cambio"] if m in cambio and m >= "2002-04")
+    print("câmbio de valuação × câmbio da base: maior diferença %.3f%% (%s)" % (difc[0] * 100, difc[1]))
+    if difc[0] > TOL_VALUACAO:
+        raise RuntimeError("câmbio de valuação do balanço não bate")
+    return meses, out
+
+
 def sgs(cod):
     hoje = datetime.date.today().strftime("%d/%m/%Y")
     d = baixar(SGS % (cod, hoje))
@@ -484,6 +585,7 @@ def main():
     vm, via = ipc()
     mon, meses_mon, cambio = monetario()
     br_base, br_m2 = brasil()
+    meses_bal, bal = balanco_bcra({m: mon[1606][m] for m in meses_mon}, cambio)
     u = max(bruta)
     print("última reserva bruta (BCRA): %s = US$ %.0f milhões" % (u, bruta[u]))
     m = meses[-1]
@@ -633,6 +735,29 @@ def main():
         variantes=recortes([serie("M2 em moeda estrangeira", {m: m2e[m] / m2t[m] * 100 for m in meses_mon}, 2,
                                   cor=AZUL, tipo="barra", rotulo=True)], True),
     )
+    conv_bal = conv          # mesmo câmbio da base e do M2
+    g_ativos = dict(
+        id="argentina-ativos-bcra", titulo="Ativos do BCRA: fontes da base monetária",
+        subtitulo="Fim de mês; trilhões de pesos ou US$ bilhões pelo câmbio oficial de fim de mês",
+        unidade="n2", fonte="BCRA (balanço, Cuadro I-2), FMI (câmbio) e FtM",
+        variantes=quatro(lambda moeda: [
+            serie("Ativos externos líquidos", conv_bal(bal["externos"], moeda), 4, cor=AZUL, tipo="barra"),
+            serie("Crédito ao setor oficial", conv_bal(bal["oficial"], moeda), 4, cor=VERMELHO, tipo="barra"),
+            serie("Créditos a entidades financeiras em moeda nacional", conv_bal(bal["bancos"], moeda), 4,
+                  cor=VERDE, tipo="barra"),
+            serie("Ativos do BCRA", conv_bal(bal["total"], moeda), 4, cor=BRANCO, largura=3, rotulo=True)]),
+    )
+    g_ativos_a = dict(
+        id="argentina-ativos-bcra-12m", titulo="Ativos do BCRA: variação em 12 meses",
+        subtitulo="Variação % do total das fontes da base monetária em pesos sobre o mesmo mês do ano anterior",
+        unidade="pct1", fonte="BCRA (balanço, Cuadro I-2) e FtM",
+        variantes=recortes([serie("Ativos do BCRA", yoy(bal["total"]), 2, cor=VERDE, largura=3, rotulo=True)], True),
+    )
+    mb_ = meses_bal[-1]
+    print("ativos do BCRA %s: %.2f tri de pesos (US$ %.1f bi), externos %.2f, oficial %.2f, bancos %.2f; 12m %.1f%%"
+          % (mb_, bal["total"][mb_] / 1e9, bal["total"][mb_] / cambio[mb_] / 1e6, bal["externos"][mb_] / 1e9,
+             bal["oficial"][mb_] / 1e9, bal["bancos"][mb_] / 1e9, yoy(bal["total"])[mb_]))
+
     m = meses_mon[-1]
     print("monetário %s: base %.2f tri, M2 %.2f tri (US$ %.1f bi), %% em moeda estrangeira %.1f%%, "
           "base 12m %.1f%%, M2 12m %.1f%%" % (m, bm[m] / 1e9, m2t[m] / 1e9, m2t[m] / cambio[m] / 1e6,
@@ -648,6 +773,7 @@ def main():
                        dict(titulo="Reservas internacionais", texto="", fontes=[], figuras=[],
                             graficos=[g_bruta, g_comp, g_liq]),
                        dict(titulo="Inflação", texto="", fontes=[], figuras=[], graficos=[g_ipc_m, g_ipc_a]),
+                       dict(titulo="Ativos do BCRA", texto="", fontes=[], figuras=[], graficos=[g_ativos, g_ativos_a]),
                        dict(titulo="Base monetária", texto="", fontes=[], figuras=[], graficos=[g_bm, g_bm_a]),
                        dict(titulo="M2", texto="", fontes=[], figuras=[],
                             graficos=[g_m2, g_m2_moeda, g_m2_4, g_m2_a, g_m2_pct])])
