@@ -48,6 +48,20 @@ O GASTO AO LONGO DO TEMPO (seção nova, 25/11/2026)
   - Brasil só vai até 2020 (o último ano com investimento do governo na
     OCDE); Japão começa em 2005, Alemanha em 1995, Reino Unido em 1990.
 
+CRÉDITO AO SETOR NÃO FINANCEIRO (seção nova, 26/11/2026)
+
+  - BIS, "Credit to the non-financial sector" (WS_TC, API v1), trimestral, em
+    % do PIB, credor = todos os setores, ajustado a quebras. Tomadores: G
+    (governo geral), H (famílias e ISFLSF), N (empresas não financeiras), P
+    (setor privado não financeiro = H + N) e C (setor não financeiro = G + P).
+  - O total do BIS usa o governo a valor de mercado quando há essa série e a
+    valor nominal quando não há; aqui o governo segue a mesma regra, para as
+    partes somarem o total. Conferências: P = H + N e C = G + H + N (≤ 0,3 p.p.
+    do PIB) em cada país; só países (sem agregados) e todos no mesmo trimestre.
+  - O "crédito ao governo" do BIS é a dívida do governo geral (títulos e
+    empréstimos, com qualquer credor), não só crédito bancário; pode diferir da
+    dívida bruta publicada por cada país.
+
 A reta: gasto (% do PIB) = a + b · log10(PIB per capita), mínimos quadrados
 sem ponderação (cada país conta um). Como o eixo X é logarítmico, ela sai reta.
 
@@ -85,6 +99,18 @@ COR_HIST = {"BRA": "#FFFFFF", "DEU": "#4F81BD", "GBR": "#8EB4E3", "JPN": "#9BBB5
 # 17,9% para 22,1% do PIB em 2008): consumo e investimento das contas nacionais passam
 # do total e o resto sairia negativo. A decomposição da China começa em 2008.
 INICIO_COMP = {"CHN": "2008"}
+BIS = "https://stats.bis.org/api/v1/data/WS_TC/Q..C+G+H+N+P.A..770.A?format=csv&startPeriod=%s"
+# nomes dos países do BIS (WS_TC), gerados uma vez pela tabela CLDR pt-BR a partir do código ISO
+NOMES_BIS = {"AR": "Argentina", "AT": "Áustria", "AU": "Austrália", "BE": "Bélgica", "BR": "Brasil", "CA": "Canadá",
+             "CH": "Suíça", "CL": "Chile", "CN": "China", "CO": "Colômbia", "CZ": "Tchéquia", "DE": "Alemanha",
+             "DK": "Dinamarca", "ES": "Espanha", "FI": "Finlândia", "FR": "França", "GB": "Reino Unido",
+             "GR": "Grécia", "HK": "Hong Kong", "HU": "Hungria", "ID": "Indonésia", "IE": "Irlanda",
+             "IL": "Israel", "IN": "Índia", "IT": "Itália", "JP": "Japão", "KR": "Coreia do Sul",
+             "LU": "Luxemburgo", "MX": "México", "MY": "Malásia", "NL": "Países Baixos", "NO": "Noruega",
+             "NZ": "Nova Zelândia", "PL": "Polônia", "PT": "Portugal", "RU": "Rússia", "SA": "Arábia Saudita",
+             "SE": "Suécia", "SG": "Singapura", "TH": "Tailândia", "TR": "Turquia", "US": "Estados Unidos",
+             "ZA": "África do Sul"}
+TOP_CREDITO = 20
 # GGX_NGDP x GGX / NGDP: tolerância por país (p.p.), de 2001 a 2026 no WEO de set/2026.
 # Ano fiscal: o FMI divide pelo PIB do ano fiscal (diferença de até 4,2 p.p., Dominica).
 # Venezuela: na hiperinflação o FMI usa outra base de PIB (até 7,9 p.p.). Polônia: 0,17 p.p.
@@ -335,6 +361,74 @@ def historico(gasto):
     return [g_total, g_comp, g_ci]
 
 
+def credito_bis():
+    """Composição do crédito ao setor não financeiro (BIS), os TOP_CREDITO países com a maior fatia do governo."""
+    import csv
+    import io
+    ini = "%d-Q1" % (datetime.date.today().year - 2)
+    ult = {}
+    for r in csv.DictReader(io.StringIO(baixar(BIS % ini).decode("utf-8"))):
+        if r["OBS_VALUE"] in ("", "NaN") or r["BORROWERS_CTY"] not in NOMES_BIS:
+            continue
+        k = (r["BORROWERS_CTY"], r["TC_BORROWERS"], r["VALUATION"])
+        if r["TIME_PERIOD"] > ult.get(k, ("", 0))[0]:
+            ult[k] = (r["TIME_PERIOD"], float(r["OBS_VALUE"]))
+    linhas, trimestres = [], set()
+    for c, nome in NOMES_BIS.items():
+        gov = ult.get((c, "G", "M")) or ult.get((c, "G", "N"))
+        partes = [gov, ult.get((c, "H", "M")), ult.get((c, "N", "M")), ult.get((c, "P", "M")), ult.get((c, "C", "M"))]
+        conferir(all(partes), "BIS sem algum setor para %s" % nome)
+        trimestres.update(x[0] for x in partes)
+        G, H, N, P, C = (x[1] for x in partes)
+        conferir(abs(P - H - N) <= 0.3, "BIS %s: privado %.1f != famílias + empresas %.1f" % (nome, P, H + N))
+        conferir(abs(C - G - H - N) <= 0.3, "BIS %s: total %.1f != governo + famílias + empresas %.1f" % (nome, C, G + H + N))
+        conferir(min(G, H, N) >= 0, "BIS %s: setor negativo" % nome)
+        linhas.append(dict(c=c, nome=nome, G=G, H=H, N=N, P=P, C=G + H + N,
+                           valor_gov="mercado" if (c, "G", "M") in ult else "nominal"))
+    conferir(len(trimestres) == 1, "países do BIS em trimestres diferentes: %s" % sorted(trimestres))
+    tri = trimestres.pop()
+    for d in linhas:
+        d["sG"], d["sH"], d["sN"], d["sP"] = (100 * d[k] / d["C"] for k in ("G", "H", "N", "P"))
+    top = sorted(linhas, key=lambda d: -d["sG"])[:TOP_CREDITO]
+    print("  BIS %s, %d países; maior fatia do governo:" % (tri, len(linhas)),
+          ", ".join("%s %.1f%%" % (d["nome"], d["sG"]) for d in top[:6]), "...", "%s %.1f%%" % (top[-1]["nome"], top[-1]["sG"]))
+    cats = [d["nome"] for d in top]
+    rot_tri = "%sº tri/%s" % (tri[-1], tri[:4])
+
+    def barras(campos):
+        return [dict(nome=nome, cor=cor, tipo="barra", dados=[[str(i), round(d[k], 1)] for i, d in enumerate(top)])
+                for k, nome, cor in campos]
+    GOV = ("sG", "Governo geral", VERMELHO)
+    variantes = [
+        dict(rot="Governo, famílias e empresas (% do total)", unidade="%", eixo=dict(max=100, passo=20),
+             series=barras([GOV, ("sH", "Famílias", AZUL), ("sN", "Empresas não financeiras", VERDE)])),
+        dict(rot="Governo e setor privado (% do total)", unidade="%", eixo=dict(max=100, passo=20),
+             series=barras([GOV, ("sP", "Setor privado não financeiro (famílias + empresas)", AZUL_CLARO)])),
+        dict(rot="Governo, famílias e empresas (% do PIB)", unidade="%",
+             series=barras([("G", "Governo geral", VERMELHO), ("H", "Famílias", AZUL),
+                            ("N", "Empresas não financeiras", VERDE)])),
+    ]
+    g = dict(
+        id="credito-setor-nao-financeiro-composicao",
+        titulo="Composição do crédito ao setor não financeiro, %s" % rot_tri,
+        subtitulo="Os %d países com a maior fatia do governo geral no total, entre os %d do BIS"
+                  % (TOP_CREDITO, len(linhas)),
+        fonte="BIS (Credit to the non-financial sector) e FtM",
+        nota=("Crédito de todos os credores (bancos, mercado de títulos, estrangeiros e o próprio banco central) ao "
+              "setor não financeiro, em %% do PIB, ajustado a quebras pelo BIS. Para o governo geral é a dívida do "
+              "governo (títulos e empréstimos), que pode diferir da dívida bruta publicada por cada país; o governo "
+              "entra a valor de mercado quando o BIS tem essa série e a valor nominal quando não tem, como no total "
+              "do BIS. Setor privado não financeiro = famílias (com as instituições sem fins lucrativos) + empresas "
+              "não financeiras; por isso ele aparece numa versão separada, para não ser contado duas vezes. Países "
+              "ordenados pela fatia do governo no total, também na versão em %% do PIB. Dados de %s."
+              % rot_tri),
+        categorias=cats, barra=0.8, unidade="%", eixo=variantes[0]["eixo"],
+        series=variantes[0]["series"],
+        variantes=[dict(v, categorias=cats, barra=0.8) for v in variantes],
+    )
+    return g
+
+
 def main():
     gasto, ed = weo("GGX_NGDP")
     ppc, _ = weo("PPPPC")
@@ -450,9 +544,11 @@ def main():
 
     hoje = datetime.date.today().isoformat()
     doc = dict(assunto="Gasto público", grupo="Análises Variadas",
-               fonte="FMI, OCDE, Banco Mundial, Our World in Data e FtM", referencia=referencia, atualizado=hoje, formato="artigo",
+               fonte="FMI, OCDE, Banco Mundial, BIS, Our World in Data e FtM", referencia=referencia, atualizado=hoje, formato="artigo",
                secoes=[dict(titulo="O gasto ao longo do tempo", texto="", fontes=[], figuras=[], graficos=graficos_hist),
-                       dict(titulo="Gasto público e renda", texto="", fontes=[], figuras=[], graficos=[g_disp])])
+                       dict(titulo="Gasto público e renda", texto="", fontes=[], figuras=[], graficos=[g_disp]),
+                       dict(titulo="Crédito ao setor não financeiro", texto="", fontes=[], figuras=[],
+                            graficos=[credito_bis()])])
     with open(SAIDA, "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
         f.write("\n")
