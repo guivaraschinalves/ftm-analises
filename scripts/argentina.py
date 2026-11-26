@@ -5,9 +5,9 @@ reservas internacionais (bruta, ativos e passivos, líquida) e inflação.
 Gera dados/argentina.json. Só biblioteca padrão. Rodado à mão. Página
 própria: argentina.html (fora do índice).
 
-Pedido dele em 26/11/2026. Todo gráfico tem dois recortes: a série inteira
-(com a marca da posse) e só desde a posse de Milei (10/12/2023; nas séries
-mensais, desde dez/2023).
+Pedido dele em 26/11/2026. Todo gráfico mostra a série inteira com a marca
+da posse de Milei (10/12/2023; nas séries mensais, dez/2023). O recorte só
+desde a posse saiu a pedido dele.
 
 DE ONDE VEM CADA COISA (Ámbito, mercados.ambito.com, histórico geral)
 
@@ -347,15 +347,22 @@ def serie(nome, s, casas, **extra):
 
 
 def recortes(series, mensal, rot_extra="", unidade=None):
-    """Série inteira (com a marca da posse) e só desde a posse de Milei."""
+    """A série inteira com a marca da posse de Milei. (O recorte "desde a posse"
+    saiu a pedido dele em 26/11/2026; a marca na série inteira fica.)"""
     desde = POSSE_MES if mensal else POSSE.isoformat()
-    suf = (", " + rot_extra) if rot_extra else ""
-    a = dict(rot="Série inteira" + suf, series=series, eventos=[dict(em=desde, rot="Posse de Milei")])
-    b = dict(rot="Desde a posse de Milei" + suf, eventos=[],
-             series=[dict(x, dados=[p for p in x["dados"] if p[0] >= desde]) for x in series])
+    a = dict(rot=rot_extra or "Série inteira", series=series, eventos=[dict(em=desde, rot="Posse de Milei")])
     if unidade:
-        a["unidade"] = b["unidade"] = unidade
-    return [a, b]
+        a["unidade"] = unidade
+    return [a]
+
+
+def achatar(g):
+    """Cartão com um recorte só não precisa de botões: as séries sobem para o gráfico."""
+    if len(g.get("variantes", [])) == 1:
+        v = g.pop("variantes")[0]
+        v.pop("rot", None)
+        g.update(v)
+    return g
 
 
 def bcra(var, desde="1996-01-01"):
@@ -1142,6 +1149,8 @@ def main():
                        dict(titulo="Base monetária", texto="", fontes=[], figuras=[], graficos=[g_bm, g_bm_a]),
                        dict(titulo="M2", texto="", fontes=[], figuras=[],
                             graficos=[g_m2, g_m2_moeda, g_m2_4, g_m2_a, g_m2_pct])])
+    for sec in doc["secoes"]:
+        sec["graficos"] = [achatar(g) for g in sec["graficos"]]
     with open(SAIDA, "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
         f.write("\n")
