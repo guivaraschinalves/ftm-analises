@@ -466,6 +466,12 @@
   // Um cartão pode ter variantes (agência, moeda, "% ou R$"…): o gráfico que
   // vale é a base com a variante escolhida por cima. O objeto fica guardado
   // para as séries manterem a identidade entre desenho e interação.
+  // os passos de um gráfico com "revelar": cada índice do eixo com dado, em ordem
+  function passosDe(g) {
+    var u = {};
+    (g.series || []).forEach(function (s) { s.dados.forEach(function (d) { u[idxDe(g, d[0])] = 1; }); });
+    return Object.keys(u).map(Number).sort(function (a, b) { return a - b; });
+  }
   function graficoDe(cartao) {
     var g = graficoBruto(cartao), fora = cartao.ocultas, ativo = cartao.ministroAtivo;
     if (g.series && ativo && g.series.some(function (s) { return s.ministro; })) {
@@ -2252,7 +2258,7 @@
     // tipo "faixa": cada ponto é [chave, mínimo, máximo] e o desenho é a
     // área entre os dois (a sazonalidade contra os anos anteriores)
     var todas = g.series.map(function (s) {
-      return s.dados.map(function (d) { return { i: idxDe(g, d[0]), v: d[1], v2: d[2] }; });
+      return s.dados.map(function (d) { return { i: idxDe(g, d[0]), v: d[1], v2: d[2], k: d[0] }; });
     });
     var ini = Infinity, fim = -Infinity;
     todas.forEach(function (pts) { pts.forEach(function (p) { if (p.i < ini) ini = p.i; if (p.i > fim) fim = p.i; }); });
@@ -2329,6 +2335,15 @@
     var escDir = mnD === Infinity ? null : escalaCasada(mnD, mxD, g.eixo2, esc.ticks.length - 1);
     var FD = escDir ? (UNIDADES[g.unidade2] || F) : F;
     var twD = escDir ? Math.max.apply(null, escDir.ticks.map(function (t) { return largura(FD.eixo(t, escDir.passo), L.tick); })) : 0;
+    // "revelar": o gráfico se completa um passo por vez (o Levy semana a
+    // semana). Escala e período são os do gráfico inteiro; só o desenho para
+    // no passo escolhido (cartao.passo, de 1 ao total)
+    if (g.revelar) {
+      var passosRev = passosDe(g);
+      var nRev = cartao.passo == null ? passosRev.length : Math.max(1, Math.min(passosRev.length, cartao.passo));
+      var corteRev = passosRev[nRev - 1];
+      vis = vis.map(function (pts) { return pts.filter(function (p) { return p.i <= corteRev; }); });
+    }
 
     var tw = Math.max.apply(null, esc.ticks.map(function (t) { return largura(F.eixo(t, esc.passo), L.tick); }));
     var rotulos = [];
@@ -2804,6 +2819,46 @@
       vis[k].forEach(function (p) {
         area.appendChild(marcaPonto(s.forma, X(p.i + 0.5), YS(p.v), r, cor, pal.bg, s.nome));
       });
+    });
+
+    // "variacoes" (com "revelar"): a variação do último passo à vista, ao lado
+    // do ponto; some quando o passo seguinte aparece
+    if (g.revelar) g.series.forEach(function (s, k) {
+      if (!s.variacoes || !vis[k].length) return;
+      var p = vis[k][vis[k].length - 1], txt = s.variacoes[p.k];
+      var YS = yDe(s), px = X(p.i + 0.5), py = YS(p.v), corV = corNoTema(s.cor, pal);
+      area.appendChild(el("circle", { cx: px, cy: py, r: L.linha * 1.1, fill: corV, stroke: pal.bg, "stroke-width": 2 }));
+      if (!txt) return;
+      // posição: a primeira, entre as candidatas em volta do ponto, que não
+      // encosta na linha nem no número do valor (à direita do ponto, na altura dele)
+      var fsV = L.rotulo, wV = largura(txt, fsV, "bold"), amostra = [];
+      vis[k].forEach(function (q, j) {
+        var x2 = X(q.i + 0.5), y2 = YS(q.v);
+        if (j) {
+          var a0 = vis[k][j - 1], x1 = X(a0.i + 0.5), y1 = YS(a0.v);
+          var nP = Math.ceil(Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1)) / 3);
+          for (var t = 1; t < nP; t++) amostra.push([x1 + (x2 - x1) * t / nP, y1 + (y2 - y1) * t / nP]);
+        }
+        amostra.push([x2, y2]);
+      });
+      var wVal = largura(unidadeDe(g, s).valor(p.v), fsV, "bold");
+      var candidatas = [[1, -1.2], [-1, -1.2], [1, 1.5], [-1, 1.5], [-1, -2.4], [1, -2.4], [-1, 2.7], [1, 2.7]];
+      var melhor = null;
+      candidatas.forEach(function (c) {
+        var bx0 = c[0] > 0 ? px + 14 : px - 14 - wV, bx1 = bx0 + wV, by = py + c[1] * fsV;
+        if (bx0 < L.x0 || bx1 > L.x1 || by - fsV * 0.6 < L.y0 || by + fsV * 0.6 > L.y1) return;
+        var bate = amostra.filter(function (q) {
+          return q[0] > bx0 - 4 && q[0] < bx1 + 4 && Math.abs(q[1] - by) < fsV * 0.75;
+        }).length;
+        if (bx1 > px + 4 && bx0 < px + 10 + wVal && Math.abs(by - py) < fsV * 1.1) bate += 1000;
+        if (!melhor || bate < melhor.bate) melhor = { c: c, bate: bate, by: by };
+      });
+      if (!melhor) melhor = { c: [-1, -1.2], by: py - fsV * 1.2 };
+      var atV = { x: melhor.c[0] > 0 ? px + 14 : px - 14, y: melhor.by, "font-size": fsV, "font-weight": "bold",
+                  "text-anchor": melhor.c[0] > 0 ? "start" : "end", "dominant-baseline": "central" };
+      area.appendChild(texto(txt, Object.assign({}, atV, { fill: "none", stroke: pal.bg, "stroke-width": 7,
+                                                          "stroke-linejoin": "round" })));
+      area.appendChild(texto(txt, Object.assign({}, atV, { fill: corV })));
     });
 
     ordem.forEach(function (o) {
@@ -3817,6 +3872,17 @@
     ligarHover(c, d);
     idsProprios(d.svg);
     palco.appendChild(d.svg);
+    // "revelar": → e ← andam as semanas antes de passar de lâmina
+    if (g.revelar && c.irPasso) {
+      apres.passos = { total: passosDe(g).length, n: c.passo || passosDe(g).length, mostrar: function (n) {
+        c.irPasso(n);
+        var d2 = construir(c, LAYOUTS.wide, tema());
+        ligarHover(c, d2);
+        idsProprios(d2.svg);
+        palco.innerHTML = "";
+        palco.appendChild(d2.svg);
+      } };
+    }
     if (animar) {
       var antes = c.anteriores, novas = null;
       c.anteriores = null;
@@ -3856,6 +3922,7 @@
   }
   function mostrarPasso(n) {
     var p = apres.passos;
+    if (p.mostrar) { p.n = Math.max(1, Math.min(p.total, n)); p.mostrar(p.n); return; }
     p.n = Math.max(0, Math.min(p.linhas.length, n));
     p.linhas.forEach(function (ls, i) { ls.forEach(function (li) { li.classList.toggle("on", i < p.n); }); });
     Object.keys(p.caixas).forEach(function (id) {
@@ -3864,11 +3931,14 @@
     p.img.classList.toggle("desfocada", p.n > 0);
   }
   function passoOuLamina(dir) {
-    var p = apres.passos;
-    if (p && ((dir > 0 && p.n < p.linhas.length) || (dir < 0 && p.n > 0))) { mostrarPasso(p.n + dir); return; }
+    var p = apres.passos, total = p ? (p.mostrar ? p.total : p.linhas.length) : 0, piso = p && p.mostrar ? 1 : 0;
+    if (p && ((dir > 0 && p.n < total) || (dir < 0 && p.n > piso))) { mostrarPasso(p.n + dir); return; }
     irNaApresentacao(apres.i + dir);
-    // voltando para a lâmina dos passos, ela aparece completa, como no PowerPoint
-    if (dir < 0 && apres.passos) mostrarPasso(apres.passos.linhas.length);
+    var q = apres.passos;
+    // voltando para a lâmina dos passos, ela aparece completa, como no PowerPoint;
+    // indo para a frente, o gráfico que se revela começa do primeiro passo
+    if (dir < 0 && q) mostrarPasso(q.mostrar ? q.total : q.linhas.length);
+    else if (dir > 0 && q && q.mostrar) mostrarPasso(1);
   }
 
   function irNaApresentacao(i, animar) {
@@ -4123,6 +4193,35 @@
         grupoVar.appendChild(b);
       });
       esquerda.appendChild(grupoVar);
+    }
+    // "revelar": ◀ ▶ andam um passo (semana ou mês), e o rótulo diz onde está
+    if (g.revelar) {
+      var passosC = passosDe(g), uniRev = g.revelar.unidade || "Passo";
+      cartao.passo = 1;
+      var grupoRev = html("div", { "class": "periodos revelar", role: "group", "aria-label": "Passo a passo de " + g.titulo });
+      var bAnt = html("button", { type: "button", texto: "◀", "aria-label": uniRev + " anterior" });
+      var bProx = html("button", { type: "button", texto: "▶", "aria-label": uniRev + " seguinte" });
+      var bTudo = html("button", { type: "button", texto: "Ver tudo" });
+      var rotRev = html("span", { "class": "revelar-rot", "aria-live": "polite" });
+      cartao.atualizarRevelar = function () {
+        var n = cartao.passo, i = passosC[n - 1];
+        rotRev.textContent = (n === 1 ? "Início" : uniRev + " " + (n - 1) + " de " + (passosC.length - 1)) +
+          " · " + rotuloX(g, i, true);
+        bAnt.disabled = n <= 1;
+        bProx.disabled = bTudo.disabled = n >= passosC.length;
+      };
+      cartao.irPasso = function (n) {
+        cartao.passo = Math.max(1, Math.min(passosC.length, n));
+        cartao.atualizarRevelar();
+        desenhar(cartao, true);
+        if (visor && visor.cartao === cartao && !visor.box.hidden) pintarVisor();
+      };
+      bAnt.addEventListener("click", function () { cartao.irPasso(cartao.passo - 1); });
+      bProx.addEventListener("click", function () { cartao.irPasso(cartao.passo + 1); });
+      bTudo.addEventListener("click", function () { cartao.irPasso(passosC.length); });
+      [bAnt, bProx, bTudo, rotRev].forEach(function (x) { grupoRev.appendChild(x); });
+      cartao.atualizarRevelar();
+      esquerda.appendChild(grupoRev);
     }
     // "escolherSeries": um botão por conta, para ligar e desligar cada uma (vale em todos os recortes)
     if (g.escolherSeries) {
@@ -4727,7 +4826,7 @@
     if (!cartao.frame.clientWidth) { cartao.chave = null; return; }
     var nomeLayout = cartao.frame.clientWidth < 700 || window.innerWidth < 700 ? "narrow" : "wide";
     var chave = nomeLayout + "|" + tema() + "|" + cartao.periodo + "|" + cartao.inicioIdx + "|" + cartao.fimIdx + "|" + cartao.variante +
-                "|" + (cartao.ano || "");
+                "|" + (cartao.ano || "") + "|" + (cartao.passo || "");
     if (!forcar && cartao.chave === chave) return;
     cartao.chave = chave;
     if (graficoDe(cartao).tipo === "comunicados") {

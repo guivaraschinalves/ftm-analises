@@ -326,6 +326,8 @@ ul.artigo-texto ul li { margin: 0 0 4px; }
 .card-escolhas .periodos + .periodos { border-left: 1px solid var(--border); padding-left: 12px; }
 .card-escolhas .periodos[hidden] { display: none; }
 .periodos { display: flex; flex-wrap: wrap; gap: 6px; }
+.revelar-rot { align-self: center; padding: 0 6px; font-size: .85rem; color: var(--ink-2); white-space: nowrap; }
+.periodos button:disabled { opacity: .4; cursor: default; }
 .periodos button, .btn {
   font: inherit; font-size: 14px; color: var(--ink-2); cursor: pointer;
   background: transparent; border: 1px solid var(--border); border-radius: 8px; padding: 5px 11px;
