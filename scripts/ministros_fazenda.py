@@ -770,8 +770,8 @@ def externo_pib():
     return out
 
 
-def levy_trabuco(mins, INDS, desvio_ppc, rat, pct2, pp, r12, d12):
-    """Levy na véspera da posse (dez/14; Selic, câmbio e rating em 31/12/14)
+def levy_trabuco(mins, INDS, desvio_ppc, pct2, pp, r12, d12):
+    """Levy na véspera da posse (dez/14; Selic e câmbio em 31/12/14)
     contra o último dado publicado, o quadro que Trabuco recebe."""
     levy, atual = next(mi for mi in mins if mi["id"] == "levy"), mins[-1]
     ext = externo_pib()
@@ -807,15 +807,6 @@ def levy_trabuco(mins, INDS, desvio_ppc, rat, pct2, pp, r12, d12):
             linhas.append(mensal("Despesa primária do governo central (% do PIB)", d12, pct2, pp))
     linhas.append(mensal("Sobre/(sub)valorização do real pela PPC", desvio_ppc, lambda v: sinal(v, 1) + "%",
                          lambda a, b: sinal(b - a, 1) + " p.p."))
-    for aid in ("sp", "moodys", "fitch"):
-        a = nota_dia(rat[aid], levy)[0]
-        pa = persp_dia(rat[aid], levy)[0]
-        _, b, ate = nota_dia(rat[aid], atual)
-        pb = persp_dia(rat[aid], atual)[1]
-        linhas.append([{"t": "Rating " + rat[aid]["nome"], "forte": True},
-                       {"t": "%s (%s)" % (nota_p(a, pa, aid), dia_curto(vespera(levy["posse"])))},
-                       {"t": "%s (%s)" % (nota_p(b, pb, aid), mes_curto(ate))},
-                       {"t": degraus(a, b), "forte": True}])
     linhas.append(mensal("Conta corrente (% do PIB)", ext["cc"], pct_s, pp))
     linhas.append(mensal("Investimento direto no país (% do PIB)", ext["idp"], pct2, pp))
     linhas.append(mensal("Necessidade de capital de curto prazo (US$)", ext["necessidade"], bi, var_bi))
@@ -824,7 +815,7 @@ def levy_trabuco(mins, INDS, desvio_ppc, rat, pct2, pp, r12, d12):
                 titulo="Levy na posse e o quadro que Trabuco recebe",
                 subtitulo="Fluxos em 12 meses; necessidade de capital: déficit em conta corrente menos IDP, "
                           "negativo quando o IDP cobre o déficit",
-                fonte="BCB, IBGE, Tesouro Nacional (RTN), BLS, Moody's, S&P, Fitch e FtM",
+                fonte="BCB, IBGE, Tesouro Nacional (RTN), BLS e FtM",
                 colunas=[{"rot": "Indicador"}, {"rot": "Levy (início)", "num": True},
                          {"rot": "Trabuco (último dado)", "num": True}, {"rot": "Variação", "num": True}],
                 linhas=linhas)
@@ -1051,7 +1042,9 @@ def montar():
         for pe, (forma, cor) in formas.items():
             pts = {m: v for m, (v, p_) in ra["anuncios"].items() if p_ == pe}
             ser.append(serie("Perspectiva " + pe.lower(), pts, 0, tipo="pontos", forma=forma, cor=cor))
-        variantes_r.append(dict(rot=ra["nome"], unidade=un, series=ser))
+        # a agência no subtítulo do próprio gráfico: em tela cheia e na imagem baixada os botões somem
+        variantes_r.append(dict(rot=ra["nome"], unidade=un, series=ser,
+                                subtitulo="Nota de longo prazo da %s" % ra["nome"]))
     # o eixo cobre as duas notas das três agências (a local chegou a A−)
     todas = [v for ra in rat.values() for ss in (ra["serie"], ra["local"]) for m, v in ss.items() if m >= INICIO]
     eixo_r = {"min": min(7, min(todas)), "max": max(14, max(todas) + 1), "passo": 1}
@@ -1161,7 +1154,7 @@ def montar():
                    colunas=[{"rot": "Indicador"}] + [{"rot": mi["curto"], "num": True} for mi in mins],
                    linhas=linhas_res)
     secoes.append(dict(titulo="Levy × Trabuco", texto="", graficos=[levy_trabuco(
-        mins, INDS, desvio_ppc, rat, pct2, pp, r12, d12)]))
+        mins, INDS, desvio_ppc, pct2, pp, r12, d12)]))
     secoes.append(dict(titulo="Médias no mandato", texto="", graficos=[res_tab]))
     secoes.append(dict(titulo="Tabela por ministro", texto="", graficos=por_min))
 
