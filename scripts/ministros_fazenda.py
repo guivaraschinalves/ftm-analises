@@ -123,6 +123,7 @@ DESTAQUE_VERMELHO = {
     "cambio-ppc": "levy",
     "rating": ("levy", "barbosa"),
 }
+PERSPECTIVAS = ("Positiva", "Estável", "Negativa")
 TOL_DIVIDA = 0.02             # 4502 / 4382 * 100 × 4537 (p.p. do PIB)
 MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
 NOTAS_SP = ["AAA", "AA+", "AA", "AA-", "A+", "A", "A-", "BBB+", "BBB", "BBB-", "BB+", "BB", "BB-",
@@ -361,16 +362,36 @@ def ratings():
             raise RuntimeError("escala de rating diferente: %r" % [v, moody, spf])
     if r["grauInvestimento"] != 12:
         raise RuntimeError("grau de investimento fora de 12")
-    out = {}
-    for a in r["agencias"]:
-        degraus = sorted([m, v] for m, v in a["me"])
-        mensal, atual = {}, None
-        for i in range(ordem(degraus[0][0]), ordem(a["fim"]) + 1):
+    def expandir(mudancas, fim):
+        """[[mês, valor], ...] só nas mudanças -> {mês: valor} em todo mês."""
+        degraus = sorted([m, v] for m, v in mudancas)
+        out_m, atual = {}, None
+        for i in range(ordem(degraus[0][0]), ordem(fim) + 1):
             m = mes_de(i)
             for dm, v in degraus:
                 if dm == m:
                     atual = v
-            mensal[m] = atual
+            out_m[m] = atual
+        return out_m
+
+    out = {}
+    for a in r["agencias"]:
+        mensal = expandir(a["me"], a["fim"])
+        local = expandir(a["ml"], a["fim"])
+        persp_m = expandir(a["persp"], a["fim"])
+        # conferência: a perspectiva de cada mês é a do último anúncio até ele
+        ult_p, n_p = None, 0
+        evs = sorted(a["eventos"])
+        for i in range(ordem("2002-01"), ordem(a["fim"]) + 1):
+            m = mes_de(i)
+            for data, _, pe in evs:
+                if data[:7] == m and pe in PERSPECTIVAS:
+                    ult_p = pe
+            if ult_p and m in persp_m:
+                if persp_m[m] != ult_p:
+                    raise RuntimeError("%s em %s: perspectiva %s × anúncios %s" % (a["nome"], m, persp_m[m], ult_p))
+                n_p += 1
+        print("rating %-8s perspectiva conferida contra os anúncios em %d meses" % (a["nome"], n_p))
         # conferência: a nota no fim de cada mês com ação de rating desde 2002 é
         # a da última ação do mês (a Moody's agiu duas vezes em ago/2006)
         ultima_do_mes = {}
@@ -386,8 +407,15 @@ def ratings():
         print("rating %-8s até %s; %d ações de rating conferidas" % (a["nome"], a["fim"], n))
         # nota em cada dia de anúncio (para a tabela, que vai pela data da posse)
         dia = {data: nivel for data, nivel, _ in sorted(a["eventos"]) if nivel is not None}
+        dia_persp = {data: pe for data, _, pe in sorted(a["eventos"]) if pe in PERSPECTIVAS}
+        # um marcador por mês com anúncio: nota e perspectiva do último anúncio do mês
+        anuncios = {}
+        for data, nivel, pe in sorted(a["eventos"]):
+            if nivel is not None and pe in PERSPECTIVAS:
+                anuncios[data[:7]] = (nivel, pe)
         out[a["id"]] = dict(nome=a["nome"], serie={m: v for m, v in mensal.items() if v is not None},
-                            dia=dia, fim=a["fim"])
+                            local={m: v for m, v in local.items() if v is not None},
+                            dia=dia, dia_persp=dia_persp, anuncios=anuncios, fim=a["fim"])
     return out
 
 
@@ -646,6 +674,18 @@ def nota_dia(r, mi):
     return em(mi["posse"]), em(mi["saida"] or "9999-12-31"), (None if mi["saida"] else r["fim"])
 
 
+def persp_dia(r, mi):
+    """Perspectiva na véspera da posse e no último dia no cargo (último anúncio antes)."""
+    def em(d):
+        ant = [x for x in r["dia_persp"] if x < d]
+        return r["dia_persp"][max(ant)] if ant else None
+    return em(mi["posse"]), em(mi["saida"] or "9999-12-31")
+
+
+def nota_p(v, pe, agencia):
+    return nota(v, agencia) + (" " + pe.lower() if pe else "")
+
+
 def nota(v, agencia):
     return (NOTAS_MOODYS if agencia == "moodys" else NOTAS_SP)[21 - v].replace("-", "\u2212")
 
@@ -833,32 +873,51 @@ def montar():
                    linhas=linhas_ppc)
     secoes.append(dict(titulo="Bônus: câmbio pela PPC", texto="", graficos=[ppc_g, ppc_tab]))
 
-    # rating: três agências na mesma escala; deslocamento mínimo para as linhas
-    # iguais não se esconderem (o valor mostrado é a nota, arredondada)
+    # rating: uma agência por vez, como no Poder & Mercado (nota em moeda
+    # estrangeira, em moeda local e um marcador por anúncio com a forma da
+    # perspectiva), e as três juntas na última opção
+    meses_r = [m for m in rat["sp"]["serie"] if m >= INICIO]
+    gi = dict(nome="Grau de investimento", cor=CINZA, traco="pontilhado", largura=3,
+              buracoMax=400, dados=[[min(meses_r, key=ordem), 12], [max(meses_r, key=ordem), 12]])
+    formas = {"Positiva": ("triangulo", VERDE), "Estável": ("circulo", CINZA), "Negativa": ("losango", VERMELHO)}
+    variantes_r = []
+    for aid in ("sp", "moodys", "fitch"):
+        ra, un = rat[aid], ("moodys" if aid == "moodys" else "nota-sp")
+        ser = [serie("Moeda estrangeira", ra["serie"], 0, cor=BRANCO, largura=5),
+               serie("Moeda local", ra["local"], 0, cor=AMARELO, traco="pontilhado", largura=3), gi]
+        for pe, (forma, cor) in formas.items():
+            pts = {m: v for m, (v, p_) in ra["anuncios"].items() if p_ == pe}
+            ser.append(serie("Perspectiva " + pe.lower(), pts, 0, tipo="pontos", forma=forma, cor=cor))
+        variantes_r.append(dict(rot=ra["nome"], unidade=un, series=ser))
+    # o eixo cobre as duas notas das três agências (a local chegou a A−)
+    todas = [v for ra in rat.values() for ss in (ra["serie"], ra["local"]) for m, v in ss.items() if m >= INICIO]
+    eixo_r = {"min": min(7, min(todas)), "max": max(14, max(todas) + 1), "passo": 1}
+    # as três juntas: deslocamento mínimo para as linhas iguais não se
+    # esconderem (o valor mostrado é a nota, arredondada)
     desloc = {"sp": 0.08, "moodys": 0.0, "fitch": -0.08}
     cores = {"sp": AZUL, "moodys": VERMELHO, "fitch": VERDE}
-    rat_series = []
+    tres = []
     for aid in ("sp", "moodys", "fitch"):
-        s = {m: v + desloc[aid] for m, v in rat[aid]["serie"].items()}
-        rat_series.append(serie(rat[aid]["nome"], s, 2, cor=cores[aid], unidade="moodys" if aid == "moodys" else "nota-sp"))
-    meses_r = [m for m in rat["sp"]["serie"] if m >= INICIO]
-    rat_series.append(dict(nome="Grau de investimento", cor=CINZA, traco="pontilhado", largura=3,
-                           buracoMax=400, dados=[[min(meses_r, key=ordem), 12], [max(meses_r, key=ordem), 12]]))
+        s3 = {m: v + desloc[aid] for m, v in rat[aid]["serie"].items()}
+        tres.append(serie(rat[aid]["nome"], s3, 2, cor=cores[aid], unidade="moodys" if aid == "moodys" else "nota-sp"))
+    variantes_r.append(dict(rot="As três", unidade="nota-sp", eixoDireita="moodys", series=tres + [gi]))
     rat_g = dict(id="ministros-rating", titulo="Rating soberano do Brasil",
-                 subtitulo="Nota de longo prazo em moeda estrangeira; S&P e Fitch à esquerda, Moody's à direita",
-                 unidade="nota-sp", eixoDireita="moodys", eixo={"min": 7, "max": 14, "passo": 1},
+                 subtitulo="Nota de longo prazo; marcadores: anúncios de cada agência, com a perspectiva; "
+                           "em As três, S&P e Fitch à esquerda e Moody's à direita",
+                 unidade="nota-sp", eixo=eixo_r,
                  fonte="Moody's, S&P e Fitch (via Poder & Mercado) e FtM", ministros=fx, presidentes=pres_fx,
-                 apresentarDaqui=True, series=rat_series)
+                 apresentarDaqui=True, variantes=variantes_r)
     linhas_rat = []
     for mi in mins:
         lin = [{"t": mi["nome"], "forte": True}, {"t": mi["pres"]}]
         for aid in ("sp", "moodys", "fitch"):
             a, b, _ = nota_dia(rat[aid], mi)
-            lin.append({"t": "%s → %s (%s)" % (nota(a, aid), nota(b, aid), degraus(a, b))})
+            pa, pb = persp_dia(rat[aid], mi)
+            lin.append({"t": "%s → %s (%s)" % (nota_p(a, pa, aid), nota_p(b, pb, aid), degraus(a, b))})
         pintar_linha(lin, "rating", mi["id"])
         linhas_rat.append(lin)
     rat_tab = dict(id="ministros-rating-tabela", tipo="tabela", titulo="Rating soberano por ministro",
-                   subtitulo="Nota na véspera da posse → nota no último dia no cargo; dados até %s"
+                   subtitulo="Nota e perspectiva na véspera da posse → no último dia no cargo; dados até %s"
                              % mes_curto(max(meses_r, key=ordem)),
                    fonte="Moody's, S&P e Fitch (via Poder & Mercado)",
                    colunas=[{"rot": "Ministro"}, {"rot": "Presidente"}, {"rot": "S&P"}, {"rot": "Moody's"}, {"rot": "Fitch"}],
@@ -879,9 +938,10 @@ def montar():
                        {"t": lp[5]["t"]}, {"t": lp[6]["t"], "forte": True}])
         for aid in ("sp", "moodys", "fitch"):
             a, b, ate = nota_dia(rat[aid], mi)
+            pa, pb = persp_dia(rat[aid], mi)
             linhas.append([{"t": "Rating " + rat[aid]["nome"], "forte": True},
-                           {"t": "%s (%s)" % (nota(a, aid), dia_curto(vespera(mi["posse"])))},
-                           {"t": "%s (%s)" % (nota(b, aid), dia_curto(vespera(mi["saida"])) if mi["saida"] else mes_curto(ate))},
+                           {"t": "%s (%s)" % (nota_p(a, pa, aid), dia_curto(vespera(mi["posse"])))},
+                           {"t": "%s (%s)" % (nota_p(b, pb, aid), dia_curto(vespera(mi["saida"])) if mi["saida"] else mes_curto(ate))},
                            {"t": degraus(a, b), "forte": True}])
         cargo = ("No cargo desde %s" % dia_curto(mi["posse"])) if not mi["saida"] else \
                 ("No cargo de %s a %s" % (dia_curto(mi["posse"]), dia_curto(mi["saida"])))

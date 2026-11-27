@@ -557,6 +557,20 @@
     return { min: min, max: max, passo: passo, ticks: ticks };
   }
 
+  // marcador de uma série "pontos": triângulo para cima, losango ou círculo
+  function marcaPonto(forma, cx, cy, r, cor, fundo, nome) {
+    var at = { fill: cor, stroke: fundo, "stroke-width": r * 0.28, "data-serie": nome || null };
+    if (forma === "triangulo") {
+      return el("polygon", Object.assign({ points:
+        [cx, cy - r * 1.2, cx + r * 1.15, cy + r * 0.85, cx - r * 1.15, cy + r * 0.85].join(" ") }, at));
+    }
+    if (forma === "losango") {
+      return el("polygon", Object.assign({ points:
+        [cx, cy - r * 1.3, cx + r * 1.1, cy, cx, cy + r * 1.3, cx - r * 1.1, cy].join(" ") }, at));
+    }
+    return el("circle", Object.assign({ cx: cx, cy: cy, r: r }, at));
+  }
+
   // ---------- legenda ----------
   function itensLegenda(g) {
     return g.series.filter(function (s) { return s.legenda !== false; });
@@ -2371,7 +2385,7 @@
     // outra linha (ou já há um número), tenta logo acima, logo abaixo, e
     // assim por diante, ficando com a altura que esbarra em menos coisa.
     var trilhas = g.series.map(function (s, k) {
-      if (s.tipo === "barra" || s.tipo === "faixa") return [];
+      if (s.tipo === "barra" || s.tipo === "faixa" || s.tipo === "pontos") return [];
       var YS = yDe(s), pts = [];
       vis[k].forEach(function (p) {
         var x = X(p.i + 0.5), y = YS(p.v), a = pts[pts.length - 1];
@@ -2716,7 +2730,7 @@
     // sem cotação) corta a linha
     var buracoMax = g.buracoMax || (g.intradiario ? 8 : g.diario ? 6 : 1);
     g.series.forEach(function (s, k) {
-      if (s.tipo === "barra" || s.tipo === "faixa" || !vis[k].length) return;
+      if (s.tipo === "barra" || s.tipo === "faixa" || s.tipo === "pontos" || !vis[k].length) return;
       var d = "", ant = null, bm = s.buracoMax || buracoMax, YS = yDe(s);  // série anual num eixo mensal liga de 12 em 12
       var trechos = [], atualT = [];
       vis[k].forEach(function (p) {
@@ -2780,6 +2794,17 @@
       }
     });
 
+    // "pontos" (a ideia do Poder & Mercado no rating): um marcador solto em
+    // cada ponto, sem linha, por cima das linhas; "forma": triangulo, losango
+    // ou circulo, para continuar legível sem cor (impresso em preto e branco)
+    g.series.forEach(function (s, k) {
+      if (s.tipo !== "pontos") return;
+      var YS = yDe(s), r = s.raio || L.linha * 1.35, cor = corNoTema(s.cor, pal);
+      vis[k].forEach(function (p) {
+        area.appendChild(marcaPonto(s.forma, X(p.i + 0.5), YS(p.v), r, cor, pal.bg, s.nome));
+      });
+    });
+
     ordem.forEach(function (o) {
       var cor = corNoTema(o.r.s.corNegativa && o.r.p.v < 0 ? o.r.s.corNegativa : o.r.s.cor, pal);
       var px = X(o.r.p.i + 0.5), py = yDe(o.r.s)(o.r.p.v), lx = L.x1 + L.rotuloX;
@@ -2808,6 +2833,8 @@
       } else if (s.tipo === "barra" || s.tipo === "faixa") {
         svg.appendChild(el("rect", { x: it.x + 6, y: y - 10, width: 22, height: 20, fill: cor,
                                      opacity: s.tipo === "faixa" ? (s.opacidade || 0.3) * 1.6 : (s.opacidade || null) }));
+      } else if (s.tipo === "pontos") {
+        svg.appendChild(marcaPonto(s.forma, it.x + legenda.sw / 2, y, Math.min(s.raio || L.linha * 1.35, 10), cor, pal.bg));
       } else if (s.area && s.legendaQuadrado) {
         // área com "legendaQuadrado": quadrado na cor e na transparência da área, não um traço
         svg.appendChild(el("rect", { x: it.x + 6, y: y - 10, width: 22, height: 20, fill: cor,
