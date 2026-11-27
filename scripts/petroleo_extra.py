@@ -185,7 +185,7 @@ def media_12(d):
     return media_n(d, 12)
 
 
-def sazonal(mensal, nome, cor, unidade, titulo, subtitulo, id_, fonte):
+def sazonal(mensal, nome, cor, unidade, titulo, subtitulo, id_, fonte, eixo=None):
     """Faixa de mínimo e máximo dos ANOS_FAIXA anos anteriores, a média deles
     e as linhas do ano corrente e do anterior, num eixo de jan a dez."""
     atual = max(mensal)[:4]
@@ -198,11 +198,14 @@ def sazonal(mensal, nome, cor, unidade, titulo, subtitulo, id_, fonte):
             media[str(k)] = sum(vs) / len(vs)
     ano = lambda a: {str(int(m[5:7]) - 1): v for m, v in mensal.items() if m[:4] == a}   # noqa: E731
     rot = "%s a %s" % (anteriores[0], anteriores[-1])
-    return dict(id=id_, titulo=titulo, subtitulo=subtitulo, unidade=unidade, fonte=fonte, categorias=MESES,
-                series=[dict(nome="Mínimo e máximo de " + rot, cor=cor, tipo="faixa", dados=faixa, opacidade=0.3),
-                        serie("Média de " + rot, CINZA, media, 1, traco="pontilhado", largura=4),
-                        serie(anteriores[-1], AZUL, ano(anteriores[-1]), 1),
-                        serie(atual, BRANCO, ano(atual), 1, rotulo=True, largura=8)])
+    g = dict(id=id_, titulo=titulo, subtitulo=subtitulo, unidade=unidade, fonte=fonte, categorias=MESES,
+             series=[dict(nome="Mínimo e máximo de " + rot, cor=cor, tipo="faixa", dados=faixa, opacidade=0.3),
+                     serie("Média de " + rot, CINZA, media, 1, traco="pontilhado", largura=4),
+                     serie(anteriores[-1], AZUL, ano(anteriores[-1]), 1),
+                     serie(atual, BRANCO, ano(atual), 1, rotulo=True, largura=8)])
+    if eixo:
+        g["eixo"] = eixo
+    return g
 
 
 # --------------------------------------------------------------------------
@@ -245,7 +248,7 @@ def graficos_producao():
                      serie("Total", BRANCO, total, 0, rotulo=True)]),
         sazonal(total, "", AZUL, "kbd", "Produção de petróleo no Brasil: sazonalidade",
                 "Mil barris por dia; faixa = mínimo e máximo de cada mês nos %d anos anteriores" % ANOS_FAIXA,
-                "producao-petroleo-sazonal", fonte),
+                "producao-petroleo-sazonal", fonte, eixo=dict(min=2000)),   # pedido dele: eixo a partir de 2.000
     ])
 
 
