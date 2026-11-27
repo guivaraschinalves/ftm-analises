@@ -5146,6 +5146,13 @@
   // vez, porque empilhar três análises numa rolagem só perde o leitor.
   function montarNav(lista, host, atual) {
     host.innerHTML = "";
+    if (COM_INICIO) {
+      var ini = html("a", { "class": "nav-assunto nav-inicio" + (atual === -1 ? " atual" : ""), href: "#" });
+      ini.appendChild(html("span", { texto: "Início" }));
+      ini.appendChild(html("span", { "class": "nav-conta", texto: lista.length + " análises" }));
+      ini.addEventListener("click", function (ev) { ev.preventDefault(); fecharIndice(); irInicio(); });
+      host.appendChild(ini);
+    }
     lista.forEach(function (dados, i) {
       // "grupo" junta assuntos da mesma família (as análises de cenário, uma
       // por data) sob um cabeçalho no índice
@@ -5727,6 +5734,7 @@
     atual = i;
     cartoes.length = 0;
     host.innerHTML = "";
+    document.body.classList.remove("no-inicio");
     // o assunto com comentários abre a coluna da margem direita (ver CSS)
     document.body.classList.toggle("com-comentarios", !!docs[i].comentarios);
     // a marca do assunto (hoje só "wealth") troca o acento e põe o logo do parceiro no topo
@@ -5743,6 +5751,58 @@
     if (ancora) irPara(ancora);
     else window.scrollTo({ top: 0, behavior: "auto" });
     try { history.replaceState(null, "", "#" + (ancora || idAssunto(docs[i]))); } catch (e) {}
+  }
+
+  // ---------- página inicial ----------
+  // No ftm.app.br (o index.html de lá traz data-inicio), a página abre num
+  // catálogo das análises, agrupadas como no índice, e cada cartão abre a
+  // sua. Sem o atributo (o github.io), abre direto na primeira, como sempre.
+  var COM_INICIO = !!(document.body && document.body.hasAttribute("data-inicio"));
+  function irInicio() {
+    try { history.pushState(null, "", location.pathname + location.search); } catch (e) {}
+    mostrarInicio();
+  }
+  function mostrarInicio() {
+    var host = document.getElementById("graficos");
+    atual = -1;
+    cartoes.length = 0;
+    host.innerHTML = "";
+    document.body.classList.remove("com-comentarios");
+    document.documentElement.removeAttribute("data-marca");
+    marcaNosGraficos(null);
+    var btnAp = document.getElementById("apresentar");
+    if (btnAp) btnAp.hidden = true;
+    if (indiceLateral) indiceLateral.innerHTML = "";
+    indiceItens = [];
+    document.body.classList.remove("com-indice-lateral");
+    document.body.classList.add("no-inicio");
+    var cat = html("div", { "class": "inicio" }), grade = null, grupo = null;
+    docs.forEach(function (dados, i) {
+      var g = dados.grupo || "";
+      if (!grade || g !== grupo) {
+        grupo = g;
+        if (g) cat.appendChild(html("h2", { "class": "inicio-grupo", texto: g }));
+        grade = html("div", { "class": "inicio-grade" });
+        cat.appendChild(grade);
+      }
+      var total = dados.secoes.reduce(function (n, sec) { return n + sec.graficos.length; }, 0);
+      var at = dados.atualizado.split("-");
+      var a = html("a", { "class": "inicio-cartao", href: "#" + idAssunto(dados) });
+      a.appendChild(html("span", { "class": "inicio-titulo", texto: dados.assunto }));
+      a.appendChild(html("span", { "class": "inicio-meta",
+        texto: "Atualizada em " + at[2] + "/" + at[1] + "/" + at[0] + " · " + total + " gráficos" }));
+      a.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        try { history.pushState(null, "", "#" + idAssunto(dados)); } catch (e) {}
+        mostrar(i);
+      });
+      grade.appendChild(a);
+    });
+    host.appendChild(cat);
+    montarNav(docs, document.getElementById("nav"), -1);
+    document.getElementById("rodape").innerHTML = "";
+    fecharIndice();
+    window.scrollTo({ top: 0, behavior: "auto" });
   }
 
   // De qual assunto é esta âncora? Serve para um link direto a um gráfico
@@ -5839,7 +5899,8 @@
       docs = r.slice(0, FONTES.length).filter(Boolean);
       if (!docs.length) throw new Error("nenhum arquivo de dados foi carregado");
       var alvo = location.hash.length > 1 ? assuntoDoHash(location.hash.slice(1)) : null;
-      mostrar(alvo ? alvo[0] : 0, alvo ? alvo[1] : null);
+      if (!alvo && COM_INICIO) mostrarInicio();
+      else mostrar(alvo ? alvo[0] : 0, alvo ? alvo[1] : null);
       // as imagens das séries vêm depois do primeiro desenho: o gráfico aparece
       // na hora, com a área lisa, e ganha a nota quando ela chega
       carregarImagens(docs).then(function () {
@@ -5903,6 +5964,21 @@
         marcarIndiceLateral();
       }, 120);
     });
+    if (COM_INICIO) {
+      var marcaLogo = document.querySelector(".marca-logo");
+      if (marcaLogo) marcaLogo.addEventListener("click", function (ev) {
+        if (!docs.length) return;
+        ev.preventDefault();
+        irInicio();
+      });
+      // voltar do navegador: da análise para a inicial, e de novo para a análise
+      window.addEventListener("popstate", function () {
+        if (!docs.length) return;
+        var alvo = location.hash.length > 1 ? assuntoDoHash(location.hash.slice(1)) : null;
+        if (!alvo) mostrarInicio();
+        else if (alvo[0] !== atual) mostrar(alvo[0], alvo[1]);
+      });
+    }
     if (GATE.ligado && !tokenSalvo()) return mostrarGate();
     carregar();
   }
