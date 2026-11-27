@@ -626,74 +626,66 @@ def ibovespa(ini, fim):
         raise RuntimeError("Ibovespa: Yahoo indisponível para a conferência (%s)" % e)
     comuns = [d for d in ib if d in yh]
     ruins = {d: (ib[d], yh[d]) for d in comuns if abs(ib[d] - yh[d]) > TOL_IBOV}
-    # um dia isolado pode divergir (10/11/2015: 46.206 no SGS, 46.179 no Yahoo);
-    # quem usa a série confere que nenhum dia divergente entrou na amostra
-    if len(comuns) < len(ib) * 0.95 or len(ruins) > 1:
+    # dias isolados divergem (28/11/2014: 54.724 no SGS, 54.664 no Yahoo; 10/11/2015:
+    # 46.206 e 46.179); sem terceira fonte, vale o SGS, e até dois dias passam
+    if len(comuns) < len(ib) * 0.95 or len(ruins) > 2:
         raise RuntimeError("Ibovespa: SGS 7 × Yahoo diverge em %d dias: %r" % (len(ruins), ruins))
     print("conferência: Ibovespa do SGS 7 bate com o Yahoo (até %.0f ponto) em %d de %d dias; fora: %r"
           % (TOL_IBOV, len(comuns) - len(ruins), len(comuns), ruins))
     return ib, set(ruins)
 
 
-def semanal(diaria, posse, saida):
-    """A véspera da posse (último dado antes dela) e o último dado de cada
-    semana (segunda a domingo) no cargo, até o dia anterior à posse do sucessor."""
-    ds = sorted(d for d in diaria if d < saida)
-    base = max(d for d in ds if d < posse)
-    semanas = {}
-    for d in ds:
-        if d >= posse:
-            semanas[datetime.date.fromisoformat(d).isocalendar()[:2]] = d
-    return {d: diaria[d] for d in [base] + sorted(semanas.values())}
-
-
-def variacoes(s, fmt):
-    ks = sorted(s)
-    return {b: fmt(s[a], s[b]) for a, b in zip(ks, ks[1:])}
-
-
-def secao_semana(mi, cambio_d, selic_d, divida):
-    """Gráficos que se completam um passo por vez (semana; mês na dívida), com a
-    variação do último passo ao lado do ponto."""
+def secao_periodo(mi, anuncio, cambio_d, selic_d, divida):
+    """Do anúncio do ministro à saída, o período inteiro de uma vez, com a
+    variação total ao lado do último ponto e a posse marcada no eixo."""
     fim = mi["saida"]
-    ib, ib_ruins = ibovespa("2014-12-01", fim)
-    uteis = {d: selic_d[d] for d in cambio_d if d in selic_d}      # a meta nos dias de PTAX
-    cam, ibs, sel = semanal(cambio_d, mi["posse"], fim), semanal(ib, mi["posse"], fim), semanal(uteis, mi["posse"], fim)
-    div = {m: divida[m] for m in divida if ordem(mi["base"]) <= ordem(m) <= ordem(mi["ate"])}
-    if ib_ruins & set(ibs):
-        raise RuntimeError("Ibovespa: dia divergente do Yahoo na amostra semanal: %r" % sorted(ib_ruins & set(ibs)))
-    for nome, ss in (("câmbio", cam), ("Ibovespa", ibs), ("Selic", sel)):
-        print("%s: %s semanal, %d pontos (%s a %s)" % (mi["curto"], nome, len(ss), min(ss), max(ss)))
-    pct = lambda a, b: sinal((b / a - 1) * 100, 2) + "%"
-    var_cam = variacoes(cam, lambda a, b: "%sR$ %s (%s)" % ("+" if b - a > 0 else "−" if round(b - a, 2) else "",
-                                                             br(abs(b - a), 2), pct(a, b)))
-    var_ib = variacoes(ibs, lambda a, b: "%s %s (%s)" % (sinal(b - a, 0), "ponto" if abs(round(b - a)) == 1 else "pontos",
-                                                         pct(a, b)))
-    var_sel = variacoes(sel, lambda a, b: sinal(b - a, 2) + " p.p.")
-    var_div = variacoes(div, lambda a, b: sinal(b - a, 2) + " p.p. do PIB")
-    nome = mi["nome"]
-    sem = dict(unidade="Semana")
+    ib, ib_ruins = ibovespa("2014-11-01", fim)
 
-    def g(gid, titulo, sub, unidade, fonte, serie_, revelar, **extra):
+    def recorte(diaria):
+        ds = sorted(d for d in diaria if d < fim)
+        base = max(d for d in ds if d < anuncio)              # último dado antes do anúncio
+        return {d: diaria[d] for d in ds if d >= base}
+    cam, ibs, sel = recorte(cambio_d), recorte(ib), recorte(selic_d)
+    base_m = mes_de(ordem(anuncio[:7]) - 1)                   # último mês fechado antes do anúncio
+    div = {m: divida[m] for m in divida if ordem(base_m) <= ordem(m) <= ordem(mi["ate"])}
+    for nome_s, ss in (("câmbio", cam), ("Ibovespa", ibs), ("Selic", sel), ("dívida", div)):
+        print("%s: %s de %s a %s (%d pontos)" % (mi["curto"], nome_s, min(ss), max(ss), len(ss)))
+    if ib_ruins & set(ibs):
+        print("Ibovespa: dias divergentes do Yahoo no período, mantido o valor do SGS: %r" % sorted(ib_ruins & set(ibs)))
+
+    def total(ss, fmt):
+        ks = sorted(ss)
+        return {ks[-1]: fmt(ss[ks[0]], ss[ks[-1]]) + " no período"}
+    pct = lambda a, b: sinal((b / a - 1) * 100, 1) + "%"
+    var_cam = total(cam, lambda a, b: "%sR$ %s (%s)" % ("+" if b - a > 0 else "−" if round(b - a, 2) else "",
+                                                       br(abs(b - a), 2), pct(a, b)))
+    var_ib = total(ibs, lambda a, b: "%s %s (%s)" % (sinal(b - a, 0), "ponto" if abs(round(b - a)) == 1 else "pontos",
+                                                    pct(a, b)))
+    var_sel = total(sel, lambda a, b: sinal(b - a, 2) + " p.p.")
+    var_div = total(div, lambda a, b: sinal(b - a, 2) + " p.p. do PIB")
+    nome = mi["nome"]
+
+    def g(gid, titulo, sub, unidade, fonte, serie_, posse, **extra):
         return dict(id="levy-" + gid, titulo=titulo, subtitulo=sub, unidade=unidade, fonte=fonte,
-                    eixo={"zero": False}, revelar=revelar, apresentarDaqui=True, series=[serie_], **extra)
-    dados = lambda s_: [[k, v] for k, v in sorted(s_.items())]
+                    eixo={"zero": False}, eventos=[{"em": posse, "rot": "Posse"}], apresentarDaqui=True,
+                    series=[serie_], **extra)
+    dados = lambda s_, c=4: [[k, round(v, c)] for k, v in sorted(s_.items())]
     graficos = [
-        g("cambio", "Câmbio com %s" % nome, "R$ por US$, PTAX no fim da semana", "brl", "BCB (PTAX, SGS 1)",
-          dict(nome="Câmbio (PTAX)", cor=BRANCO, dados=[[k, round(v, 4)] for k, v in sorted(cam.items())],
-               rotulo=True, largura=5, variacoes=var_cam), sem, diario=True, buracoMax=8),
-        g("ibovespa", "Ibovespa com %s" % nome, "Pontos, fechamento da semana", "int", "B3 (via BCB, SGS 7)",
-          dict(nome="Ibovespa", cor=VERDE, dados=dados(ibs), rotulo=True, largura=5, variacoes=var_ib),
-          sem, diario=True, buracoMax=8),
-        g("selic", "Meta da Selic com %s" % nome, "% a.a., no fim da semana", "%", "BCB (SGS 432)",
-          dict(nome="Meta da Selic", cor=AZUL, dados=dados(sel), rotulo=True, largura=5, variacoes=var_sel),
-          sem, diario=True, buracoMax=8),
-        g("divida", "Dívida bruta do governo geral com %s" % nome, "% do PIB, metodologia até 2007; dado mensal", "%",
+        g("cambio", "Câmbio com %s" % nome, "R$ por US$, PTAX diária", "brl", "BCB (PTAX, SGS 1)",
+          dict(nome="Câmbio (PTAX)", cor=BRANCO, dados=dados(cam), rotulo=True, largura=4, variacoes=var_cam),
+          mi["posse"], diario=True),
+        g("ibovespa", "Ibovespa com %s" % nome, "Pontos, fechamento diário", "int", "B3 (via BCB, SGS 7)",
+          dict(nome="Ibovespa", cor=VERDE, dados=dados(ibs, 0), rotulo=True, largura=4, variacoes=var_ib),
+          mi["posse"], diario=True),
+        g("selic", "Meta da Selic com %s" % nome, "% a.a.", "%", "BCB (SGS 432)",
+          dict(nome="Meta da Selic", cor=AZUL, dados=dados(sel, 2), rotulo=True, largura=4, variacoes=var_sel),
+          mi["posse"], diario=True),
+        g("divida", "Dívida bruta do governo geral com %s" % nome, "% do PIB, metodologia até 2007", "%",
           "BCB (SGS 4502 e 4382) e FtM",
-          dict(nome="Dívida bruta", cor=LARANJA, dados=[[k, round(v, 2)] for k, v in sorted(div.items())],
-               rotulo=True, largura=5, variacoes=var_div), dict(unidade="Mês")),
+          dict(nome="Dívida bruta", cor=LARANJA, dados=dados(div, 2), rotulo=True, largura=5, variacoes=var_div),
+          mi["posse"][:7]),
     ]
-    return dict(titulo="%s semana a semana" % nome, texto="", graficos=graficos)
+    return dict(titulo="%s, do anúncio à saída" % nome, texto="", graficos=graficos)
 
 
 # ---------- gráficos e tabelas ----------
@@ -1226,7 +1218,8 @@ def montar():
     secoes.append(dict(titulo="Médias no mandato", texto="", graficos=[res_tab]))
     # a seção "Tabela por ministro" saiu da página (pedido dele); por_min fica montado, fora do JSON
     # pedido dele: um espaço só para o Levy, semana a semana
-    secoes.append(secao_semana(next(m for m in mins if m["id"] == "levy"), cambio_d, selic_d, divida))
+    # anúncio oficial pelo Planalto: 27/11/2014
+    secoes.append(secao_periodo(next(m for m in mins if m["id"] == "levy"), "2014-11-27", cambio_d, selic_d, divida))
 
     doc = dict(assunto="Ministros da Fazenda", grupo="Análises Variadas",
                capaFtm=dict(titulo="Ministros da Fazenda desde Palocci",

@@ -2821,9 +2821,9 @@
       });
     });
 
-    // "variacoes" (com "revelar"): a variação do último passo à vista, ao lado
-    // do ponto; some quando o passo seguinte aparece
-    if (g.revelar) g.series.forEach(function (s, k) {
+    // "variacoes": {chave: texto} na série; o texto do último ponto à vista sai
+    // ao lado dele (com "revelar", some quando o passo seguinte aparece)
+    g.series.forEach(function (s, k) {
       if (!s.variacoes || !vis[k].length) return;
       var p = vis[k][vis[k].length - 1], txt = s.variacoes[p.k];
       var YS = yDe(s), px = X(p.i + 0.5), py = YS(p.v), corV = corNoTema(s.cor, pal);
