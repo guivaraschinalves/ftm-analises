@@ -796,7 +796,8 @@ def montar():
             sub_tab += "; meses acima do centro da meta (SGS 13521) e acima do teto do intervalo do CMN, do total de meses"
         if ind["id"] in ("selic", "cambio"):
             colunas.append({"rot": "Média no período", "num": True})
-            sub_tab += "; média: média simples dos dias úteis no cargo"
+            # a meta da Selic (432) tem valor em todo dia corrido; a PTAX, só nos dias úteis
+            sub_tab += "; média: média simples dos dias %s no cargo" % ("corridos" if ind["id"] == "selic" else "úteis")
         if ind["id"] == "divida":
             colunas.append({"rot": "Variação média mensal", "num": True})
             sub_tab += "; variação média mensal: variação total dividida pelo número de meses"

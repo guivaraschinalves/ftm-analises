@@ -2784,7 +2784,7 @@
           opacity: s.opacidade || null
         };
         area.appendChild(el("path", Object.assign({ stroke: corNoTema(s.cor, pal), "clip-path": "url(#" + idPos + ")", "data-serie": s.nome }, atLin)));
-        area.appendChild(el("path", Object.assign({ stroke: corNoTema(s.corNegativa, pal), "clip-path": "url(#" + idNeg + ")" }, atLin)));
+        area.appendChild(el("path", Object.assign({ stroke: corNoTema(s.corNegativa, pal), "clip-path": "url(#" + idNeg + ")", "data-serie": s.nome }, atLin)));
       } else {
         area.appendChild(el("path", {
           d: d, fill: "none", stroke: corNoTema(s.cor, pal), "stroke-width": w, "data-serie": s.nome,
