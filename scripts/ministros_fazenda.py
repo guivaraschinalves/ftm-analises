@@ -87,12 +87,12 @@ PRESIDENTES = [
 DESTAQUE_VERMELHO = {
     "primario": "mantega",
     "nominal": "haddad",
-    "divida": "meirelles",
+    "divida": ("levy", "meirelles"),
     "ipca": "levy",
     "selic": "guedes",
     "cambio": "levy",
     "cambio-ppc": "levy",
-    "rating": "mantega",
+    "rating": ("levy", "barbosa"),
 }
 TOL_DIVIDA = 0.02             # 4502 / 4382 * 100 × 4537 (p.p. do PIB)
 MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
@@ -416,7 +416,8 @@ def celula(p, fmt):
 
 
 def pintar_linha(linha, ind_id, mid):
-    if DESTAQUE_VERMELHO.get(ind_id) == mid:
+    alvo = DESTAQUE_VERMELHO.get(ind_id)
+    if mid == alvo or (isinstance(alvo, tuple) and mid in alvo):
         for c in linha:
             c["cor"] = VERMELHO
     return linha
