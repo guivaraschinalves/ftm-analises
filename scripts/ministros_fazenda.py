@@ -860,20 +860,27 @@ def montar():
         pc = lambda p: {"t": "n.d."} if p is None else {"t": "%s%% (%s)" % (sinal(p[1], 1), mes_curto(p[0]))}
         v = sinal(fim[1] - ini[1], 1) + " p.p." if ini and fim and fim[0] != ini[0] else "n.d."
         lp = [{"t": mi["nome"], "forte": True}, {"t": mi["pres"]},
-              {"t": "%s (%s)" % (rs(mercado_ppc[mi["base"]]), mes_curto(mi["base"]))},
-              {"t": "%s (%s)" % (rs(ppc_s[mi["base"]]), mes_curto(mi["base"]))},
               pc(ini), pc(fim), {"t": v, "forte": True}]
+        # picos nos meses do ministro (do primeiro ao último mês no cargo)
+        no_cargo = [mes_de(i) for i in range(ordem(mi["de"]), ordem(mi["ate"]) + 1) if mes_de(i) in desvio_ppc]
+        if no_cargo:
+            mx = max(no_cargo, key=lambda m: desvio_ppc[m])
+            mn = min(no_cargo, key=lambda m: desvio_ppc[m])
+            lp.extend([pc((mx, desvio_ppc[mx])), pc((mn, desvio_ppc[mn]))])
+        else:
+            lp.extend([{"t": "n.d."}, {"t": "n.d."}])
         pintar_linha(lp, "cambio-ppc", mi["id"])
         linhas_ppc.append(lp)
     ppc_tab = dict(id="ministros-cambio-ppc-tabela", tipo="tabela",
                    titulo="Câmbio pela PPC por ministro",
                    subtitulo="Sobre/(sub)valorização: dólar pela PPC ÷ dólar de mercado − 1 (média do mês); positivo, "
-                             "real sobrevalorizado; início: mês anterior ao primeiro mês do ministro",
+                             "real sobrevalorizado; início: mês anterior ao primeiro mês do ministro; máximo e mínimo: "
+                             "picos nos meses do ministro",
                    fonte="BCB, BLS e FtM",
-                   colunas=[{"rot": "Ministro"}, {"rot": "Presidente"}, {"rot": "Câmbio no início", "num": True},
-                            {"rot": "PPC no início", "num": True},
+                   colunas=[{"rot": "Ministro"}, {"rot": "Presidente"},
                             {"rot": "Sobre/(sub)valorização no início", "num": True},
-                            {"rot": "No final", "num": True}, {"rot": "Variação", "num": True}],
+                            {"rot": "No final", "num": True}, {"rot": "Variação", "num": True},
+                            {"rot": "Máximo no mandato", "num": True}, {"rot": "Mínimo no mandato", "num": True}],
                    linhas=linhas_ppc)
     secoes.append(dict(titulo="Bônus: câmbio pela PPC", texto="", graficos=[ppc_g, ppc_tab]))
 
@@ -938,8 +945,8 @@ def montar():
             linhas.append([{"t": nome_ind, "forte": True}, {"t": l[2]["t"]}, {"t": l[3]["t"]},
                            {"t": l[4]["t"], "forte": True}])
         lp = linhas_ppc[k]
-        linhas.append([{"t": "Sobre/(sub)valorização do real pela PPC", "forte": True}, {"t": lp[4]["t"]},
-                       {"t": lp[5]["t"]}, {"t": lp[6]["t"], "forte": True}])
+        linhas.append([{"t": "Sobre/(sub)valorização do real pela PPC", "forte": True}, {"t": lp[2]["t"]},
+                       {"t": lp[3]["t"]}, {"t": lp[4]["t"], "forte": True}])
         for aid in ("sp", "moodys", "fitch"):
             a, b, ate = nota_dia(rat[aid], mi)
             pa, pb = persp_dia(rat[aid], mi)
