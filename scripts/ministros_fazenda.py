@@ -581,7 +581,7 @@ def grafico_mandato(gid, titulo, doze_real, mins, ref, fonte):
     longas = ["Mês anterior à posse"] + ["%dº mês no cargo" % k for k in range(1, nmax + 1)]
     return dict(id=gid, titulo=titulo,
                 subtitulo="Variação real do acumulado em 12 meses desde o mês anterior ao do ministro, em R$ bilhões "
-                          "a preços de %s pelo IPCA; eixo: meses no cargo; superávit positivo" % mes_curto(ref),
+                          "a preços de %s pelo IPCA" % mes_curto(ref),
                 unidade="bi", fonte=fonte, categorias=cats, categoriasLongas=longas, apresentarDaqui=True,
                 series=series)
 
@@ -733,7 +733,7 @@ def montar():
              fonte="BCB (NFSP, SGS 5793) e FtM", rot="Primário"),
         dict(id="nominal", sec="Resultado nominal", s=nom, unidade="%", fmt=pct2, var=pp, cor=BRANCO,
              titulo="Resultado nominal do setor público consolidado",
-             sub="% do PIB, acumulado em 12 meses; superávit positivo",
+             sub="% do PIB, acumulado em 12 meses",
              fonte="BCB (NFSP, SGS 5727) e FtM", rot="Nominal"),
         dict(id="divida", sec="Dívida bruta do governo geral", s=divida, unidade="%", fmt=pct2, var=pp, cor=LARANJA,
              titulo="Dívida bruta do governo geral",
@@ -783,8 +783,13 @@ def montar():
         linhas = []
         colunas = [{"rot": "Ministro"}, {"rot": "Presidente"}, {"rot": "Início", "num": True},
                    {"rot": "Final", "num": True}, {"rot": "Variação", "num": True}]
-        sub_tab = ("Início: véspera da posse; final: último dia no cargo ou último dado" if ind.get("diaria") else
-                   "Início: mês anterior ao primeiro mês do ministro; final: último mês no cargo ou último dado")
+        # a regra dos meses (início e final) só aparece na primeira tabela, a do primário
+        if ind.get("diaria"):
+            sub_tab = "Início: véspera da posse; final: último dia no cargo ou último dado"
+        elif ind["id"] == "primario":
+            sub_tab = "Início: mês anterior ao primeiro mês do ministro; final: último mês no cargo ou último dado"
+        else:
+            sub_tab = ""
         if ind["id"] == "ipca":
             colunas.extend([{"rot": "Acima da meta", "num": True}, {"rot": "Acima do intervalo", "num": True}])
             sub_tab += "; meses acima do centro da meta (SGS 13521) e acima do teto do intervalo do CMN, do total de meses"
@@ -813,9 +818,11 @@ def montar():
                 l.append({"t": "n.d." if jm is None else pct2(jm)})
             pintar_linha(l, ind["id"], mi["id"])
             linhas.append(l)
+        sub_tab = sub_tab.lstrip("; ")
         tab = dict(id="ministros-" + ind["id"] + "-tabela", tipo="tabela",
-                   titulo=ind["titulo"] + " por ministro", subtitulo=sub_tab,
-                   fonte=ind["fonte"], colunas=colunas, linhas=linhas)
+                   titulo=ind["titulo"] + " por ministro", fonte=ind["fonte"], colunas=colunas, linhas=linhas)
+        if sub_tab:
+            tab["subtitulo"] = sub_tab[0].upper() + sub_tab[1:]
         graficos = [g, tab]
         if ind["id"] in ("primario", "nominal"):
             graficos.append(grafico_mandato(
@@ -831,7 +838,8 @@ def montar():
             for var_c in gc["variantes"]:
                 for se in var_c["series"]:
                     se["cor"] = CORES_CONDICIONANTES[se["nome"]]
-            gc.update(id="ministros-divida-condicionantes", ministros=fx, presidentes=pres_fx, apresentarDaqui=True)
+            gc.update(id="ministros-divida-condicionantes", ministros=fx, presidentes=pres_fx, apresentarDaqui=True,
+                      subtitulo="Contribuição para a variação da dívida bruta no conceito FMI, em p.p. do PIB")
             graficos.append(gc)
         if secoes and secoes[-1]["titulo"] == ind["sec"]:
             secoes[-1]["graficos"].extend(graficos)
@@ -841,8 +849,7 @@ def montar():
 
     # câmbio pela PPC (bônus): a série do FtM Dados, com base única em jun/1994
     ppc_g = dict(id="ministros-cambio-ppc", titulo="Câmbio de mercado e câmbio pela PPC",
-                 subtitulo="R$ por US$, média do mês; PPC: R$ 1,00 = US$ 1,00 em junho de 1994, corrigido pelo IPCA "
-                           "sobre o CPI dos EUA; sobre/(sub)valorização: dólar pela PPC ÷ dólar de mercado − 1",
+                 subtitulo="R$ por US$, média do mês",
                  unidade="brl", fonte="BCB (PTAX, SGS 1; IPCA, SGS 433), BLS (CPI-U) e FtM",
                  ministros=fx, presidentes=pres_fx, apresentarDaqui=True,
                  variantes=[
@@ -873,9 +880,7 @@ def montar():
         linhas_ppc.append(lp)
     ppc_tab = dict(id="ministros-cambio-ppc-tabela", tipo="tabela",
                    titulo="Câmbio pela PPC por ministro",
-                   subtitulo="Sobre/(sub)valorização: dólar pela PPC ÷ dólar de mercado − 1 (média do mês); positivo, "
-                             "real sobrevalorizado; início: mês anterior ao primeiro mês do ministro; máximo e mínimo: "
-                             "picos nos meses do ministro",
+                   subtitulo="Positivo: real sobrevalorizado; negativo: real subvalorizado",
                    fonte="BCB, BLS e FtM",
                    colunas=[{"rot": "Ministro"}, {"rot": "Presidente"},
                             {"rot": "Sobre/(sub)valorização no início", "num": True},
@@ -910,11 +915,10 @@ def montar():
     tres = []
     for aid in ("sp", "moodys", "fitch"):
         s3 = {m: v + desloc[aid] for m, v in rat[aid]["serie"].items()}
-        tres.append(serie(rat[aid]["nome"], s3, 2, cor=cores[aid], unidade="moodys" if aid == "moodys" else "nota-sp"))
+        tres.append(serie(rat[aid]["nome"] + (" (dir.)" if aid == "moodys" else ""), s3, 2, cor=cores[aid], unidade="moodys" if aid == "moodys" else "nota-sp"))
     variantes_r.append(dict(rot="As três", unidade="nota-sp", eixoDireita="moodys", series=tres + [gi]))
     rat_g = dict(id="ministros-rating", titulo="Rating soberano do Brasil",
-                 subtitulo="Nota de longo prazo; marcadores: anúncios de cada agência, com a perspectiva; "
-                           "em As três, S&P e Fitch à esquerda e Moody's à direita",
+                 subtitulo="Nota de longo prazo", varianteNoSubtitulo=False,
                  unidade="nota-sp", eixo=eixo_r,
                  fonte="Moody's, S&P e Fitch (via Poder & Mercado) e FtM", ministros=fx, presidentes=pres_fx,
                  apresentarDaqui=True, variantes=variantes_r)

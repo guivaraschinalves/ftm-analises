@@ -489,7 +489,8 @@
       for (var b in v) if (b !== "rot") fora[b] = v[b];
       // o recorte escolhido entra no subtítulo: sem isso, a imagem baixada não
       // diz qual deles está na tela
-      fora.subtitulo = (base.subtitulo ? base.subtitulo + " · " : "") + v.rot;
+      // "varianteNoSubtitulo": false deixa o subtítulo como está (o rating, onde o botão já diz a agência)
+      if (base.varianteNoSubtitulo !== false) fora.subtitulo = (base.subtitulo ? base.subtitulo + " · " : "") + v.rot;
       cartao.montados[k] = fora;
     }
     return cartao.montados[k];
