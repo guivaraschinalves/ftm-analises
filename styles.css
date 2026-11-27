@@ -355,6 +355,7 @@ ul.artigo-texto ul li { margin: 0 0 4px; }
 .menu hr { border: 0; border-top: 1px solid var(--border); margin: 6px 4px; }
 
 .frame { position: relative; background: var(--chart-bg); border-top: 1px solid var(--border); }
+.frame:has(.tabela) { overflow-x: auto; }
 .frame svg { display: block; width: 100%; height: auto; touch-action: pan-y; }
 .nota { margin: 0; padding: 10px 14px; color: var(--ink-2); font-size: 14px; border-top: 1px solid var(--border); }
 /* os acontecimentos marcados no gráfico, por extenso */
@@ -518,6 +519,9 @@ body.visor-aberto { overflow: hidden; }
 }
 .frame .tabela tbody tr:last-child td { border-bottom: 0; }
 .frame .tabela tbody tr:hover { background: var(--accent-wash); }
+.frame .tabela tbody tr.linha-destaque,
+.apres-quadro-corpo .tabela tbody tr.linha-destaque { background: rgba(192, 80, 77, .12); }
+.frame .tabela tbody tr.linha-destaque:hover { background: rgba(192, 80, 77, .2); }
 .frame .tabela td.forte { font-weight: 700; }
 
 @media (max-width: 860px) {

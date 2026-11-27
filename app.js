@@ -467,7 +467,13 @@
   // vale é a base com a variante escolhida por cima. O objeto fica guardado
   // para as séries manterem a identidade entre desenho e interação.
   function graficoDe(cartao) {
-    var g = graficoBruto(cartao), fora = cartao.ocultas;
+    var g = graficoBruto(cartao), fora = cartao.ocultas, ativo = cartao.ministroAtivo;
+    if (g.series && ativo && g.series.some(function (s) { return s.ministro; })) {
+      g = Object.assign({}, g, {
+        series: g.series.filter(function (s) { return !s.ministro || s.ministro === ativo; })
+          .map(function (s) { return s.ministro ? Object.assign({}, s, { legenda: true, rotulo: true }) : s; })
+      });
+    }
     if (!fora || !g.series || !Object.keys(fora).some(function (n) { return fora[n]; })) return g;
     // "escolherSeries": as contas que o leitor desligou nos botões do cartão
     return Object.assign({}, g, { series: g.series.filter(function (x) { return !fora[x.nome]; }) });
@@ -2085,15 +2091,15 @@
   // fio tracejado em cada troca de ministro, e a fila de retratos: cada foto
   // quer ficar sobre o meio da faixa dela; as que se encostam (mandatos curtos
   // lado a lado) são afastadas o mínimo, e um fio liga a foto à faixa.
-  function desenharMandatos(g, svg, pal, L, X, d0, d1, retr, idClip) {
+  function desenharMandatos(g, svg, pal, L, X, d0, d1, retr, idClip, ativo) {
     var claro = tema() === "light";
-    var vis = g.ministros.map(function (m, k) {
+    var faixasVis = g.ministros.map(function (m, k) {
       var a = Math.max(idxDe(g, m.de), d0), b = Math.min(idxDe(g, m.ate) + 1, d1);
       return { m: m, k: k, a: a, b: b };
     }).filter(function (v) { return v.b > v.a; });
-    if (!vis.length) return;
+    if (!faixasVis.length) return [];
     var ph = L.y1 - L.y0;
-    vis.forEach(function (v) {
+    faixasVis.forEach(function (v) {
       svg.appendChild(el("rect", { x: X(v.a), y: L.y0, width: X(v.b) - X(v.a), height: ph, fill: pal.texto,
                                    opacity: v.k % 2 ? (claro ? 0.085 : 0.13) : (claro ? 0.03 : 0.045) }));
       if (v.a > d0 && v.a === idxDe(g, v.m.de)) {
@@ -2101,6 +2107,14 @@
                                      "stroke-width": 1.2, "stroke-dasharray": "4 6", opacity: 0.7 }));
       }
     });
+    var vis = faixasVis;
+    if (ativo) {
+      var soAtivo = faixasVis.filter(function (v) { return v.m.id === ativo; });
+      if (soAtivo.length) vis = soAtivo;
+    } else if (faixasVis.length > 1 && faixasVis[0].a === d0 && faixasVis[0].b === d0 + 1 &&
+               idxDe(g, faixasVis[1].m.de) === d0 + 1) {
+      vis = faixasVis.slice(1);
+    }
     // largura das fotos: a cheia, ou a que couber com todas lado a lado
     var gap = 10, n = vis.length, lo = 12, hi = L.W - 12;
     var fw = Math.min(retr.fotoH * 0.75, (hi - lo - gap * (n - 1)) / n), fh = fw / 0.75;
@@ -2114,24 +2128,68 @@
       return corpoQueCabe(v.m.curto || v.m.nome, retr.nomeFs, passo - 4, "bold");
     })));
     fsN = Math.min.apply(null, vis.map(function (v) { return corpoQueCabe(v.m.curto || v.m.nome, fsN, passo - 4, "bold"); }));
+    var retratos = [];
     vis.forEach(function (v, k) {
       var x = xs[k], xf = x - fw / 2, idF = idClip + "-retrato-" + v.k;
       svg.appendChild(el("defs", {}, [el("clipPath", { id: idF }, [
         el("rect", { x: xf, y: yF, width: fw, height: fh, rx: 8 })])]));
+      var grp = el("g", { "class": "retrato-ministro", "data-ministro-id": v.m.id || "" });
       if (v.m.foto) {
-        svg.appendChild(el("image", { href: IMAGENS[v.m.foto] || v.m.foto, x: xf, y: yF, width: fw, height: fh,
+        grp.appendChild(el("image", { href: IMAGENS[v.m.foto] || v.m.foto, x: xf, y: yF, width: fw, height: fh,
                                       preserveAspectRatio: "xMidYMid slice", "clip-path": "url(#" + idF + ")" }));
       }
-      svg.appendChild(el("rect", { x: xf, y: yF, width: fw, height: fh, rx: 8, fill: "none",
+      grp.appendChild(el("rect", { x: xf, y: yF, width: fw, height: fh, rx: 8, fill: "none",
                                    stroke: pal.suave, "stroke-width": 1.2, opacity: 0.6 }));
-      svg.appendChild(texto(v.m.curto || v.m.nome, { x: x, y: yNome, "font-size": fsN, "font-weight": "bold",
+      grp.appendChild(texto(v.m.curto || v.m.nome, { x: x, y: yNome, "font-size": fsN, "font-weight": "bold",
                                                       fill: pal.texto, "text-anchor": "middle" }));
+      grp.appendChild(el("rect", { x: xf, y: yF, width: fw, height: yNome + fsN * 0.4 - yF, fill: "transparent" }));
+      svg.appendChild(grp);
+      retratos.push({ grp: grp, m: v.m });
       // o fio sai de baixo do nome e desce até o alto da faixa
       var yFio = yNome + fsN * 0.45;
       svg.appendChild(el("polyline", {
         points: x + "," + yFio + " " + x + "," + (yFio + 6) + " " + pos[k] + "," + (L.y0 - 3) + " " + pos[k] + "," + L.y0,
         fill: "none", stroke: pal.suave, "stroke-width": 1.2, opacity: 0.8 }));
     });
+    return retratos;
+  }
+
+  // Faixa de mandatos presidenciais abaixo dos rótulos do eixo X.
+  function desenharPresidentes(g, svg, pal, L, X, d0, d1, yP, hP) {
+    var claro = tema() === "light";
+    var vis = g.presidentes.map(function (p, k) {
+      var a = Math.max(idxDe(g, p.de), d0), b = Math.min(idxDe(g, p.ate) + 1, d1);
+      return { p: p, k: k, a: a, b: b };
+    }).filter(function (v) { return v.b > v.a; });
+    if (!vis.length) return;
+    var fsMax = Math.round(L.xlab * 0.88);
+    vis.forEach(function (v) {
+      var x0 = X(v.a), x1 = X(v.b), w = x1 - x0;
+      svg.appendChild(el("rect", {
+        x: x0, y: yP, width: w, height: hP, fill: pal.texto,
+        opacity: v.k % 2 ? (claro ? 0.11 : 0.16) : (claro ? 0.045 : 0.07)
+      }));
+      if (v.a > d0 && v.a === idxDe(g, v.p.de)) {
+        svg.appendChild(el("line", {
+          x1: x0, x2: x0, y1: yP, y2: yP + hP,
+          stroke: pal.suave, "stroke-width": 1.2, opacity: 0.7
+        }));
+      }
+      if (w >= 26) {
+        var fs = corpoQueCabe(v.p.nome, fsMax, w - 10, "bold");
+        if (fs >= 9) {
+          svg.appendChild(texto(v.p.nome, {
+            x: (x0 + x1) / 2, y: yP + hP / 2, "font-size": fs, "font-weight": "bold",
+            fill: pal.texto, "text-anchor": "middle", "dominant-baseline": "central"
+          }));
+        }
+      }
+    });
+    var bx0 = X(vis[0].a), bx1 = X(vis[vis.length - 1].b);
+    svg.appendChild(el("rect", {
+      x: bx0, y: yP, width: bx1 - bx0, height: hP, fill: "none",
+      stroke: pal.suave, "stroke-width": 1, opacity: 0.45
+    }));
   }
 
   function construir(cartao, L0, nomeTema) {
@@ -2152,6 +2210,8 @@
       var maiorCat = Math.max.apply(null, g.categorias.map(function (c) { return largura(c, L.xlab * 1.1); }));
       L.y1 = Math.min(L.y1, L.H - 44 - maiorCat * 0.72);
     }
+    var presH = (g.presidentes && g.presidentes.length) ? Math.round(L.xlab * 1.55) : 0;
+    if (presH) L.y1 -= presH + (L.xRot <= -55 ? 28 : 22);
 
     // subtítulo que não cabe numa linha quebra em duas (versão estreita)
     var subLinhas = [g.subtitulo || ""];
@@ -2350,7 +2410,8 @@
     // Faixa com "cor" (ciclos de alta e de corte) sai na cor dela, um pouco
     // mais forte; "rot" é um número curto escrito no alto da faixa, que desce
     // uma linha quando bate no da faixa anterior e some se não couber.
-    if (retr) desenharMandatos(g, svg, pal, L, X, d0, d1, retr, idClip);
+    var retratos = [];
+    if (retr) retratos = desenharMandatos(g, svg, pal, L, X, d0, d1, retr, idClip, cartao.ministroAtivo);
     var fsSomb = L.tick * 0.85, fimRot = [-Infinity, -Infinity];
     (g.sombras || []).forEach(function (sb) {
       var ia = Math.max(idxDe(g, sb.de), d0), ib = Math.min(idxDe(g, sb.ate) + 1, d1);
@@ -2497,6 +2558,10 @@
           "dominant-baseline": "hanging", transform: "rotate(" + L.xRot + " " + (cx + 4) + " " + (L.y1 + 16) + ")"
         }));
       }
+    }
+    if (presH) {
+      var yP = L.y1 + Math.round(L.xlab * (L.xRot <= -55 ? 3.4 : 3.1)) + 12;
+      desenharPresidentes(g, svg, pal, L, X, d0, d1, yP, presH);
     }
 
     // acontecimentos: linha vertical fina na data, rótulo curto no alto. A
@@ -2768,7 +2833,7 @@
 
     rotulosEventos.forEach(function (t) { svg.appendChild(t); });
 
-    return { svg: svg, L: L, pal: pal, X: X, Y: Y, yDe: yDe, d0: d0, d1: d1, vis: vis, esc: esc };
+    return { svg: svg, L: L, pal: pal, X: X, Y: Y, yDe: yDe, d0: d0, d1: d1, vis: vis, esc: esc, retratos: retratos };
   }
 
   // ---------- passar o mouse ----------
@@ -2788,6 +2853,7 @@
     cartao.inicioIdx = ini;
     cartao.fimIdx = fim;
     cartao.periodo = ini === null && fim === null ? "tudo" : "faixa";
+    if (ini === null && fim === null) cartao.ministroAtivo = null;
     if (cartao.atualizarPeriodos) cartao.atualizarPeriodos();
     desenhar(cartao, true);
     if (visor && visor.cartao === cartao && !visor.box.hidden) pintarVisor();
@@ -2851,7 +2917,10 @@
       var titulo = rotuloX(g, i, true);
       // a faixa de fundo sob o mouse, se ela tiver o que dizer ("dica")
       var somb = (g.sombras || []).concat((g.ministros || []).map(function (m) {
-        return { de: m.de, ate: m.ate, dica: m.nome };
+        var pr = (g.presidentes || []).filter(function (p) {
+          return idxDe(g, p.de) <= i && i <= idxDe(g, p.ate);
+        })[0];
+        return { de: m.de, ate: m.ate, dica: pr ? m.nome + " (" + pr.nome + ")" : m.nome };
       })).filter(function (sb) {
         return sb.dica && idxDe(g, sb.de) <= i && i <= idxDe(g, sb.ate);
       })[0];
@@ -2941,6 +3010,24 @@
     alvo.addEventListener("pointermove", function (ev) { if (!arrasto) mover(ev); else limpar(); });
     alvo.addEventListener("pointerdown", function (ev) { if (!arrasto) mover(ev); });
     alvo.addEventListener("pointerleave", function () { if (!arrasto) limpar(); });
+
+    (desenho.retratos || []).forEach(function (r) {
+      if (!r.m.id) return;
+      r.grp.style.cursor = "pointer";
+      r.grp.appendChild(el("title", {
+        texto: cartao.ministroAtivo === r.m.id ? "Clique para ver todos os ministros" : "Clique para ver só " + r.m.nome
+      }));
+      r.grp.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        if (cartao.ministroAtivo === r.m.id) {
+          aplicarJanela(cartao, null, null);
+        } else {
+          cartao.ministroAtivo = r.m.id;
+          var gBase = graficoBruto(cartao);
+          aplicarJanela(cartao, idxDe(gBase, r.m.base || r.m.de), idxDe(gBase, r.m.ate));
+        }
+      });
+    });
   }
 
   // ---------- retrátil (categorias, seções e cartões) ----------
@@ -4570,6 +4657,10 @@
     var tbody = html("tbody", {});
     (g.linhas || []).forEach(function (linha) {
       var l = html("tr", {});
+      var corLinha = linha.length && linha.every(function (c) {
+        return c && typeof c === "object" && c.cor && c.cor === linha[0].cor;
+      }) ? linha[0].cor : null;
+      if (corLinha) l.className = "linha-destaque";
       linha.forEach(function (cel, k) {
         var col = (g.colunas || [])[k] || {};
         var o = (cel && typeof cel === "object") ? cel : { t: cel };

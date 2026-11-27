@@ -11,10 +11,12 @@ Indicadores (todos mensais, BCB/SGS salvo indicação):
     financiamento, então o sinal é invertido: superávit positivo);
   - resultado nominal, idem (5727), conferido pela identidade
     nominal = primário + juros nominais (5760);
-  - dívida bruta do governo geral, % do PIB, metodologia usada a partir de
-    2008 (13762; a série começa em dez/2006);
+  - dívida bruta do governo geral, % do PIB, metodologia usada até 2007
+    (conceito FMI): saldo em R$ milhões (4502) dividido pelo PIB acumulado
+    em 12 meses (4382), conferido contra a série em % do PIB (4537);
   - IPCA acumulado em 12 meses (13522), refeito a partir da variação mensal
-    (433) como conferência;
+    (433) como conferência, e comparado à meta de inflação (13521) com o
+    intervalo de tolerância do CMN;
   - meta da Selic (432, diária): o valor no último dia do mês;
   - câmbio: PTAX de venda (1, diária) no último dia útil do mês, conferida
     contra a série mensal de fim de período (3696);
@@ -71,6 +73,27 @@ MINISTROS = [
     ("haddad", "Fernando Haddad", "Haddad", "2023-01-01", "2026-03-19"),
     ("durigan", "Dario Durigan", "Durigan", "2026-03-19", None),
 ]
+# Presidente em exercício por mês (maio/2016 conta para Temer, que assumiu em
+# 12/05/2016 no afastamento de Dilma, junto com a posse de Meirelles).
+PRESIDENTES = [
+    ("Lula I", "2003-01", "2006-12"),
+    ("Lula II", "2007-01", "2010-12"),
+    ("Dilma I", "2011-01", "2014-12"),
+    ("Dilma II", "2015-01", "2016-04"),
+    ("Temer", "2016-05", "2018-12"),
+    ("Bolsonaro", "2019-01", "2022-12"),
+    ("Lula III", "2023-01", None),
+]
+DESTAQUE_VERMELHO = {
+    "primario": "mantega",
+    "nominal": "haddad",
+    "ipca": "levy",
+    "selic": "guedes",
+    "cambio": "levy",
+    "cambio-ppc": "levy",
+    "rating": "mantega",
+}
+TOL_DIVIDA = 0.02             # 4502 / 4382 * 100 × 4537 (p.p. do PIB)
 MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
 NOTAS_SP = ["AAA", "AA+", "AA", "AA-", "A+", "A", "A-", "BBB+", "BBB", "BBB-", "BB+", "BB", "BB-",
             "B+", "B", "B-", "CCC+", "CCC", "CCC-", "CC", "C"]
@@ -175,8 +198,21 @@ def meses_dos_ministros(ultimo):
     return out
 
 
+def presidentes_faixas(ultimo):
+    return [dict(nome=nome, de=de, ate=ate or ultimo) for nome, de, ate in PRESIDENTES]
+
+
+def presidente_do_ministro(mi, pres_fx):
+    nomes = [p["nome"] for p in pres_fx
+             if ordem(p["de"]) <= ordem(mi["ate"]) and ordem(p["ate"]) >= ordem(mi["de"])]
+    if nomes == ["Lula I", "Lula II", "Dilma I"]:
+        return "Lula I, II e Dilma I"
+    return ", ".join(nomes)
+
+
 def faixas(mins):
-    return [dict(de=m["de"], ate=m["ate"], nome=m["nome"], curto=m["curto"], foto=m["foto"]) for m in mins]
+    return [dict(id=m["id"], base=m["base"], de=m["de"], ate=m["ate"], nome=m["nome"],
+                 curto=m["curto"], foto=m["foto"]) for m in mins]
 
 
 # ---------- fontes ----------
@@ -190,8 +226,28 @@ def fiscal():
     return {m: -v for m, v in prim.items()}, {m: -v for m, v in nom.items()}
 
 
+def divida_ate2007():
+    saldo, pib12, ref = sgs(4502, "01/01/2002"), sgs(4382, "01/01/2002"), sgs(4537, "01/01/2002")
+    div = {m: saldo[m] / pib12[m] * 100 for m in saldo if m in pib12}
+    difs = [abs(div[m] - ref[m]) for m in div if m in ref]
+    if not difs or max(difs) > TOL_DIVIDA:
+        raise RuntimeError("DBGG até 2007: 4502 / 4382 × 100 difere %.4f p.p. da 4537" % (max(difs) if difs else 999))
+    print("conferência: DBGG até 2007 bate com a 4537 em %d meses (máx %.4f p.p.)" % (len(difs), max(difs)))
+    return div
+
+
+def tolerancia_meta(ano):
+    if ano <= 2002:
+        return 2.0
+    if ano <= 2005:
+        return 2.5
+    if ano <= 2016:
+        return 2.0
+    return 1.5
+
+
 def ipca():
-    a12, mens = sgs(13522, "01/01/2000"), sgs(433, "01/01/1999")
+    a12, mens, meta_a = sgs(13522, "01/01/2000"), sgs(433, "01/01/1999"), sgs(13521, "01/01/2000")
     n = 0
     for m in a12:
         i = ordem(m)
@@ -205,7 +261,15 @@ def ipca():
             raise RuntimeError("IPCA 12 meses de %s: refeito %.3f × SGS %.2f" % (m, (p - 1) * 100, a12[m]))
         n += 1
     print("conferência: IPCA 12 meses refeito bate em %d meses" % n)
-    return a12, mens
+    centros = {int(m[:4]): v for m, v in meta_a.items()}
+    ultimo_c = centros[max(centros)]
+    meta, teto = {}, {}
+    for m in a12:
+        ano = int(m[:4])
+        c = centros.get(ano, ultimo_c)
+        meta[m] = c
+        teto[m] = c + tolerancia_meta(ano)
+    return a12, mens, meta, teto
 
 
 def selic(ate):
@@ -348,15 +412,30 @@ def celula(p, fmt):
     return {"t": "n.d."} if p is None else {"t": "%s (%s)" % (fmt(p[1]), mes_curto(p[0]))}
 
 
-def linha_ind(nome, s, mi, fmt, var, diaria=None):
+def pintar_linha(linha, ind_id, mid):
+    if DESTAQUE_VERMELHO.get(ind_id) == mid:
+        for c in linha:
+            c["cor"] = VERMELHO
+    return linha
+
+
+def linha_ind(nome, pres, s, mi, fmt, var, diaria=None):
     if diaria:
         ini, fim = ponta_dia(diaria, mi)
         cel = lambda p: {"t": "n.d."} if p is None else {"t": "%s (%s)" % (fmt(p[1]), dia_curto(p[0]))}
         v = var(ini[1], fim[1]) if ini and fim else "n.d."
-        return [{"t": nome, "forte": True}, cel(ini), cel(fim), {"t": v, "forte": True}]
+        return [{"t": nome, "forte": True}, {"t": pres}, cel(ini), cel(fim), {"t": v, "forte": True}]
     ini, fim = ponta(s, mi["base"], mi["ate"])
     v = var(ini[1], fim[1]) if ini and fim and fim[0] != ini[0] else "n.d."
-    return [{"t": nome, "forte": True}, celula(ini, fmt), celula(fim, fmt), {"t": v, "forte": True}]
+    return [{"t": nome, "forte": True}, {"t": pres}, celula(ini, fmt), celula(fim, fmt), {"t": v, "forte": True}]
+
+
+def contagem_meta_ipca(ipca12, meta, teto, mi):
+    ms = [mes_de(i) for i in range(ordem(mi["de"]), ordem(mi["ate"]) + 1)]
+    validos = [m for m in ms if m in ipca12]
+    acima_m = sum(1 for m in validos if ipca12[m] > meta[m])
+    acima_t = sum(1 for m in validos if ipca12[m] > teto[m])
+    return "%d/%d" % (acima_m, len(validos)), "%d/%d" % (acima_t, len(validos))
 
 
 def nota_dia(r, mi):
@@ -385,8 +464,8 @@ def montar():
     hoje = datetime.date.today()
     fechado = mes_de(ordem(hoje.strftime("%Y-%m")) - 1)        # último mês fechado
     prim, nom = fiscal()
-    divida = sgs(13762, "01/01/2006")
-    ipca12, ipca_m = ipca()
+    divida = divida_ate2007()
+    ipca12, ipca_m, meta_ipca, teto_ipca = ipca()
     selic_m, selic_d = selic(fechado)
     cambio_m, cambio_d = cambio(fechado)
     cpi = cpi_eua()
@@ -394,6 +473,9 @@ def montar():
 
     ultimo = max(max(prim), max(ipca12), max(selic_m), max(cambio_m))
     mins = meses_dos_ministros(ultimo)
+    pres_fx = presidentes_faixas(ultimo)
+    for mi in mins:
+        mi["pres"] = presidente_do_ministro(mi, pres_fx)
     fx = faixas(mins)
     trechos = ppc(cambio_m, ipca_m, cpi, mins)
 
@@ -413,11 +495,11 @@ def montar():
              fonte="BCB (NFSP, SGS 5727) e FtM", rot="Nominal"),
         dict(id="divida", sec="Dívida bruta do governo geral", s=divida, unidade="%", fmt=pct2, var=pp,
              titulo="Dívida bruta do governo geral",
-             sub="% do PIB; metodologia usada pelo BC a partir de 2008, com a série desde dez/2006",
-             fonte="BCB (SGS 13762)", rot="Dívida bruta (DBGG)"),
+             sub="% do PIB; metodologia usada pelo BC até 2007 (conceito FMI, com toda a carteira do Tesouro no BC)",
+             fonte="BCB (SGS 4502, 4382 e 4537) e FtM", rot="Dívida bruta (DBGG)"),
         dict(id="ipca", sec="Inflação", s=ipca12, unidade="%", fmt=pct2, var=pp,
              titulo="IPCA", sub="Variação % acumulada em 12 meses",
-             fonte="IBGE (IPCA, via BCB, SGS 13522)", rot="IPCA em 12 meses"),
+             fonte="IBGE (IPCA, via BCB, SGS 13522 e 13521)", rot="IPCA em 12 meses"),
         dict(id="selic", sec="Selic", s=selic_m, unidade="%", fmt=pct2, var=pp,
              titulo="Meta da taxa Selic", sub="% a.a.; valor no último dia do mês",
              fonte="BCB (SGS 432)", rot="Meta da Selic", diaria=selic_d),
@@ -429,20 +511,27 @@ def montar():
     secoes = []
     for ind in INDS:
         g = dict(id="ministros-" + ind["id"], titulo=ind["titulo"], subtitulo=ind["sub"], unidade=ind["unidade"],
-                 fonte=ind["fonte"], ministros=fx, apresentarDaqui=True,
+                 fonte=ind["fonte"], ministros=fx, presidentes=pres_fx, apresentarDaqui=True,
                  series=[serie(ind["rot"], ind["s"], 4 if ind["unidade"] == "brl" else 2, cor=BRANCO,
                                rotulo=True, legenda=False)])
         linhas = []
+        colunas = [{"rot": "Ministro"}, {"rot": "Presidente"}, {"rot": "Início", "num": True},
+                   {"rot": "Final", "num": True}, {"rot": "Variação", "num": True}]
+        sub_tab = ("Início: véspera da posse; final: último dia no cargo ou último dado" if ind.get("diaria") else
+                   "Início: mês anterior ao primeiro mês do ministro; final: último mês no cargo ou último dado")
+        if ind["id"] == "ipca":
+            colunas.extend([{"rot": "Acima da meta", "num": True}, {"rot": "Acima do intervalo", "num": True}])
+            sub_tab += "; meses acima do centro da meta (SGS 13521) e acima do teto do intervalo do CMN, do total de meses"
         for mi in mins:
-            l = linha_ind(mi["nome"], ind["s"], mi, ind["fmt"], ind["var"], ind.get("diaria"))
+            l = linha_ind(mi["nome"], mi["pres"], ind["s"], mi, ind["fmt"], ind["var"], ind.get("diaria"))
+            if ind["id"] == "ipca":
+                am, at = contagem_meta_ipca(ipca12, meta_ipca, teto_ipca, mi)
+                l.extend([{"t": am}, {"t": at}])
+            pintar_linha(l, ind["id"], mi["id"])
             linhas.append(l)
         tab = dict(id="ministros-" + ind["id"] + "-tabela", tipo="tabela",
-                   titulo=ind["titulo"] + " por ministro",
-                   subtitulo=("Início: véspera da posse; final: último dia no cargo ou último dado" if ind.get("diaria") else
-                              "Início: mês anterior ao primeiro mês do ministro; final: último mês no cargo ou último dado"),
-                   fonte=ind["fonte"], colunas=[{"rot": "Ministro"}, {"rot": "Início", "num": True},
-                                                {"rot": "Final", "num": True}, {"rot": "Variação", "num": True}],
-                   linhas=linhas)
+                   titulo=ind["titulo"] + " por ministro", subtitulo=sub_tab,
+                   fonte=ind["fonte"], colunas=colunas, linhas=linhas)
         secoes.append(dict(titulo=ind["sec"], texto="", graficos=[g, tab]))
         ind["linhas"] = linhas
 
@@ -450,11 +539,11 @@ def montar():
     ppc_series = [serie("Câmbio (PTAX)", cambio_m, 4, cor=BRANCO, rotulo=True)]
     for k, (mi, s) in enumerate(zip(mins, trechos)):
         ppc_series.append(serie("Câmbio pela PPC desde a posse", s, 4, ini=mi["base"], cor=AZUL,
-                                legenda=(k == 0)))
+                                legenda=(k == 0), ministro=mi["id"]))
     ppc_g = dict(id="ministros-cambio-ppc", titulo="Câmbio observado e câmbio pela PPC desde a posse",
-                 subtitulo="R$ por US$, fim do mês; PPC: câmbio do mês anterior ao do ministro corrigido pelo IPCA sobre o CPI dos EUA",
+                 subtitulo="R$ por US$, fim do mês; PPC: câmbio do mês anterior ao do ministro corrigido pelo IPCA sobre o CPI dos EUA; clique na foto para ver só o ministro",
                  unidade="brl", fonte="BCB (PTAX, SGS 1; IPCA, SGS 433), BLS (CPI-U, via FRED) e FtM",
-                 ministros=fx, apresentarDaqui=True, series=ppc_series)
+                 ministros=fx, presidentes=pres_fx, apresentarDaqui=True, series=ppc_series)
     linhas_ppc = []
     for mi, s in zip(mins, trechos):
         fim_m = max(s, key=ordem)
@@ -462,16 +551,19 @@ def montar():
         if fim_c != fim_m:
             fim_m = min(fim_m, fim_c, key=ordem)
         base = cambio_m[mi["base"]]
-        linhas_ppc.append([{"t": mi["nome"], "forte": True},
-                           {"t": "%s (%s)" % (rs(base), mes_curto(mi["base"]))},
-                           {"t": "%s (%s)" % (rs(s[fim_m]), mes_curto(fim_m))},
-                           {"t": "%s (%s)" % (rs(cambio_m[fim_m]), mes_curto(fim_m))},
-                           {"t": sinal((cambio_m[fim_m] / s[fim_m] - 1) * 100, 1) + "%", "forte": True}])
+        lp = [{"t": mi["nome"], "forte": True},
+              {"t": mi["pres"]},
+              {"t": "%s (%s)" % (rs(base), mes_curto(mi["base"]))},
+              {"t": "%s (%s)" % (rs(s[fim_m]), mes_curto(fim_m))},
+              {"t": "%s (%s)" % (rs(cambio_m[fim_m]), mes_curto(fim_m))},
+              {"t": sinal((cambio_m[fim_m] / s[fim_m] - 1) * 100, 1) + "%", "forte": True}]
+        pintar_linha(lp, "cambio-ppc", mi["id"])
+        linhas_ppc.append(lp)
     ppc_tab = dict(id="ministros-cambio-ppc-tabela", tipo="tabela",
                    titulo="Câmbio observado e câmbio pela PPC por ministro",
                    subtitulo="Desvio: câmbio observado no final sobre o câmbio pela PPC; positivo, real mais depreciado que a PPC indica",
                    fonte="BCB, BLS e FtM",
-                   colunas=[{"rot": "Ministro"}, {"rot": "Câmbio no início", "num": True},
+                   colunas=[{"rot": "Ministro"}, {"rot": "Presidente"}, {"rot": "Câmbio no início", "num": True},
                             {"rot": "Câmbio pela PPC no final", "num": True},
                             {"rot": "Câmbio observado no final", "num": True}, {"rot": "Desvio", "num": True}],
                    linhas=linhas_ppc)
@@ -491,32 +583,36 @@ def montar():
     rat_g = dict(id="ministros-rating", titulo="Rating soberano do Brasil",
                  subtitulo="Nota de longo prazo em moeda estrangeira; S&P e Fitch à esquerda, Moody's à direita",
                  unidade="nota-sp", eixoDireita="moodys", eixo={"min": 7, "max": 14, "passo": 1},
-                 fonte="Moody's, S&P e Fitch (via Poder & Mercado) e FtM", ministros=fx, apresentarDaqui=True,
-                 series=rat_series)
+                 fonte="Moody's, S&P e Fitch (via Poder & Mercado) e FtM", ministros=fx, presidentes=pres_fx,
+                 apresentarDaqui=True, series=rat_series)
     linhas_rat = []
     for mi in mins:
-        lin = [{"t": mi["nome"], "forte": True}]
+        lin = [{"t": mi["nome"], "forte": True}, {"t": mi["pres"]}]
         for aid in ("sp", "moodys", "fitch"):
             a, b, _ = nota_dia(rat[aid], mi)
             lin.append({"t": "%s → %s (%s)" % (nota(a, aid), nota(b, aid), degraus(a, b))})
+        pintar_linha(lin, "rating", mi["id"])
         linhas_rat.append(lin)
     rat_tab = dict(id="ministros-rating-tabela", tipo="tabela", titulo="Rating soberano por ministro",
                    subtitulo="Nota na véspera da posse → nota no último dia no cargo; dados até %s"
                              % mes_curto(max(meses_r, key=ordem)),
                    fonte="Moody's, S&P e Fitch (via Poder & Mercado)",
-                   colunas=[{"rot": "Ministro"}, {"rot": "S&P"}, {"rot": "Moody's"}, {"rot": "Fitch"}],
+                   colunas=[{"rot": "Ministro"}, {"rot": "Presidente"}, {"rot": "S&P"}, {"rot": "Moody's"}, {"rot": "Fitch"}],
                    linhas=linhas_rat)
     secoes.append(dict(titulo="Rating soberano", texto="", graficos=[rat_g, rat_tab]))
 
     # uma tabela por ministro
     por_min = []
     for k, mi in enumerate(mins):
-        linhas = [ind["linhas"][k][:] for ind in INDS]
-        for l, ind in zip(linhas, INDS):
-            l[0] = {"t": ind["titulo"] if ind["id"] != "ipca" else "IPCA em 12 meses", "forte": True}
+        linhas = []
+        for ind in INDS:
+            l = ind["linhas"][k]
+            nome_ind = ind["titulo"] if ind["id"] != "ipca" else "IPCA em 12 meses"
+            linhas.append([{"t": nome_ind, "forte": True}, {"t": l[2]["t"]}, {"t": l[3]["t"]},
+                           {"t": l[4]["t"], "forte": True}])
         lp = linhas_ppc[k]
-        linhas.append([{"t": "Câmbio pela PPC desde a posse", "forte": True}, lp[1], lp[2],
-                       {"t": "desvio " + lp[4]["t"], "forte": True}])
+        linhas.append([{"t": "Câmbio pela PPC desde a posse", "forte": True}, {"t": lp[2]["t"]}, {"t": lp[3]["t"]},
+                       {"t": "desvio " + lp[5]["t"], "forte": True}])
         for aid in ("sp", "moodys", "fitch"):
             a, b, ate = nota_dia(rat[aid], mi)
             linhas.append([{"t": "Rating " + rat[aid]["nome"], "forte": True},
@@ -525,7 +621,8 @@ def montar():
                            {"t": degraus(a, b), "forte": True}])
         cargo = ("No cargo desde %s" % dia_curto(mi["posse"])) if not mi["saida"] else \
                 ("No cargo de %s a %s" % (dia_curto(mi["posse"]), dia_curto(mi["saida"])))
-        por_min.append(dict(id="ministros-tabela-" + mi["id"], tipo="tabela", titulo=mi["nome"],
+        por_min.append(dict(id="ministros-tabela-" + mi["id"], tipo="tabela",
+                            titulo="%s (%s)" % (mi["nome"], mi["pres"]),
                             subtitulo="%s; séries mensais: %s a %s; Selic, câmbio e rating: véspera da posse e último dia"
                                       % (cargo, mes_curto(mi["base"]), mes_curto(mi["ate"])),
                             fonte="BCB, IBGE, BLS, Moody's, S&P, Fitch e FtM",
