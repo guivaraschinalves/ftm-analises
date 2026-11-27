@@ -22,6 +22,9 @@
 
   var NOTAS_MOODYS = ["Aaa", "Aa1", "Aa2", "Aa3", "A1", "A2", "A3", "Baa1", "Baa2", "Baa3", "Ba1", "Ba2", "Ba3",
                       "B1", "B2", "B3", "Caa1", "Caa2", "Caa3", "Ca", "C"];
+  // a mesma régua na notação de S&P e Fitch (AAA = 21, BBB− = 12)
+  var NOTAS_SP = ["AAA", "AA+", "AA", "AA\u2212", "A+", "A", "A\u2212", "BBB+", "BBB", "BBB\u2212", "BB+", "BB", "BB\u2212",
+                  "B+", "B", "B\u2212", "CCC+", "CCC", "CCC\u2212", "CC", "C"];
 
   var PALETAS = {
     dark: {
@@ -89,7 +92,7 @@
                 "dados/cenario-2026-10-28-fomc.json",
                 "dados/orcamento-2027.json", "dados/defasagem-combustiveis.json", "dados/eleicoes.json", "dados/midterms-2026.json",
                 "dados/petroleo.json", "dados/ueno-bank.json", "dados/migracao-europa.json", "dados/gasto-publico.json",
-                "dados/argentina.json", "dados/missao-global-miami.json"];
+                "dados/argentina.json", "dados/ministros-fazenda.json", "dados/missao-global-miami.json"];
   // Uma página pode pedir outros arquivos: <body data-fontes="dados/x.json">.
   if (document.body && document.body.getAttribute("data-fontes")) {
     FONTES = document.body.getAttribute("data-fontes").split(/\s*,\s*/);
@@ -364,6 +367,9 @@
                 valor: function (v) { return NOTAS_MOODYS[21 - Math.round(v)] || ""; } },
     "usd-bi": { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
                 valor: function (v) { return "US$ " + nf(1).format(v) + " bi"; } },
+    // nota de S&P e Fitch na mesma régua da Moody's (BBB− = Baa3 = 12)
+    "nota-sp": { eixo: function (v) { return NOTAS_SP[21 - Math.round(v)] || ""; },
+                 valor: function (v) { return NOTAS_SP[21 - Math.round(v)] || ""; } },
     // do ftm-dados (SpaceX e Anthropic): duas casas para o passo pequeno da
     // cascata, bilhões que viram trilhões, % sem casas e múltiplo com uma casa
     "usd-bi2": { eixo: function (v, passo) { return nf(casasDoPasso(passo)).format(v); },
@@ -2075,6 +2081,59 @@
     return [];
   }
 
+  // Faixas alternadas (dois tons do texto, para não depender de cor) com um
+  // fio tracejado em cada troca de ministro, e a fila de retratos: cada foto
+  // quer ficar sobre o meio da faixa dela; as que se encostam (mandatos curtos
+  // lado a lado) são afastadas o mínimo, e um fio liga a foto à faixa.
+  function desenharMandatos(g, svg, pal, L, X, d0, d1, retr, idClip) {
+    var claro = tema() === "light";
+    var vis = g.ministros.map(function (m, k) {
+      var a = Math.max(idxDe(g, m.de), d0), b = Math.min(idxDe(g, m.ate) + 1, d1);
+      return { m: m, k: k, a: a, b: b };
+    }).filter(function (v) { return v.b > v.a; });
+    if (!vis.length) return;
+    var ph = L.y1 - L.y0;
+    vis.forEach(function (v) {
+      svg.appendChild(el("rect", { x: X(v.a), y: L.y0, width: X(v.b) - X(v.a), height: ph, fill: pal.texto,
+                                   opacity: v.k % 2 ? (claro ? 0.085 : 0.13) : (claro ? 0.03 : 0.045) }));
+      if (v.a > d0 && v.a === idxDe(g, v.m.de)) {
+        svg.appendChild(el("line", { x1: X(v.a), x2: X(v.a), y1: L.y0, y2: L.y1, stroke: pal.suave,
+                                     "stroke-width": 1.2, "stroke-dasharray": "4 6", opacity: 0.7 }));
+      }
+    });
+    // largura das fotos: a cheia, ou a que couber com todas lado a lado
+    var gap = 10, n = vis.length, lo = 12, hi = L.W - 12;
+    var fw = Math.min(retr.fotoH * 0.75, (hi - lo - gap * (n - 1)) / n), fh = fw / 0.75;
+    var pos = vis.map(function (v) { return (X(v.a) + X(v.b)) / 2; });
+    var xs = pos.slice(), passo = fw + gap;
+    for (var i = 0; i < n; i++) xs[i] = Math.max(xs[i], i ? xs[i - 1] + passo : lo + fw / 2);
+    for (var j = n - 1; j >= 0; j--) xs[j] = Math.min(xs[j], j < n - 1 ? xs[j + 1] - passo : hi - fw / 2);
+    for (var q = 0; q < n; q++) xs[q] = Math.max(xs[q], q ? xs[q - 1] + passo : lo + fw / 2);
+    var yF = retr.topo + (retr.fotoH - fh), yNome = retr.topo + retr.fotoH + retr.nomeFs * 1.05;
+    var fsN = Math.min(retr.nomeFs, Math.max.apply(null, vis.map(function (v) {
+      return corpoQueCabe(v.m.curto || v.m.nome, retr.nomeFs, passo - 4, "bold");
+    })));
+    fsN = Math.min.apply(null, vis.map(function (v) { return corpoQueCabe(v.m.curto || v.m.nome, fsN, passo - 4, "bold"); }));
+    vis.forEach(function (v, k) {
+      var x = xs[k], xf = x - fw / 2, idF = idClip + "-retrato-" + v.k;
+      svg.appendChild(el("defs", {}, [el("clipPath", { id: idF }, [
+        el("rect", { x: xf, y: yF, width: fw, height: fh, rx: 8 })])]));
+      if (v.m.foto) {
+        svg.appendChild(el("image", { href: IMAGENS[v.m.foto] || v.m.foto, x: xf, y: yF, width: fw, height: fh,
+                                      preserveAspectRatio: "xMidYMid slice", "clip-path": "url(#" + idF + ")" }));
+      }
+      svg.appendChild(el("rect", { x: xf, y: yF, width: fw, height: fh, rx: 8, fill: "none",
+                                   stroke: pal.suave, "stroke-width": 1.2, opacity: 0.6 }));
+      svg.appendChild(texto(v.m.curto || v.m.nome, { x: x, y: yNome, "font-size": fsN, "font-weight": "bold",
+                                                      fill: pal.texto, "text-anchor": "middle" }));
+      // o fio sai de baixo do nome e desce até o alto da faixa
+      var yFio = yNome + fsN * 0.45;
+      svg.appendChild(el("polyline", {
+        points: x + "," + yFio + " " + x + "," + (yFio + 6) + " " + pos[k] + "," + (L.y0 - 3) + " " + pos[k] + "," + L.y0,
+        fill: "none", stroke: pal.suave, "stroke-width": 1.2, opacity: 0.8 }));
+    });
+  }
+
   function construir(cartao, L0, nomeTema) {
     var g = graficoDe(cartao), pal = PALETAS[nomeTema], F = unidade(g);
     if (g.painel) return construirPainel(cartao, L0, nomeTema);
@@ -2103,6 +2162,16 @@
     var legenda = montarLegenda(g, L);
     var topoLegenda = L.legenda.y || (L.sub.y + (subLinhas.length - 1) * L.sub.fs * 1.2 + 62);
     var y0 = topoLegenda + (legenda.linhas - 1) * L.legenda.passo + 42;
+    // "ministros" (ou qualquer lista de mandatos com retrato): uma fila de
+    // retratos acima do gráfico, cada um ligado por um fio à faixa do período
+    // dele. A fila fica fora da área do gráfico, então a escala não muda.
+    var retr = null;
+    if (g.ministros && g.ministros.length) {
+      var fotoH = Math.round(L.W >= 1500 ? 132 : 112), nomeFs = Math.round(L.xlab * 0.92);
+      if (!itensLegenda(g).length) y0 -= 22;                 // sem legenda, a fila sobe para o lugar dela
+      retr = { topo: y0, fotoH: fotoH, nomeFs: nomeFs };
+      y0 += fotoH + nomeFs * 1.45 + 26;
+    }
 
     // período visível
     // tipo "faixa": cada ponto é [chave, mínimo, máximo] e o desenho é a
@@ -2281,6 +2350,7 @@
     // Faixa com "cor" (ciclos de alta e de corte) sai na cor dela, um pouco
     // mais forte; "rot" é um número curto escrito no alto da faixa, que desce
     // uma linha quando bate no da faixa anterior e some se não couber.
+    if (retr) desenharMandatos(g, svg, pal, L, X, d0, d1, retr, idClip);
     var fsSomb = L.tick * 0.85, fimRot = [-Infinity, -Infinity];
     (g.sombras || []).forEach(function (sb) {
       var ia = Math.max(idxDe(g, sb.de), d0), ib = Math.min(idxDe(g, sb.ate) + 1, d1);
@@ -2780,7 +2850,9 @@
       }));
       var titulo = rotuloX(g, i, true);
       // a faixa de fundo sob o mouse, se ela tiver o que dizer ("dica")
-      var somb = (g.sombras || []).filter(function (sb) {
+      var somb = (g.sombras || []).concat((g.ministros || []).map(function (m) {
+        return { de: m.de, ate: m.ate, dica: m.nome };
+      })).filter(function (sb) {
         return sb.dica && idxDe(g, sb.de) <= i && i <= idxDe(g, sb.ate);
       })[0];
       var extra = somb ? 1 : 0;
@@ -5550,6 +5622,7 @@
           (g.variantes || [{ series: g.series }]).concat([{ series: g.series }]).forEach(function (v) {
             (v.series || []).forEach(function (s) { if (s.imagem) caminhos[s.imagem] = 1; });
           });
+          (g.ministros || []).forEach(function (m) { if (m.foto) caminhos[m.foto] = 1; });
         });
       });
     });
