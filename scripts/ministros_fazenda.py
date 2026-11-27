@@ -57,7 +57,7 @@ TOL_PTAX = 0.00005            # PTAX diária no último dia útil × 3696 (R$)
 TOL_CPI = 0.0002              # FRED ÷ FMI constante (desvio relativo)
 
 BRANCO, AZUL, VERMELHO, VERDE, AZUL_ESC = "#FFFFFF", "#4F81BD", "#C0504D", "#9BBB59", "#1F497D"
-CINZA = "#8a8a86"
+LARANJA, CINZA = "#F79646", "#8a8a86"
 
 # (id, nome, nome curto, posse, saída). Datas: lista oficial de ministros da
 # Fazenda (Economia de 2019 a 2022). A interinidade de Bernard Appy (3 a
@@ -485,35 +485,39 @@ def montar():
     pctvar = lambda a, b: sinal((b / a - 1) * 100, 1) + "%"
 
     INDS = [
-        dict(id="primario", sec="Resultado primário", s=prim, unidade="%", fmt=pct2, var=pp,
+        dict(id="primario", sec="Resultado primário", s=prim, unidade="%", fmt=pct2, var=pp, cor=VERDE,
+             cor_neg=VERMELHO,
              titulo="Resultado primário do setor público consolidado",
              sub="% do PIB, acumulado em 12 meses; superávit positivo",
              fonte="BCB (NFSP, SGS 5793) e FtM", rot="Primário"),
-        dict(id="nominal", sec="Resultado nominal", s=nom, unidade="%", fmt=pct2, var=pp,
+        dict(id="nominal", sec="Resultado nominal", s=nom, unidade="%", fmt=pct2, var=pp, cor=BRANCO,
              titulo="Resultado nominal do setor público consolidado",
              sub="% do PIB, acumulado em 12 meses; superávit positivo",
              fonte="BCB (NFSP, SGS 5727) e FtM", rot="Nominal"),
-        dict(id="divida", sec="Dívida bruta do governo geral", s=divida, unidade="%", fmt=pct2, var=pp,
+        dict(id="divida", sec="Dívida bruta do governo geral", s=divida, unidade="%", fmt=pct2, var=pp, cor=LARANJA,
              titulo="Dívida bruta do governo geral",
              sub="% do PIB; metodologia usada pelo BC até 2007 (conceito FMI, com toda a carteira do Tesouro no BC)",
              fonte="BCB (SGS 4502, 4382 e 4537) e FtM", rot="Dívida bruta (DBGG)"),
-        dict(id="ipca", sec="Inflação", s=ipca12, unidade="%", fmt=pct2, var=pp,
+        dict(id="ipca", sec="Inflação", s=ipca12, unidade="%", fmt=pct2, var=pp, cor=VERDE,
              titulo="IPCA", sub="Variação % acumulada em 12 meses",
              fonte="IBGE (IPCA, via BCB, SGS 13522 e 13521)", rot="IPCA em 12 meses"),
-        dict(id="selic", sec="Selic", s=selic_m, unidade="%", fmt=pct2, var=pp,
+        dict(id="selic", sec="Selic", s=selic_m, unidade="%", fmt=pct2, var=pp, cor=AZUL,
              titulo="Meta da taxa Selic", sub="% a.a.; valor no último dia do mês",
              fonte="BCB (SGS 432)", rot="Meta da Selic", diaria=selic_d),
-        dict(id="cambio", sec="Câmbio", s=cambio_m, unidade="brl", fmt=rs, var=pctvar,
+        dict(id="cambio", sec="Câmbio", s=cambio_m, unidade="brl", fmt=rs, var=pctvar, cor=BRANCO,
              titulo="Taxa de câmbio", sub="R$ por US$; PTAX de venda no último dia útil do mês",
              fonte="BCB (PTAX, SGS 1)", rot="Câmbio (PTAX)", diaria=cambio_d),
     ]
 
     secoes = []
     for ind in INDS:
+        extra_ser = dict(rotulo=True, legenda=False)
+        if ind.get("cor_neg"):
+            extra_ser["corNegativa"] = ind["cor_neg"]
         g = dict(id="ministros-" + ind["id"], titulo=ind["titulo"], subtitulo=ind["sub"], unidade=ind["unidade"],
                  fonte=ind["fonte"], ministros=fx, presidentes=pres_fx, apresentarDaqui=True,
-                 series=[serie(ind["rot"], ind["s"], 4 if ind["unidade"] == "brl" else 2, cor=BRANCO,
-                               rotulo=True, legenda=False)])
+                 series=[serie(ind["rot"], ind["s"], 4 if ind["unidade"] == "brl" else 2, cor=ind["cor"],
+                               **extra_ser)])
         linhas = []
         colunas = [{"rot": "Ministro"}, {"rot": "Presidente"}, {"rot": "Início", "num": True},
                    {"rot": "Final", "num": True}, {"rot": "Variação", "num": True}]

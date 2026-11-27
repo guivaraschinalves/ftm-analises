@@ -2755,16 +2755,33 @@
         }
       }
       var w = espessuraDaLinha(s.largura || L.linha);
-      area.appendChild(el("path", {
-        d: d, fill: "none", stroke: corNoTema(s.cor, pal), "stroke-width": w, "data-serie": s.nome,
-        "stroke-linejoin": "round", "stroke-linecap": s.traco ? "butt" : "round",
-        "stroke-dasharray": s.traco === "pontilhado" ? (w * 1.2) + " " + (w * 1.6) : null,
-        opacity: s.opacidade || null
-      }));
+      if (s.corNegativa) {
+        var yzCor = YS(0), idPos = idClip + "-pos-" + k, idNeg = idClip + "-neg-" + k;
+        var hPos = Math.max(0, yzCor - (L.y0 - 4)), hNeg = Math.max(0, L.y1 + 4 - yzCor);
+        svg.insertBefore(el("defs", {}, [
+          el("clipPath", { id: idPos }, [el("rect", { x: L.x0, y: L.y0 - 4, width: pw, height: hPos })]),
+          el("clipPath", { id: idNeg }, [el("rect", { x: L.x0, y: yzCor, width: pw, height: hNeg })])
+        ]), svg.firstChild);
+        var atLin = {
+          d: d, fill: "none", "stroke-width": w, "stroke-linejoin": "round",
+          "stroke-linecap": s.traco ? "butt" : "round",
+          "stroke-dasharray": s.traco === "pontilhado" ? (w * 1.2) + " " + (w * 1.6) : null,
+          opacity: s.opacidade || null
+        };
+        area.appendChild(el("path", Object.assign({ stroke: corNoTema(s.cor, pal), "clip-path": "url(#" + idPos + ")", "data-serie": s.nome }, atLin)));
+        area.appendChild(el("path", Object.assign({ stroke: corNoTema(s.corNegativa, pal), "clip-path": "url(#" + idNeg + ")" }, atLin)));
+      } else {
+        area.appendChild(el("path", {
+          d: d, fill: "none", stroke: corNoTema(s.cor, pal), "stroke-width": w, "data-serie": s.nome,
+          "stroke-linejoin": "round", "stroke-linecap": s.traco ? "butt" : "round",
+          "stroke-dasharray": s.traco === "pontilhado" ? (w * 1.2) + " " + (w * 1.6) : null,
+          opacity: s.opacidade || null
+        }));
+      }
     });
 
     ordem.forEach(function (o) {
-      var cor = corNoTema(o.r.s.cor, pal);
+      var cor = corNoTema(o.r.s.corNegativa && o.r.p.v < 0 ? o.r.s.corNegativa : o.r.s.cor, pal);
       var px = X(o.r.p.i + 0.5), py = yDe(o.r.s)(o.r.p.v), lx = L.x1 + L.rotuloX;
       svg.appendChild(el("polyline", {
         points: px + "," + py + " " + (lx - 4) + "," + o.y, fill: "none", stroke: pal.suave, "stroke-width": 1.2
@@ -2776,9 +2793,10 @@
     });
     noMeio.forEach(function (o) {
       var at = { x: o.x, y: o.y, "font-size": L.rotulo, "font-weight": "bold", "dominant-baseline": "central" };
+      var corM = corNoTema(o.r.s.corNegativa && o.r.p.v < 0 ? o.r.s.corNegativa : o.r.s.cor, pal);
       svg.appendChild(texto(o.r.txt, Object.assign({}, at, { fill: "none", stroke: pal.bg, "stroke-width": 6,
                                                              "stroke-linejoin": "round" })));
-      svg.appendChild(texto(o.r.txt, Object.assign({}, at, { fill: corNoTema(o.r.s.cor, pal) })));
+      svg.appendChild(texto(o.r.txt, Object.assign({}, at, { fill: corM })));
     });
 
     // legenda
@@ -2942,11 +2960,12 @@
       }
       linhas.forEach(function (l, k) {
         var ty = by + pad + fs * 0.8 + (k + 1 + extra) * fs * 1.3;
-        camada.appendChild(el("rect", { x: bx + pad, y: ty - fs * 0.62, width: fs * 0.7, height: fs * 0.7, rx: 2, fill: corNoTema(l.s.cor, pal) }));
+        var corPt = corNoTema(l.s.corNegativa && l.v < 0 ? l.s.corNegativa : l.s.cor, pal);
+        camada.appendChild(el("rect", { x: bx + pad, y: ty - fs * 0.62, width: fs * 0.7, height: fs * 0.7, rx: 2, fill: corPt }));
         camada.appendChild(texto(l.s.nome, { x: bx + pad + fs * 1.1, y: ty, "font-size": fs, fill: pal.suave }));
         camada.appendChild(texto(valorTip(l.v, l.s), { x: bx + w - pad, y: ty, "font-size": fs, "font-weight": "bold", fill: pal.texto, "text-anchor": "end" }));
         if (desenho.vis[g.series.indexOf(l.s)] && l.s.tipo !== "barra") {
-          camada.appendChild(el("circle", { cx: x, cy: (desenho.yDe ? desenho.yDe(l.s) : desenho.Y)(l.v), r: 6, fill: corNoTema(l.s.cor, pal), stroke: pal.bg, "stroke-width": 2 }));
+          camada.appendChild(el("circle", { cx: x, cy: (desenho.yDe ? desenho.yDe(l.s) : desenho.Y)(l.v), r: 6, fill: corPt, stroke: pal.bg, "stroke-width": 2 }));
         }
       });
     }
