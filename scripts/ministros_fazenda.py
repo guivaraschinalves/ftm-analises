@@ -49,6 +49,7 @@ import datetime
 import io
 import json
 import os
+import sys
 import time
 import urllib.request
 
@@ -707,6 +708,129 @@ def degraus(a, b):
     return "%s%d %s" % ("+" if d > 0 else "−", abs(d), "degrau" if abs(d) == 1 else "degraus")
 
 
+def doze_meses(mensal):
+    """{mês: soma dos 12 meses até ele}, só onde os 12 meses existem."""
+    out = {}
+    for m in mensal:
+        ms = [mes_de(ordem(m) - k) for k in range(12)]
+        if all(x in mensal for x in ms):
+            out[m] = sum(mensal[x] for x in ms)
+    return out
+
+
+def rtn_pib():
+    """Receita líquida e despesa primária do governo central em 12 meses, em %
+    do PIB (RTN, tabela 1.1, sobre o PIB de 12 meses do BC, SGS 4382).
+    Confere: receita líquida menos despesa total = primário acima da linha."""
+    sys.path.insert(0, os.path.join(FTM_DADOS, "scripts"))
+    import rtn                                   # noqa: E402
+    tab, unidade = rtn.tabela("1.1")
+    if "Correntes" not in unidade:
+        raise RuntimeError("RTN: aba 1.1 não está em valores correntes (%s)" % unidade)
+
+    def linha(prefixo):
+        rot = [k for k in tab if k.startswith(prefixo)]
+        if len(rot) != 1:
+            raise RuntimeError("RTN: linha %r não encontrada uma única vez" % prefixo)
+        return tab[rot[0]]
+    rec, desp = linha("3. RECEITA LÍQUIDA"), linha("4. DESPESA TOTAL")
+    prim = linha("5. RESULTADO PRIMÁRIO GOVERNO CENTRAL - ACIMA DA LINHA")
+    erro = max(abs(rec[m] - desp[m] - prim[m]) for m in prim if m in rec and m in desp)
+    if erro > 1:
+        raise RuntimeError("RTN: receita líquida − despesa ≠ primário (R$ %.1f mi)" % erro)
+    pib = sgs(4382, "01/01/1997")
+    pct = lambda d: {m: v / pib[m] * 100 for m, v in doze_meses(d).items() if m in pib}   # noqa: E731
+    r12, d12 = pct(rec), pct(desp)
+    u = max(r12, key=ordem)
+    print("RTN até %s: receita líquida %.2f%% e despesa primária %.2f%% do PIB (12 meses); "
+          "conferência do primário, maior diferença R$ %.2f mi" % (u, r12[u], d12[u], erro))
+    return r12, d12
+
+
+def externo_pib():
+    """Conta corrente e IDP em 12 meses (% do PIB e US$ milhões), necessidade
+    de capital de curto prazo (déficit em conta corrente menos IDP, US$
+    milhões) e reservas em % do PIB. Confere conta corrente e IDP em % do PIB
+    contra as séries do BC (23079 e 23080)."""
+    cc, idp = doze_meses(sgs(22701, "01/01/1995")), doze_meses(sgs(22885, "01/01/1995"))
+    pib_usd, reservas = sgs(4192, "01/01/1995"), sgs(3546, "01/01/1995")
+    out = {}
+    for nome, d, cod in (("cc", cc, 23079), ("idp", idp, 23080)):
+        oficial = sgs(cod, "01/01/1995")
+        pct = {m: v / pib_usd[m] * 100 for m, v in d.items() if m in pib_usd}
+        difs = [abs(pct[m] - oficial[m]) for m in oficial if m in pct]
+        if not difs or max(difs) > TOL_IDENT:
+            raise RuntimeError("%s em %% do PIB não bate com o SGS %d (%.3f p.p.)"
+                               % (nome, cod, max(difs) if difs else -1))
+        print("conferência: %s em 12 meses / PIB contra o SGS %d em %d meses, maior diferença %.3f p.p."
+              % (nome, cod, len(difs), max(difs)))
+        out[nome] = pct
+    out["necessidade"] = {m: -(cc[m] + idp[m]) for m in cc if m in idp}
+    out["reservas"] = {m: v / pib_usd[m] * 100 for m, v in reservas.items() if m in pib_usd}
+    return out
+
+
+def levy_trabuco(mins, INDS, desvio_ppc, rat, pct2, pp):
+    """Levy na véspera da posse (dez/14; Selic, câmbio e rating em 31/12/14)
+    contra o último dado publicado, o quadro que Trabuco recebe."""
+    levy, atual = next(mi for mi in mins if mi["id"] == "levy"), mins[-1]
+    r12, d12 = rtn_pib()
+    ext = externo_pib()
+    bi = lambda v: sinal(v / 1000, 1) + " bi"                        # noqa: E731
+    var_bi = lambda a, b: sinal((b - a) / 1000, 1) + " bi"           # noqa: E731
+
+    def mensal(nome, s, fmt, var):
+        a = (levy["base"], s[levy["base"]])
+        u = max(s, key=ordem)
+        b = (u, s[u])
+        return [{"t": nome, "forte": True}, celula(a, fmt), celula(b, fmt), {"t": var(a[1], b[1]), "forte": True}]
+
+    def diaria(nome, d, fmt, var):
+        a, b = ponta_dia(d, levy)[0], ponta_dia(d, atual)[1]
+        cel = lambda p: {"t": "%s (%s)" % (fmt(p[1]), dia_curto(p[0]))}   # noqa: E731
+        return [{"t": nome, "forte": True}, cel(a), cel(b), {"t": var(a[1], b[1]), "forte": True}]
+
+    nomes = {"primario": "Resultado primário do setor público (% do PIB)",
+             "nominal": "Resultado nominal do setor público (% do PIB)",
+             "divida": "Dívida bruta do governo geral (% do PIB)", "ipca": "IPCA em 12 meses",
+             "selic": "Meta da Selic (% a.a.)", "juro-real": "Juro real ex post (% a.a.)",
+             "cambio": "Câmbio (R$ por US$)"}
+    pct_s = lambda v: sinal(v, 2) + "%"                              # noqa: E731
+    linhas = []
+    for ind in INDS:
+        fmt = pct_s if ind["id"] in ("primario", "nominal") else ind["fmt"]
+        if ind.get("diaria"):
+            linhas.append(diaria(nomes[ind["id"]], ind["diaria"], fmt, ind["var"]))
+        else:
+            linhas.append(mensal(nomes[ind["id"]], ind["s"], fmt, ind["var"]))
+        if ind["id"] == "nominal":
+            linhas.append(mensal("Receita líquida do governo central (% do PIB)", r12, pct2, pp))
+            linhas.append(mensal("Despesa primária do governo central (% do PIB)", d12, pct2, pp))
+    linhas.append(mensal("Sobre/(sub)valorização do real pela PPC", desvio_ppc, lambda v: sinal(v, 1) + "%",
+                         lambda a, b: sinal(b - a, 1) + " p.p."))
+    for aid in ("sp", "moodys", "fitch"):
+        a = nota_dia(rat[aid], levy)[0]
+        pa = persp_dia(rat[aid], levy)[0]
+        _, b, ate = nota_dia(rat[aid], atual)
+        pb = persp_dia(rat[aid], atual)[1]
+        linhas.append([{"t": "Rating " + rat[aid]["nome"], "forte": True},
+                       {"t": "%s (%s)" % (nota_p(a, pa, aid), dia_curto(vespera(levy["posse"])))},
+                       {"t": "%s (%s)" % (nota_p(b, pb, aid), mes_curto(ate))},
+                       {"t": degraus(a, b), "forte": True}])
+    linhas.append(mensal("Conta corrente (% do PIB)", ext["cc"], pct_s, pp))
+    linhas.append(mensal("Investimento direto no país (% do PIB)", ext["idp"], pct2, pp))
+    linhas.append(mensal("Necessidade de capital de curto prazo (US$)", ext["necessidade"], bi, var_bi))
+    linhas.append(mensal("Reservas internacionais (% do PIB)", ext["reservas"], pct2, pp))
+    return dict(id="ministros-levy-trabuco", tipo="tabela",
+                titulo="Levy na posse e o quadro que Trabuco recebe",
+                subtitulo="Fluxos em 12 meses; necessidade de capital: déficit em conta corrente menos IDP, "
+                          "negativo quando o IDP cobre o déficit",
+                fonte="BCB, IBGE, Tesouro Nacional (RTN), BLS, Moody's, S&P, Fitch e FtM",
+                colunas=[{"rot": "Indicador"}, {"rot": "Levy (início)", "num": True},
+                         {"rot": "Trabuco (último dado)", "num": True}, {"rot": "Variação", "num": True}],
+                linhas=linhas)
+
+
 def montar():
     hoje = datetime.date.today()
     fechado = mes_de(ordem(hoje.strftime("%Y-%m")) - 1)        # último mês fechado
@@ -1024,6 +1148,8 @@ def montar():
                    fonte="BCB, IBGE, BLS e FtM",
                    colunas=[{"rot": "Indicador"}] + [{"rot": mi["curto"], "num": True} for mi in mins],
                    linhas=linhas_res)
+    secoes.append(dict(titulo="Levy × Trabuco", texto="", graficos=[levy_trabuco(
+        mins, INDS, desvio_ppc, rat, pct2, pp)]))
     secoes.append(dict(titulo="Médias no mandato", texto="", graficos=[res_tab]))
     secoes.append(dict(titulo="Tabela por ministro", texto="", graficos=por_min))
 
