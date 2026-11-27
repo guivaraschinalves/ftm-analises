@@ -119,6 +119,7 @@ DESTAQUE_VERMELHO = {
     "divida": ("levy", "meirelles"),
     "ipca": "levy",
     "selic": "guedes",
+    "juro-real": "palocci",
     "cambio": "levy",
     "cambio-ppc": "levy",
     "rating": ("levy", "barbosa"),
