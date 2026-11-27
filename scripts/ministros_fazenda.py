@@ -433,6 +433,20 @@ def linha_ind(nome, pres, s, mi, fmt, var, diaria=None):
     return [{"t": nome, "forte": True}, {"t": pres}, celula(ini, fmt), celula(fim, fmt), {"t": v, "forte": True}]
 
 
+def media_dia(diaria, mi):
+    """Média simples dos dias com dado, da posse ao último dia no cargo."""
+    vs = [v for d, v in diaria.items() if mi["posse"] <= d and (not mi["saida"] or d < mi["saida"])]
+    return sum(vs) / len(vs) if vs else None
+
+
+def var_media_mensal(s, mi):
+    """(final − início) / número de meses entre eles, em p.p. por mês."""
+    ini, fim = ponta(s, mi["base"], mi["ate"])
+    if not (ini and fim) or fim[0] == ini[0]:
+        return None
+    return (fim[1] - ini[1]) / (ordem(fim[0]) - ordem(ini[0]))
+
+
 def contagem_meta_ipca(ipca12, meta, teto, mi):
     ms = [mes_de(i) for i in range(ordem(mi["de"]), ordem(mi["ate"]) + 1)]
     validos = [m for m in ms if m in ipca12]
@@ -546,11 +560,23 @@ def montar():
         if ind["id"] == "ipca":
             colunas.extend([{"rot": "Acima da meta", "num": True}, {"rot": "Acima do intervalo", "num": True}])
             sub_tab += "; meses acima do centro da meta (SGS 13521) e acima do teto do intervalo do CMN, do total de meses"
+        if ind["id"] in ("selic", "cambio"):
+            colunas.append({"rot": "Média no período", "num": True})
+            sub_tab += "; média: média simples dos dias úteis no cargo"
+        if ind["id"] == "divida":
+            colunas.append({"rot": "Variação média mensal", "num": True})
+            sub_tab += "; variação média mensal: variação total dividida pelo número de meses"
         for mi in mins:
             l = linha_ind(mi["nome"], mi["pres"], ind["s"], mi, ind["fmt"], ind["var"], ind.get("diaria"))
             if ind["id"] == "ipca":
                 am, at = contagem_meta_ipca(ipca12, meta_ipca, teto_ipca, mi)
                 l.extend([{"t": am}, {"t": at}])
+            if ind["id"] in ("selic", "cambio"):
+                med = media_dia(ind["diaria"], mi)
+                l.append({"t": "n.d." if med is None else ind["fmt"](med)})
+            if ind["id"] == "divida":
+                vm = var_media_mensal(ind["s"], mi)
+                l.append({"t": "n.d." if vm is None else sinal(vm, 2) + " p.p."})
             pintar_linha(l, ind["id"], mi["id"])
             linhas.append(l)
         tab = dict(id="ministros-" + ind["id"] + "-tabela", tipo="tabela",
