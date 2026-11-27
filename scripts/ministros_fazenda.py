@@ -87,6 +87,7 @@ PRESIDENTES = [
 DESTAQUE_VERMELHO = {
     "primario": "mantega",
     "nominal": "haddad",
+    "divida": "meirelles",
     "ipca": "levy",
     "selic": "guedes",
     "cambio": "levy",
@@ -263,13 +264,15 @@ def ipca():
     print("conferência: IPCA 12 meses refeito bate em %d meses" % n)
     centros = {int(m[:4]): v for m, v in meta_a.items()}
     ultimo_c = centros[max(centros)]
-    meta, teto = {}, {}
+    meta, piso, teto = {}, {}, {}
     for m in a12:
         ano = int(m[:4])
         c = centros.get(ano, ultimo_c)
+        t = tolerancia_meta(ano)
         meta[m] = c
-        teto[m] = c + tolerancia_meta(ano)
-    return a12, mens, meta, teto
+        piso[m] = c - t
+        teto[m] = c + t
+    return a12, mens, meta, piso, teto
 
 
 def selic(ate):
@@ -465,7 +468,7 @@ def montar():
     fechado = mes_de(ordem(hoje.strftime("%Y-%m")) - 1)        # último mês fechado
     prim, nom = fiscal()
     divida = divida_ate2007()
-    ipca12, ipca_m, meta_ipca, teto_ipca = ipca()
+    ipca12, ipca_m, meta_ipca, piso_ipca, teto_ipca = ipca()
     selic_m, selic_d = selic(fechado)
     cambio_m, cambio_d = cambio(fechado)
     cpi = cpi_eua()
@@ -514,10 +517,27 @@ def montar():
         extra_ser = dict(rotulo=True, legenda=False)
         if ind.get("cor_neg"):
             extra_ser["corNegativa"] = ind["cor_neg"]
-        g = dict(id="ministros-" + ind["id"], titulo=ind["titulo"], subtitulo=ind["sub"], unidade=ind["unidade"],
-                 fonte=ind["fonte"], ministros=fx, presidentes=pres_fx, apresentarDaqui=True,
-                 series=[serie(ind["rot"], ind["s"], 4 if ind["unidade"] == "brl" else 2, cor=ind["cor"],
-                               **extra_ser)])
+        if ind["id"] == "ipca":
+            faixa_meta = [[m, round(piso_ipca[m], 2), round(teto_ipca[m], 2)]
+                          for m in sorted(ipca12, key=ordem) if m >= INICIO]
+            g = dict(id="ministros-" + ind["id"], titulo=ind["titulo"], subtitulo=ind["sub"], unidade=ind["unidade"],
+                     fonte=ind["fonte"], ministros=fx, presidentes=pres_fx, apresentarDaqui=True,
+                     variantes=[
+                         dict(rot="IPCA",
+                              series=[serie(ind["rot"], ind["s"], 2, cor=ind["cor"], rotulo=True, legenda=False)]),
+                         dict(rot="Com meta e intervalo",
+                              series=[
+                                  dict(nome="Intervalo de tolerância", cor=CINZA, tipo="faixa",
+                                       opacidade=0.22, dados=faixa_meta),
+                                  serie("Centro da meta", meta_ipca, 2, cor=BRANCO, traco="pontilhado", largura=3),
+                                  serie(ind["rot"], ind["s"], 2, cor=ind["cor"], rotulo=True),
+                              ]),
+                     ])
+        else:
+            g = dict(id="ministros-" + ind["id"], titulo=ind["titulo"], subtitulo=ind["sub"], unidade=ind["unidade"],
+                     fonte=ind["fonte"], ministros=fx, presidentes=pres_fx, apresentarDaqui=True,
+                     series=[serie(ind["rot"], ind["s"], 4 if ind["unidade"] == "brl" else 2, cor=ind["cor"],
+                                   **extra_ser)])
         linhas = []
         colunas = [{"rot": "Ministro"}, {"rot": "Presidente"}, {"rot": "Início", "num": True},
                    {"rot": "Final", "num": True}, {"rot": "Variação", "num": True}]
@@ -652,8 +672,9 @@ def main():
     print("\núltimo ponto de cada gráfico:")
     for sec in doc["secoes"]:
         for g in sec["graficos"]:
-            if g.get("series"):
-                s = g["series"][0]
+            s_lista = g.get("series") or (g["variantes"][0]["series"] if g.get("variantes") else None)
+            if s_lista:
+                s = s_lista[0]
                 print("  %-28s %s %s" % (g["id"], s["dados"][-1][0], s["dados"][-1][1]))
     with open(SAIDA, "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
