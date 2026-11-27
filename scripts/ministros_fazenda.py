@@ -545,8 +545,17 @@ def fiscal_real(prim, nom, ipca_m):
         idx[m] = nivel
     ref = max(idx)
     out = {}
+    # PIB mensal (4380), para as médias no mandato; somado em 12 meses tem de dar a 4382
+    pib_m = sgs(4380, "01/01/2001")
+    erros = [abs(sum(pib_m[mes_de(ordem(m) - k)] for k in range(12)) - pib12[m]) for m in pib12
+             if all(mes_de(ordem(m) - k) in pib_m for k in range(12))]
+    if len(erros) < 250 or max(erros) > 2:
+        raise RuntimeError("PIB: 12 meses da 4380 não dão a 4382 (R$ %.0f mi)" % max(erros))
+    print("conferência: PIB mensal 4380 somado em 12 meses = 4382 em %d meses (máx R$ %.1f mi)" % (len(erros), max(erros)))
+    out["pib_mensal"] = pib_m
     for chave, cod, pct in (("primario", 4649, prim), ("nominal", 4583, nom)):
         fluxo = {m: -v for m, v in sgs(cod, "01/01/2001").items()}
+        out["fluxo_" + chave] = fluxo
         doze_nom, doze_real = {}, {}
         for m in fluxo:
             janela = [mes_de(ordem(m) - k) for k in range(12)]
@@ -971,6 +980,52 @@ def montar():
                                      {"rot": "Final", "num": True}, {"rot": "Variação", "num": True}],
                             linhas=linhas))
     secoes.append(dict(titulo="Tabela por ministro", texto="", graficos=por_min))
+
+    # resumo: média de cada indicador no mandato, ministros nas colunas
+    def meses_de(mi, serie_m):
+        return [mes_de(i) for i in range(ordem(mi["de"]), ordem(mi["ate"]) + 1) if mes_de(i) in serie_m]
+
+    def fluxo_pib(chave, mi):
+        fl, pib = doze_real["fluxo_" + chave], doze_real["pib_mensal"]
+        ms = [m for m in meses_de(mi, fl) if m in pib]
+        return sum(fl[m] for m in ms) / sum(pib[m] for m in ms) * 100 if ms else None
+
+    def media_meses(serie_m, mi):
+        ms = meses_de(mi, serie_m)
+        return sum(serie_m[m] for m in ms) / len(ms) if ms else None
+
+    def ipca_anual(mi):
+        ms = meses_de(mi, ipca_m)
+        p = 1.0
+        for m in ms:
+            p *= 1 + ipca_m[m] / 100
+        return (p ** (12 / len(ms)) - 1) * 100 if ms else None
+
+    pct_sinal = lambda v: sinal(v, 2) + "%"
+    resumo = [
+        ("Resultado primário (% do PIB)", lambda mi: fluxo_pib("primario", mi), pct_sinal),
+        ("Resultado nominal (% do PIB)", lambda mi: fluxo_pib("nominal", mi), pct_sinal),
+        ("Dívida bruta do governo geral (% do PIB)", lambda mi: media_meses(divida, mi), pct2),
+        ("IPCA (% a.a.)", ipca_anual, pct2),
+        ("Meta da Selic (% a.a.)", lambda mi: media_dia(selic_d, mi), pct2),
+        ("Juro real ex post (% a.a.)", lambda mi: juro_real_medio(selic_mes, ipca_m, mi), pct2),
+        ("Câmbio (R$ por US$)", lambda mi: media_dia(cambio_d, mi), rs),
+        ("Sobre/(sub)valorização pela PPC", lambda mi: media_meses(desvio_ppc, mi), lambda v: sinal(v, 1) + "%"),
+    ]
+    linhas_res = []
+    for nome_ind, f, fmt in resumo:
+        lin = [{"t": nome_ind, "forte": True}]
+        for mi in mins:
+            v = f(mi)
+            lin.append({"t": "n.d." if v is None else fmt(v)})
+        linhas_res.append(lin)
+    res_tab = dict(id="ministros-resumo-medias", tipo="tabela", titulo="Média no mandato de cada ministro",
+                   subtitulo="Primário e nominal: resultado no mandato sobre o PIB do período; IPCA e juro real: "
+                             "anualizados; Selic: dias corridos; câmbio: dias úteis; dívida e PPC: média dos meses",
+                   fonte="BCB, IBGE, BLS e FtM",
+                   colunas=[{"rot": "Indicador"}] + [{"rot": mi["curto"], "num": True} for mi in mins],
+                   linhas=linhas_res)
+    secoes.append(dict(titulo="Médias no mandato", texto="", graficos=[res_tab]))
 
     doc = dict(assunto="Ministros da Fazenda", grupo="Análises Variadas",
                capaFtm=dict(titulo="Ministros da Fazenda desde Palocci",
