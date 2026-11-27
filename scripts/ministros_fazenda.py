@@ -747,36 +747,10 @@ def rtn_pib():
     return r12, d12
 
 
-def externo_pib():
-    """Conta corrente e IDP em 12 meses (% do PIB e US$ milhões), necessidade
-    de capital de curto prazo (déficit em conta corrente menos IDP, US$
-    milhões) e reservas em % do PIB. Confere conta corrente e IDP em % do PIB
-    contra as séries do BC (23079 e 23080)."""
-    cc, idp = doze_meses(sgs(22701, "01/01/1995")), doze_meses(sgs(22885, "01/01/1995"))
-    pib_usd, reservas = sgs(4192, "01/01/1995"), sgs(3546, "01/01/1995")
-    out = {}
-    for nome, d, cod in (("cc", cc, 23079), ("idp", idp, 23080)):
-        oficial = sgs(cod, "01/01/1995")
-        pct = {m: v / pib_usd[m] * 100 for m, v in d.items() if m in pib_usd}
-        difs = [abs(pct[m] - oficial[m]) for m in oficial if m in pct]
-        if not difs or max(difs) > TOL_IDENT:
-            raise RuntimeError("%s em %% do PIB não bate com o SGS %d (%.3f p.p.)"
-                               % (nome, cod, max(difs) if difs else -1))
-        print("conferência: %s em 12 meses / PIB contra o SGS %d em %d meses, maior diferença %.3f p.p."
-              % (nome, cod, len(difs), max(difs)))
-        out[nome] = pct
-    out["necessidade"] = {m: -(cc[m] + idp[m]) for m in cc if m in idp}
-    out["reservas"] = {m: v / pib_usd[m] * 100 for m, v in reservas.items() if m in pib_usd}
-    return out
-
-
 def levy_trabuco(mins, INDS, desvio_ppc, pct2, pp, r12, d12):
     """Levy na véspera da posse (dez/14; Selic e câmbio em 31/12/14)
     contra o último dado publicado, o quadro que Trabuco recebe."""
     levy, atual = next(mi for mi in mins if mi["id"] == "levy"), mins[-1]
-    ext = externo_pib()
-    bi = lambda v: sinal(v / 1000, 1) + " bi"                        # noqa: E731
-    var_bi = lambda a, b: sinal((b - a) / 1000, 1) + " bi"           # noqa: E731
 
     def mensal(nome, s, fmt, var):
         a = (levy["base"], s[levy["base"]])
@@ -807,14 +781,9 @@ def levy_trabuco(mins, INDS, desvio_ppc, pct2, pp, r12, d12):
             linhas.append(mensal("Despesa primária do governo central (% do PIB)", d12, pct2, pp))
     linhas.append(mensal("Sobre/(sub)valorização do real pela PPC", desvio_ppc, lambda v: sinal(v, 1) + "%",
                          lambda a, b: sinal(b - a, 1) + " p.p."))
-    linhas.append(mensal("Conta corrente (% do PIB)", ext["cc"], pct_s, pp))
-    linhas.append(mensal("Investimento direto no país (% do PIB)", ext["idp"], pct2, pp))
-    linhas.append(mensal("Necessidade de capital de curto prazo (US$)", ext["necessidade"], bi, var_bi))
-    linhas.append(mensal("Reservas internacionais (% do PIB)", ext["reservas"], pct2, pp))
     return dict(id="ministros-levy-trabuco", tipo="tabela",
                 titulo="Levy na posse e o quadro que Trabuco recebe",
-                subtitulo="Fluxos em 12 meses; necessidade de capital: déficit em conta corrente menos IDP, "
-                          "negativo quando o IDP cobre o déficit",
+                subtitulo="Fluxos em 12 meses",
                 fonte="BCB, IBGE, Tesouro Nacional (RTN), BLS e FtM",
                 colunas=[{"rot": "Indicador"}, {"rot": "Levy (início)", "num": True},
                          {"rot": "Trabuco (último dado)", "num": True}, {"rot": "Variação", "num": True}],
