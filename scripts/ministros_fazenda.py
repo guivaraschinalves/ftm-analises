@@ -979,7 +979,6 @@ def montar():
                             colunas=[{"rot": "Indicador"}, {"rot": "Início", "num": True},
                                      {"rot": "Final", "num": True}, {"rot": "Variação", "num": True}],
                             linhas=linhas))
-    secoes.append(dict(titulo="Tabela por ministro", texto="", graficos=por_min))
 
     # resumo: média de cada indicador no mandato, ministros nas colunas
     def meses_de(mi, serie_m):
@@ -1026,6 +1025,7 @@ def montar():
                    colunas=[{"rot": "Indicador"}] + [{"rot": mi["curto"], "num": True} for mi in mins],
                    linhas=linhas_res)
     secoes.append(dict(titulo="Médias no mandato", texto="", graficos=[res_tab]))
+    secoes.append(dict(titulo="Tabela por ministro", texto="", graficos=por_min))
 
     doc = dict(assunto="Ministros da Fazenda", grupo="Análises Variadas",
                capaFtm=dict(titulo="Ministros da Fazenda desde Palocci",
