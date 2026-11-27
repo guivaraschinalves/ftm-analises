@@ -770,11 +770,10 @@ def externo_pib():
     return out
 
 
-def levy_trabuco(mins, INDS, desvio_ppc, rat, pct2, pp):
+def levy_trabuco(mins, INDS, desvio_ppc, rat, pct2, pp, r12, d12):
     """Levy na véspera da posse (dez/14; Selic, câmbio e rating em 31/12/14)
     contra o último dado publicado, o quadro que Trabuco recebe."""
     levy, atual = next(mi for mi in mins if mi["id"] == "levy"), mins[-1]
-    r12, d12 = rtn_pib()
     ext = externo_pib()
     bi = lambda v: sinal(v / 1000, 1) + " bi"                        # noqa: E731
     var_bi = lambda a, b: sinal((b - a) / 1000, 1) + " bi"           # noqa: E731
@@ -982,6 +981,19 @@ def montar():
             secoes.append(dict(titulo=ind["sec"], texto="", graficos=graficos))
         ind["linhas"] = linhas
 
+    # receita líquida e despesa primária do governo central (RTN), logo depois do nominal
+    r12, d12 = rtn_pib()
+    # eixo a partir de um piso par abaixo do menor valor do período: do zero, as linhas ficam achatadas
+    piso = min(v for d in (r12, d12) for m, v in d.items() if ordem(m) >= ordem(INICIO))
+    rd_g = dict(id="ministros-receita-despesa", titulo="Receita líquida e despesa primária do governo central",
+                subtitulo="% do PIB, acumulado em 12 meses", unidade="%", eixo=dict(min=int(piso // 2) * 2 - 2),
+                fonte="Tesouro Nacional (RTN, tabela 1.1), BCB (PIB, SGS 4382) e FtM",
+                ministros=fx, presidentes=pres_fx, apresentarDaqui=True,
+                series=[serie("Receita líquida", r12, 2, cor=AZUL, rotulo=True),
+                        serie("Despesa primária", d12, 2, cor=VERMELHO, rotulo=True)])
+    pos = next(i for i, sec in enumerate(secoes) if sec["titulo"] == "Resultado nominal") + 1
+    secoes.insert(pos, dict(titulo="Receita e despesa do governo central", texto="", graficos=[rd_g]))
+
     # câmbio pela PPC (bônus): a série do FtM Dados, com base única em jun/1994
     ppc_g = dict(id="ministros-cambio-ppc", titulo="Câmbio de mercado e câmbio pela PPC",
                  subtitulo="R$ por US$, média do mês",
@@ -1149,7 +1161,7 @@ def montar():
                    colunas=[{"rot": "Indicador"}] + [{"rot": mi["curto"], "num": True} for mi in mins],
                    linhas=linhas_res)
     secoes.append(dict(titulo="Levy × Trabuco", texto="", graficos=[levy_trabuco(
-        mins, INDS, desvio_ppc, rat, pct2, pp)]))
+        mins, INDS, desvio_ppc, rat, pct2, pp, r12, d12)]))
     secoes.append(dict(titulo="Médias no mandato", texto="", graficos=[res_tab]))
     secoes.append(dict(titulo="Tabela por ministro", texto="", graficos=por_min))
 
