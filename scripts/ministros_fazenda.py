@@ -20,9 +20,19 @@ Indicadores (todos mensais, BCB/SGS salvo indicação):
   - meta da Selic (432, diária): o valor no último dia do mês;
   - câmbio: PTAX de venda (1, diária) no último dia útil do mês, conferida
     contra a série mensal de fim de período (3696);
-  - câmbio pela PPC: o câmbio do mês anterior ao primeiro mês de cada ministro
-    corrigido pela inflação relativa (IPCA, 433, contra o CPI-U dos EUA sem
-    ajuste sazonal, FRED CPIAUCNS, conferido contra o mesmo índice no FMI);
+  - câmbio pela PPC: a série do FtM Dados (dados/moedas.json), base única
+    R$ 1,00 = US$ 1,00 em junho de 1994 corrigida pelo IPCA sobre o CPI dos
+    EUA, contra o dólar de mercado (PTAX média do mês); conferidas contra a
+    PTAX diária e contra o IPCA (433) ÷ CPI-U (FRED CPIAUCNS, conferido contra
+    o FMI) em janelas de 12 meses;
+  - juro real ex post da taxa básica: a série do FtM Dados (dados/juros.json),
+    Selic efetiva em 12 meses (4390) sobre o IPCA (433), refeita aqui;
+  - fatores condicionantes da DBGG no conceito FMI: o gráfico do FtM Dados
+    (dados/fiscal.json), cuja variação em 12 meses tem de bater com a nossa
+    dívida; cores trocadas pelas da paleta oficial;
+  - primário e nominal por mês de mandato: fluxo mensal (4649 e 4583) a preços
+    do último IPCA, somado em 12 meses (conferido contra 5793 e 5727 com o PIB
+    4382), menos o valor do mês-base de cada ministro;
   - rating soberano em moeda estrangeira, longo prazo (Moody's, S&P e Fitch),
     lido do JSON do Poder & Mercado (aba "Base Rating 2" da planilha), no
     GitHub.
@@ -58,6 +68,25 @@ TOL_CPI = 0.0002              # FRED ÷ FMI constante (desvio relativo)
 
 BRANCO, AZUL, VERMELHO, VERDE, AZUL_ESC = "#FFFFFF", "#4F81BD", "#C0504D", "#9BBB59", "#1F497D"
 LARANJA, CINZA = "#F79646", "#8a8a86"
+AMARELO, AZUL_CLARO, VINHO = "#FFFF00", "#8EB4E3", "#632523"
+# uma cor por ministro nos gráficos por mês de mandato: as 7 cromáticas da
+# paleta oficial mais branco e cinza (as escuras nos mandatos curtos)
+CORES_MINISTRO = {"palocci": AZUL, "mantega": VERMELHO, "levy": VERDE, "barbosa": VINHO, "meirelles": AZUL_CLARO,
+                  "guardia": AZUL_ESC, "guedes": AMARELO, "haddad": BRANCO, "durigan": CINZA}
+# condicionantes: as cores do FtM Dados trocadas pelas da paleta oficial
+# (laranja com verde e roxo com azul se confundem no daltonismo)
+CORES_CONDICIONANTES = {"Juros nominais": VERMELHO, "Emissões líquidas": AZUL, "Variação cambial": VERDE,
+                        "Outros": CINZA, "Carteira do BC menos compromissadas": AMARELO,
+                        "Efeito do crescimento do PIB": AZUL_CLARO, "Variação da dívida/PIB": BRANCO}
+
+# o FtM Dados (repositório privado): PPC, juro real ex post e fatores
+# condicionantes saem das mesmas séries publicadas lá, lidas do clone local
+FTM_DADOS = os.environ.get("FTM_DADOS", os.path.expanduser("~/projetos/ftm-dados"))
+TOL_PTAX_MEDIA = 0.0006       # dólar de mercado do FtM Dados × média da PTAX diária no mês (R$)
+TOL_PPC = 0.006               # PPC ÷ (PPC de 12 meses antes × IPCA ÷ CPI de 12 meses) − 1
+TOL_EXPOST = 0.02             # juro real ex post do FtM Dados × refeito pela 4390 e 433 (p.p.)
+TOL_COND = 0.03               # variação da dívida/PIB em 12 meses nos condicionantes × a nossa (p.p.)
+TOL_FLUXO = 0.02              # soma de 12 meses do fluxo ÷ PIB × 5793/5727 (p.p.)
 
 # (id, nome, nome curto, posse, saída). Datas: lista oficial de ministros da
 # Fazenda (Economia de 2019 a 2022). A interinidade de Bernard Appy (3 a
@@ -138,7 +167,10 @@ def sgs(codigo, ini="01/01/1999", diario=False):
         d1 = min(hoje, d0.replace(year=d0.year + 9) - datetime.timedelta(days=1))
         url = SGS % (codigo, d0.strftime("%d/%m/%Y"), d1.strftime("%d/%m/%Y"))
         for k in range(5):
-            lst = json.loads(baixar(url).decode("utf-8"))
+            try:
+                lst = json.loads(baixar(url).decode("utf-8"))
+            except ValueError:            # o SGS às vezes responde 200 com corpo vazio
+                lst = None
             if isinstance(lst, list):
                 break
             if k == 4:
@@ -359,24 +391,171 @@ def ratings():
     return out
 
 
-def ppc(cambio_m, ipca_m, cpi, mins):
-    """Para cada ministro: câmbio do mês-base × (IPCA acumulado / CPI acumulado)."""
-    idx, nivel = {}, 100.0
+def ftm_dados(arquivo, gid):
+    """O gráfico `gid` de dados/<arquivo> no clone local do FtM Dados."""
+    caminho = os.path.join(FTM_DADOS, "dados", arquivo)
+    with open(caminho, encoding="utf-8") as f:
+        d = json.load(f)
+    achado = []
+
+    def andar(o):
+        if isinstance(o, dict):
+            if o.get("id") == gid:
+                achado.append(o)
+            for v in o.values():
+                andar(v)
+        elif isinstance(o, list):
+            for v in o:
+                andar(v)
+    andar(d)
+    if not achado:
+        raise RuntimeError("FtM Dados: %s sem o gráfico %s" % (arquivo, gid))
+    return achado[0]
+
+
+def serie_de(g, comeco):
+    return {m: v for m, v in next(s for s in g["series"] if s["nome"].startswith(comeco))["dados"]}
+
+
+def ppc_ftm(ipca_m, cpi, cambio_d):
+    """Dólar de mercado (PTAX média do mês) e câmbio pela PPC do FtM Dados, base
+    única: R$ 1,00 = US$ 1,00 em junho de 1994, corrigido pela inflação relativa."""
+    g = ftm_dados("moedas.json", "moedas-cambio-ppc")
+    mercado, ppc_s = serie_de(g, "Dólar de mercado"), serie_de(g, "Câmbio pela PPC")
+    ult = max(ppc_s)
+    mercado = {m: v for m, v in mercado.items() if m <= ult}        # o último ponto lá é o fechamento do dia
+    # conferência 1: o dólar de mercado é a média da PTAX diária no mês
+    dias = {}
+    for d, v in cambio_d.items():
+        dias.setdefault(d[:7], []).append(v)
+    difs = [abs(mercado[m] - sum(dias[m]) / len(dias[m])) for m in mercado if m in dias and m >= "2002-01"]
+    if len(difs) < 280 or max(difs) > TOL_PTAX_MEDIA:
+        raise RuntimeError("PPC: dólar de mercado do FtM Dados × PTAX média difere R$ %.4f" % max(difs))
+    print("conferência: dólar de mercado do FtM Dados = PTAX média do mês em %d meses (máx R$ %.4f)"
+          % (len(difs), max(difs)))
+    # conferência 2: a PPC anda pelo IPCA sobre o CPI dos EUA. Mês a mês a
+    # planilha do FtM Dados se afasta até 0,3% (calendário do índice de poder de
+    # compra do BLS), mas em 12 meses e no período todo a conta fecha
+    rel = []
+    for m in ppc_s:
+        a = mes_de(ordem(m) - 12)
+        janela = [mes_de(ordem(m) - k) for k in range(12)]
+        if a >= "2002-01" and a in ppc_s and m in cpi and a in cpi and all(x in ipca_m for x in janela):
+            f = 1.0
+            for x in janela:
+                f *= 1 + ipca_m[x] / 100
+            rel.append(abs(ppc_s[m] / (ppc_s[a] * f / (cpi[m] / cpi[a])) - 1))
+    if len(rel) < 270 or max(rel) > TOL_PPC:
+        raise RuntimeError("PPC do FtM Dados não anda pelo IPCA ÷ CPI em 12 meses (desvio %.3f%%)" % (max(rel) * 100))
+    print("conferência: PPC do FtM Dados anda pelo IPCA ÷ CPI em %d janelas de 12 meses (desvio máximo %.3f%%)"
+          % (len(rel), max(rel) * 100))
+    return mercado, ppc_s
+
+
+def juro_real_ftm(ipca_m):
+    """Juro real ex post da taxa básica do FtM Dados: Selic efetivamente paga em
+    12 meses (4390) deflacionada pelo IPCA dos mesmos 12 meses (433)."""
+    g = ftm_dados("juros.json", "juros-expost")
+    jr = serie_de(g, "Brasil")
+    selic_mes = sgs(4390, "01/01/1999")
+    n, pior = 0, 0.0
+    for m in jr:
+        janela = [mes_de(ordem(m) - k) for k in range(12)]
+        if not all(x in selic_mes and x in ipca_m for x in janela):
+            continue
+        s = i = 1.0
+        for x in janela:
+            s *= 1 + selic_mes[x] / 100
+            i *= 1 + ipca_m[x] / 100
+        pior = max(pior, abs((s / i - 1) * 100 - jr[m]))
+        n += 1
+    if n < 280 or pior > TOL_EXPOST:
+        raise RuntimeError("juro real ex post do FtM Dados × refeito: %.3f p.p." % pior)
+    print("conferência: juro real ex post do FtM Dados refeito pela 4390 e 433 em %d meses (máx %.4f p.p.)" % (n, pior))
+    return jr, selic_mes
+
+
+def juro_real_medio(selic_mes, ipca_m, mi):
+    """Juro real dos meses do ministro, anualizado: produto da Selic sobre produto do IPCA."""
+    ms = [mes_de(i) for i in range(ordem(mi["de"]), ordem(mi["ate"]) + 1)]
+    ms = [m for m in ms if m in selic_mes and m in ipca_m]
+    if not ms:
+        return None
+    s = i = 1.0
+    for m in ms:
+        s *= 1 + selic_mes[m] / 100
+        i *= 1 + ipca_m[m] / 100
+    return ((s / i) ** (12 / len(ms)) - 1) * 100
+
+
+def condicionantes_ftm(divida):
+    """Fatores condicionantes da DBGG no conceito FMI (a nossa metodologia até
+    2007), do FtM Dados; a linha de variação tem de bater com a nossa dívida."""
+    g = ftm_dados("fiscal.json", "fiscal-divida-condicionantes-fmi")
+    v12 = next(v for v in g["variantes"] if v["rot"] == "Em 12 meses")
+    var = serie_de(v12, "Variação da dívida")
+    difs = []
+    for m, v in var.items():
+        a = mes_de(ordem(m) - 12)
+        if m in divida and a in divida:
+            difs.append(abs(v - (divida[m] - divida[a])))
+    if len(difs) < 150 or max(difs) > TOL_COND:
+        raise RuntimeError("condicionantes do FtM Dados × nossa dívida: %.3f p.p." % max(difs))
+    print("conferência: variação da dívida em 12 meses dos condicionantes bate com a nossa em %d meses (máx %.3f p.p.)"
+          % (len(difs), max(difs)))
+    return g
+
+
+def fiscal_real(prim, nom, ipca_m):
+    """Primário e nominal acumulados em 12 meses, em R$ milhões a preços do último
+    IPCA: fluxo mensal (4649 e 4583, sinal invertido) deflacionado mês a mês."""
+    pib12 = sgs(4382, "01/01/2001")
+    idx, nivel = {}, 1.0
     for m in sorted(ipca_m):
         nivel *= 1 + ipca_m[m] / 100
         idx[m] = nivel
-    trechos = []
+    ref = max(idx)
+    out = {}
+    for chave, cod, pct in (("primario", 4649, prim), ("nominal", 4583, nom)):
+        fluxo = {m: -v for m, v in sgs(cod, "01/01/2001").items()}
+        doze_nom, doze_real = {}, {}
+        for m in fluxo:
+            janela = [mes_de(ordem(m) - k) for k in range(12)]
+            if all(x in fluxo and x in idx for x in janela):
+                doze_nom[m] = sum(fluxo[x] for x in janela)
+                doze_real[m] = sum(fluxo[x] * idx[ref] / idx[x] for x in janela)
+        difs = [abs(doze_nom[m] / pib12[m] * 100 - pct[m]) for m in doze_nom if m in pib12 and m in pct]
+        if len(difs) < 250 or max(difs) > TOL_FLUXO:
+            raise RuntimeError("%s: soma de 12 meses da %d ÷ PIB difere %.3f p.p. da série em %% do PIB"
+                               % (chave, cod, max(difs)))
+        print("conferência: %s, 12 meses da %d ÷ 4382 bate com a série em %% do PIB em %d meses (máx %.4f p.p.)"
+              % (chave, cod, len(difs), max(difs)))
+        out[chave] = doze_real
+    return out, ref
+
+
+def grafico_mandato(gid, titulo, doze_real, mins, ref, fonte):
+    """Uma linha por ministro: variação real do acumulado em 12 meses desde o
+    mês-base, em R$ bilhões; no eixo X, os meses no cargo."""
+    series, nmax = [], 0
     for mi in mins:
         b = mi["base"]
-        if b not in cambio_m or b not in idx or b not in cpi:
-            raise RuntimeError("PPC de %s: falta o mês-base %s" % (mi["nome"], b))
-        s = {}
-        for i in range(ordem(b), ordem(mi["ate"]) + 1):
+        if b not in doze_real:
+            continue
+        pts = [["0", 0.0]]
+        for k, i in enumerate(range(ordem(mi["de"]), ordem(mi["ate"]) + 1), 1):
             m = mes_de(i)
-            if m in idx and m in cpi:
-                s[m] = cambio_m[b] * (idx[m] / idx[b]) / (cpi[m] / cpi[b])
-        trechos.append(s)
-    return trechos
+            if m in doze_real:
+                pts.append([str(k), round((doze_real[m] - doze_real[b]) / 1000, 1)])
+        nmax = max(nmax, int(pts[-1][0]))
+        series.append(dict(nome=mi["nome"], cor=CORES_MINISTRO[mi["id"]], dados=pts, rotulo=True, largura=4))
+    cats = [str(k) if k % 12 == 0 else "" for k in range(nmax + 1)]
+    longas = ["Mês anterior à posse"] + ["%dº mês no cargo" % k for k in range(1, nmax + 1)]
+    return dict(id=gid, titulo=titulo,
+                subtitulo="Variação real do acumulado em 12 meses desde o mês anterior ao do ministro, em R$ bilhões "
+                          "a preços de %s pelo IPCA; eixo: meses no cargo; superávit positivo" % mes_curto(ref),
+                unidade="bi", fonte=fonte, categorias=cats, categoriasLongas=longas, apresentarDaqui=True,
+                series=series)
 
 
 # ---------- gráficos e tabelas ----------
@@ -488,6 +667,11 @@ def montar():
     cambio_m, cambio_d = cambio(fechado)
     cpi = cpi_eua()
     rat = ratings()
+    mercado_ppc, ppc_s = ppc_ftm(ipca_m, cpi, cambio_d)
+    juro_real, selic_mes = juro_real_ftm(ipca_m)
+    cond = condicionantes_ftm(divida)
+    doze_real, ref_real = fiscal_real(prim, nom, ipca_m)
+    desvio_ppc = {m: (ppc_s[m] / mercado_ppc[m] - 1) * 100 for m in ppc_s if m in mercado_ppc}
 
     ultimo = max(max(prim), max(ipca12), max(selic_m), max(cambio_m))
     mins = meses_dos_ministros(ultimo)
@@ -495,7 +679,6 @@ def montar():
     for mi in mins:
         mi["pres"] = presidente_do_ministro(mi, pres_fx)
     fx = faixas(mins)
-    trechos = ppc(cambio_m, ipca_m, cpi, mins)
 
     pct2 = lambda v: br(v, 2) + "%"
     pp = lambda a, b: sinal(b - a, 2) + " p.p."
@@ -522,6 +705,10 @@ def montar():
         dict(id="selic", sec="Selic", s=selic_m, unidade="%", fmt=pct2, var=pp, cor=AZUL,
              titulo="Meta da taxa Selic", sub="% a.a.; valor no último dia do mês",
              fonte="BCB (SGS 432)", rot="Meta da Selic", diaria=selic_d),
+        dict(id="juro-real", sec="Selic", s=juro_real, unidade="%", fmt=pct2, var=pp, cor=AZUL_CLARO,
+             titulo="Juro real ex post da taxa básica",
+             sub="% a.a.; Selic efetivamente paga em 12 meses deflacionada pelo IPCA dos mesmos 12 meses",
+             fonte="BCB (Selic, SGS 4390; IPCA, SGS 433) e FtM", rot="Juro real ex post"),
         dict(id="cambio", sec="Câmbio", s=cambio_m, unidade="brl", fmt=rs, var=pctvar, cor=BRANCO,
              titulo="Taxa de câmbio", sub="R$ por US$; PTAX de venda no último dia útil do mês",
              fonte="BCB (PTAX, SGS 1)", rot="Câmbio (PTAX)", diaria=cambio_d),
@@ -567,6 +754,9 @@ def montar():
         if ind["id"] == "divida":
             colunas.append({"rot": "Variação média mensal", "num": True})
             sub_tab += "; variação média mensal: variação total dividida pelo número de meses"
+        if ind["id"] == "juro-real":
+            colunas.append({"rot": "Média anualizada no período", "num": True})
+            sub_tab += "; média: Selic sobre IPCA nos meses do ministro, anualizada"
         for mi in mins:
             l = linha_ind(mi["nome"], mi["pres"], ind["s"], mi, ind["fmt"], ind["var"], ind.get("diaria"))
             if ind["id"] == "ipca":
@@ -578,45 +768,68 @@ def montar():
             if ind["id"] == "divida":
                 vm = var_media_mensal(ind["s"], mi)
                 l.append({"t": "n.d." if vm is None else sinal(vm, 2) + " p.p."})
+            if ind["id"] == "juro-real":
+                jm = juro_real_medio(selic_mes, ipca_m, mi)
+                l.append({"t": "n.d." if jm is None else pct2(jm)})
             pintar_linha(l, ind["id"], mi["id"])
             linhas.append(l)
         tab = dict(id="ministros-" + ind["id"] + "-tabela", tipo="tabela",
                    titulo=ind["titulo"] + " por ministro", subtitulo=sub_tab,
                    fonte=ind["fonte"], colunas=colunas, linhas=linhas)
-        secoes.append(dict(titulo=ind["sec"], texto="", graficos=[g, tab]))
+        graficos = [g, tab]
+        if ind["id"] in ("primario", "nominal"):
+            graficos.append(grafico_mandato(
+                "ministros-%s-mandato" % ind["id"], "%s por mês de mandato" % ind["titulo"],
+                doze_real[ind["id"]], mins, ref_real,
+                "BCB (NFSP, SGS %s; IPCA, SGS 433) e FtM" % ("4649" if ind["id"] == "primario" else "4583")))
+        if ind["id"] == "divida":
+            gc = json.loads(json.dumps({k: v for k, v in cond.items() if k not in ("id", "selecao")}))
+            for var_c in gc["variantes"]:
+                for se in var_c["series"]:
+                    se["cor"] = CORES_CONDICIONANTES[se["nome"]]
+            gc.update(id="ministros-divida-condicionantes", ministros=fx, presidentes=pres_fx, apresentarDaqui=True)
+            graficos.append(gc)
+        if secoes and secoes[-1]["titulo"] == ind["sec"]:
+            secoes[-1]["graficos"].extend(graficos)
+        else:
+            secoes.append(dict(titulo=ind["sec"], texto="", graficos=graficos))
         ind["linhas"] = linhas
 
-    # câmbio pela PPC (bônus)
-    ppc_series = [serie("Câmbio (PTAX)", cambio_m, 4, cor=BRANCO, rotulo=True)]
-    for k, (mi, s) in enumerate(zip(mins, trechos)):
-        ppc_series.append(serie("Câmbio pela PPC desde a posse", s, 4, ini=mi["base"], cor=AZUL,
-                                legenda=(k == 0), ministro=mi["id"]))
-    ppc_g = dict(id="ministros-cambio-ppc", titulo="Câmbio observado e câmbio pela PPC desde a posse",
-                 subtitulo="R$ por US$, fim do mês; PPC: câmbio do mês anterior ao do ministro corrigido pelo IPCA sobre o CPI dos EUA",
-                 unidade="brl", fonte="BCB (PTAX, SGS 1; IPCA, SGS 433), BLS (CPI-U, via FRED) e FtM",
-                 ministros=fx, presidentes=pres_fx, apresentarDaqui=True, series=ppc_series)
+    # câmbio pela PPC (bônus): a série do FtM Dados, com base única em jun/1994
+    ppc_g = dict(id="ministros-cambio-ppc", titulo="Câmbio de mercado e câmbio pela PPC",
+                 subtitulo="R$ por US$, média do mês; PPC: R$ 1,00 = US$ 1,00 em junho de 1994, corrigido pelo IPCA "
+                           "sobre o CPI dos EUA; sobre/(sub)valorização: dólar pela PPC ÷ dólar de mercado − 1",
+                 unidade="brl", fonte="BCB (PTAX, SGS 1; IPCA, SGS 433), BLS (CPI-U) e FtM",
+                 ministros=fx, presidentes=pres_fx, apresentarDaqui=True,
+                 variantes=[
+                     dict(rot="Câmbio e PPC", unidade="brl", series=[
+                         serie("Dólar de mercado", mercado_ppc, 4, cor=VERDE, rotulo=True, largura=5),
+                         serie("Câmbio pela PPC", ppc_s, 4, cor=AZUL, rotulo=True, largura=5)]),
+                     dict(rot="Sobre/(sub)valorização", unidade="%",
+                          subtitulo="Dólar pela PPC ÷ dólar de mercado − 1, em %; positivo, real sobrevalorizado",
+                          series=[serie("Sobre/(sub)valorização do real", desvio_ppc, 2, cor=LARANJA,
+                                        area=True, rotulo=True, largura=4)]),
+                 ])
     linhas_ppc = []
-    for mi, s in zip(mins, trechos):
-        fim_m = max(s, key=ordem)
-        fim_c = max([m for m in cambio_m if m <= mi["ate"]], key=ordem)
-        if fim_c != fim_m:
-            fim_m = min(fim_m, fim_c, key=ordem)
-        base = cambio_m[mi["base"]]
-        lp = [{"t": mi["nome"], "forte": True},
-              {"t": mi["pres"]},
-              {"t": "%s (%s)" % (rs(base), mes_curto(mi["base"]))},
-              {"t": "%s (%s)" % (rs(s[fim_m]), mes_curto(fim_m))},
-              {"t": "%s (%s)" % (rs(cambio_m[fim_m]), mes_curto(fim_m))},
-              {"t": sinal((cambio_m[fim_m] / s[fim_m] - 1) * 100, 1) + "%", "forte": True}]
+    for mi in mins:
+        ini, fim = ponta(desvio_ppc, mi["base"], mi["ate"])
+        pc = lambda p: {"t": "n.d."} if p is None else {"t": "%s%% (%s)" % (sinal(p[1], 1), mes_curto(p[0]))}
+        v = sinal(fim[1] - ini[1], 1) + " p.p." if ini and fim and fim[0] != ini[0] else "n.d."
+        lp = [{"t": mi["nome"], "forte": True}, {"t": mi["pres"]},
+              {"t": "%s (%s)" % (rs(mercado_ppc[mi["base"]]), mes_curto(mi["base"]))},
+              {"t": "%s (%s)" % (rs(ppc_s[mi["base"]]), mes_curto(mi["base"]))},
+              pc(ini), pc(fim), {"t": v, "forte": True}]
         pintar_linha(lp, "cambio-ppc", mi["id"])
         linhas_ppc.append(lp)
     ppc_tab = dict(id="ministros-cambio-ppc-tabela", tipo="tabela",
-                   titulo="Câmbio observado e câmbio pela PPC por ministro",
-                   subtitulo="Desvio: câmbio observado no final sobre o câmbio pela PPC; positivo, real mais depreciado que a PPC indica",
+                   titulo="Câmbio pela PPC por ministro",
+                   subtitulo="Sobre/(sub)valorização: dólar pela PPC ÷ dólar de mercado − 1 (média do mês); positivo, "
+                             "real sobrevalorizado; início: mês anterior ao primeiro mês do ministro",
                    fonte="BCB, BLS e FtM",
                    colunas=[{"rot": "Ministro"}, {"rot": "Presidente"}, {"rot": "Câmbio no início", "num": True},
-                            {"rot": "Câmbio pela PPC no final", "num": True},
-                            {"rot": "Câmbio observado no final", "num": True}, {"rot": "Desvio", "num": True}],
+                            {"rot": "PPC no início", "num": True},
+                            {"rot": "Sobre/(sub)valorização no início", "num": True},
+                            {"rot": "No final", "num": True}, {"rot": "Variação", "num": True}],
                    linhas=linhas_ppc)
     secoes.append(dict(titulo="Bônus: câmbio pela PPC", texto="", graficos=[ppc_g, ppc_tab]))
 
@@ -662,8 +875,8 @@ def montar():
             linhas.append([{"t": nome_ind, "forte": True}, {"t": l[2]["t"]}, {"t": l[3]["t"]},
                            {"t": l[4]["t"], "forte": True}])
         lp = linhas_ppc[k]
-        linhas.append([{"t": "Câmbio pela PPC desde a posse", "forte": True}, {"t": lp[2]["t"]}, {"t": lp[3]["t"]},
-                       {"t": "desvio " + lp[5]["t"], "forte": True}])
+        linhas.append([{"t": "Sobre/(sub)valorização do real pela PPC", "forte": True}, {"t": lp[4]["t"]},
+                       {"t": lp[5]["t"]}, {"t": lp[6]["t"], "forte": True}])
         for aid in ("sp", "moodys", "fitch"):
             a, b, ate = nota_dia(rat[aid], mi)
             linhas.append([{"t": "Rating " + rat[aid]["nome"], "forte": True},
@@ -688,11 +901,11 @@ def montar():
                fonte="BCB, IBGE, BLS, Moody's, S&P, Fitch e FtM; fotos: Agência Brasil, Palácio do Planalto, FMI, "
                      "Ministério da Fazenda, Ministério da Indústria e Governo de SP (Wikimedia Commons)",
                referencia=ultimo, atualizado=hoje.isoformat(), formato="artigo", secoes=secoes)
-    return doc, mins, INDS, rat, trechos, cambio_m
+    return doc, mins, INDS, rat, cambio_m
 
 
 def main():
-    doc, mins, inds, rat, trechos, cambio_m = montar()
+    doc, mins, inds, rat, cambio_m = montar()
     print("\nministros e meses:")
     for m in mins:
         print("  %-20s %s a %s (base %s)" % (m["nome"], m["de"], m["ate"], m["base"]))
