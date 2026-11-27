@@ -591,7 +591,7 @@ def montar():
         ppc_series.append(serie("Câmbio pela PPC desde a posse", s, 4, ini=mi["base"], cor=AZUL,
                                 legenda=(k == 0), ministro=mi["id"]))
     ppc_g = dict(id="ministros-cambio-ppc", titulo="Câmbio observado e câmbio pela PPC desde a posse",
-                 subtitulo="R$ por US$, fim do mês; PPC: câmbio do mês anterior ao do ministro corrigido pelo IPCA sobre o CPI dos EUA; clique na foto para ver só o ministro",
+                 subtitulo="R$ por US$, fim do mês; PPC: câmbio do mês anterior ao do ministro corrigido pelo IPCA sobre o CPI dos EUA",
                  unidade="brl", fonte="BCB (PTAX, SGS 1; IPCA, SGS 433), BLS (CPI-U, via FRED) e FtM",
                  ministros=fx, presidentes=pres_fx, apresentarDaqui=True, series=ppc_series)
     linhas_ppc = []
