@@ -1224,7 +1224,7 @@ def montar():
     secoes.append(dict(titulo="Levy × Trabuco", texto="", graficos=[levy_trabuco(
         mins, INDS, desvio_ppc, pct2, pp, r12, d12)]))
     secoes.append(dict(titulo="Médias no mandato", texto="", graficos=[res_tab]))
-    secoes.append(dict(titulo="Tabela por ministro", texto="", graficos=por_min))
+    # a seção "Tabela por ministro" saiu da página (pedido dele); por_min fica montado, fora do JSON
     # pedido dele: um espaço só para o Levy, semana a semana
     secoes.append(secao_semana(next(m for m in mins if m["id"] == "levy"), cambio_d, selic_d, divida))
 
