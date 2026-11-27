@@ -824,6 +824,10 @@ def montar():
                 "BCB (NFSP, SGS %s; IPCA, SGS 433) e FtM" % ("4649" if ind["id"] == "primario" else "4583")))
         if ind["id"] == "divida":
             gc = json.loads(json.dumps({k: v for k, v in cond.items() if k not in ("id", "selecao")}))
+            # só "Em 12 meses" e "No ano" (pedido dele: sem o de 4 anos)
+            gc["variantes"] = [v for v in gc["variantes"] if v["rot"] in ("Em 12 meses", "No ano")]
+            if len(gc["variantes"]) != 2:
+                raise RuntimeError("condicionantes: faltam as variantes Em 12 meses e No ano no FtM Dados")
             for var_c in gc["variantes"]:
                 for se in var_c["series"]:
                     se["cor"] = CORES_CONDICIONANTES[se["nome"]]
